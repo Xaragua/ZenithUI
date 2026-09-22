@@ -1,0 +1,232 @@
+@namespace ZenithUI
+
+@inherits ZenComponentBase
+
+@*
+    The library's action control. Renders a <button>, or an <a> when Href is set.
+
+    Three details that are easy to get wrong and expensive to get wrong:
+
+    1. `type` defaults to "button". An HTML <button> inside a <form> defaults to type="submit",
+       so a "Cancel" button with no explicit type submits the form. Opting into submission is
+       the safer default.
+
+    2. A disabled link is not a thing in HTML - the browser follows an <a href> regardless. So
+       when Href is set and Disabled is true, the href is dropped entirely and aria-disabled
+       carries the state, rather than rendering a link that looks dead and still navigates.
+
+    3. While loading, the label stays in the DOM at zero opacity rather than being replaced by the
+       spinner. Swapping the content would make the button resize mid-click, moving the target out
+       from under the pointer.
+*@
+
+@if (IsLink)
+{
+    <a class="@RootClass(ButtonClass)"
+       style="@Style"
+       href="@(Inert ? null : Href)"
+       target="@Target"
+       rel="@ResolvedRel"
+       role="@(Inert ? "link" : null)"
+       aria-label="@AriaLabel"
+       aria-disabled="@(Inert ? "true" : null)"
+       aria-busy="@(Loading ? "true" : null)"
+       tabindex="@(Inert ? "-1" : null)"
+       @attributes="AttributesWithoutClass">
+        @Inner
+    </a>
+}
+else
+{
+    <button class="@RootClass(ButtonClass)"
+            style="@Style"
+            type="@ButtonType"
+            aria-label="@AriaLabel"
+            disabled="@Inert"
+            aria-busy="@(Loading ? "true" : null)"
+            @onclick="HandleClickAsync"
+            @attributes="AttributesWithoutClass">
+        @Inner
+    </button>
+}
+
+@code {
+    /// <summary>Button label.</summary>
+    [Parameter]
+    public RenderFragment? ChildContent { get; set; }
+
+    /// <summary>Semantic colour role.</summary>
+    [Parameter]
+    public ZenIntent Intent { get; set; } = ZenIntent.Neutral;
+
+    /// <summary>Visual weight.</summary>
+    [Parameter]
+    public ZenVariant Variant { get; set; } = ZenVariant.Solid;
+
+    /// <summary>Control size.</summary>
+    [Parameter]
+    public ZenSize Size { get; set; } = ZenSize.Medium;
+
+    /// <summary>
+    /// Renders an anchor instead of a button. Use it for navigation; a control that changes the
+    /// current page should be a link so that middle-click, copy-link and open-in-new-tab work.
+    /// </summary>
+    [Parameter]
+    public string? Href { get; set; }
+
+    /// <summary>Anchor target, for example <c>"_blank"</c>. Only meaningful with <see cref="Href"/>.</summary>
+    [Parameter]
+    public string? Target { get; set; }
+
+    /// <summary>
+    /// Anchor <c>rel</c>. Defaults to <c>"noopener noreferrer"</c> when <see cref="Target"/> is
+    /// <c>"_blank"</c>, which stops the opened page from reaching back through <c>window.opener</c>.
+    /// </summary>
+    [Parameter]
+    public string? Rel { get; set; }
+
+    /// <summary>
+    /// The <c>type</c> attribute. Defaults to <c>"button"</c> so a button inside a form does not
+    /// submit it by accident; set <c>"submit"</c> explicitly on the one that should.
+    /// </summary>
+    [Parameter]
+    public string ButtonType { get; set; } = "button";
+
+    /// <summary>Disables the control.</summary>
+    [Parameter]
+    public bool Disabled { get; set; }
+
+    /// <summary>
+    /// Shows a spinner and blocks interaction. The label stays in place so the button does not
+    /// change size mid-click.
+    /// </summary>
+    [Parameter]
+    public bool Loading { get; set; }
+
+    /// <summary>Leading icon markup, typically a <see cref="ZenIcons"/> constant.</summary>
+    [Parameter]
+    public string? Icon { get; set; }
+
+    /// <summary>Trailing icon markup.</summary>
+    [Parameter]
+    public string? TrailingIcon { get; set; }
+
+    /// <summary>
+    /// Square icon-only button. Requires <see cref="AriaLabel"/>, since there is no visible text
+    /// to name the control.
+    /// </summary>
+    [Parameter]
+    public bool IconOnly { get; set; }
+
+    /// <summary>Accessible name. Required when <see cref="IconOnly"/> is set.</summary>
+    [Parameter]
+    public string? AriaLabel { get; set; }
+
+    /// <summary>Stretches the button to its container's width.</summary>
+    [Parameter]
+    public bool FullWidth { get; set; }
+
+    /// <summary>Click handler. Not invoked while disabled or loading.</summary>
+    [Parameter]
+    public EventCallback<MouseEventArgs> OnClick { get; set; }
+
+    private bool IsLink => !string.IsNullOrEmpty(Href);
+
+    /// <summary>Disabled or loading - either way the control must not act.</summary>
+    private bool Inert => Disabled || Loading;
+
+    private string? ResolvedRel =>
+        Rel ?? (Target == "_blank" ? "noopener noreferrer" : null);
+
+    private Task HandleClickAsync(MouseEventArgs args)
+    {
+        // A disabled <button> will not fire this, but a Loading one is not disabled at the DOM
+        // level in every path, and belt-and-braces here costs nothing.
+        if (Inert)
+        {
+            return Task.CompletedTask;
+        }
+
+        return OnClick.InvokeAsync(args);
+    }
+
+    private RenderFragment Inner => builder =>
+    {
+        var seq = 0;
+
+        if (Loading)
+        {
+            builder.OpenElement(seq++, "span");
+            builder.AddAttribute(seq++, "class", "absolute inline-flex");
+            builder.OpenComponent<ZenSpinner>(seq++);
+            builder.AddComponentParameter(seq++, nameof(ZenSpinner.Size), Size);
+            // The button already carries aria-busy; a second announcement would be noise.
+            builder.AddComponentParameter(seq++, nameof(ZenSpinner.Label), string.Empty);
+            builder.CloseComponent();
+            builder.CloseElement();
+        }
+
+        // Content is wrapped so the whole group can be faded as one unit while loading, keeping
+        // the button's measured size identical.
+        builder.OpenElement(seq++, "span");
+        builder.AddAttribute(seq++, "class", ContentClass);
+
+        if (Icon is not null)
+        {
+            builder.OpenComponent<ZenIcon>(seq++);
+            builder.AddComponentParameter(seq++, nameof(ZenIcon.Path), Icon);
+            builder.AddComponentParameter(seq++, nameof(ZenIcon.Size), Size);
+            builder.CloseComponent();
+        }
+
+        if (ChildContent is not null)
+        {
+            builder.AddContent(seq++, ChildContent);
+        }
+
+        if (TrailingIcon is not null)
+        {
+            builder.OpenComponent<ZenIcon>(seq++);
+            builder.AddComponentParameter(seq++, nameof(ZenIcon.Path), TrailingIcon);
+            builder.AddComponentParameter(seq++, nameof(ZenIcon.Size), Size);
+            builder.CloseComponent();
+        }
+
+        builder.CloseElement();
+    };
+
+    private string ContentClass => CssBuilder
+        .Default("inline-flex items-center")
+        .AddClass(Size switch
+        {
+            ZenSize.Small => "gap-1.5",
+            ZenSize.Large => "gap-2.5",
+            _ => "gap-2",
+        })
+        .AddClass("opacity-0", Loading)
+        .Build()!;
+
+    private string ButtonClass => CssBuilder
+        .Default(ZenStyles.InteractiveBase)
+        .AddClass("relative")
+        .AddClass(ZenStyles.Variant(Intent, Variant))
+        .AddClass(ZenStyles.ControlRadius(Size))
+        .AddClass(IconOnly ? ZenStyles.SquareControlSize(Size) : ZenStyles.ControlSize(Size))
+        .AddClass("w-full", FullWidth)
+        .AddClass("cursor-wait", Loading)
+        .Build()!;
+
+    protected override void OnParametersSet()
+    {
+        // An icon-only button with no accessible name is announced as just "button". This is a
+        // development-time mistake with no runtime recovery, so it fails loudly rather than
+        // shipping a control no screen reader user can identify.
+        if (IconOnly && string.IsNullOrWhiteSpace(AriaLabel)
+            && (AdditionalAttributes is null || !AdditionalAttributes.ContainsKey("aria-label")))
+        {
+            throw new InvalidOperationException(
+                $"{nameof(ZenButton)}: {nameof(IconOnly)} requires {nameof(AriaLabel)}. Without a " +
+                "visible label there is nothing else to name the control.");
+        }
+    }
+}

@@ -1,0 +1,200 @@
+@namespace ZenithUI
+
+@inherits ZenComponentBase
+
+@*
+    A bounded surface with optional header, footer and action slots.
+
+    Note the element choice: a card renders as <article> by default, not <div>. A card is nearly
+    always a self-contained piece of content, which is exactly what <article> means, and it gives
+    screen reader users a landmark to navigate by for free. Set Element to override.
+
+    When Href is set the whole card becomes a link. That is a deliberate constraint rather than an
+    oversight: nesting interactive controls inside a linked card produces invalid HTML and a
+    genuinely broken experience (the inner button is unreachable by keyboard in some browsers, and
+    click targets overlap). If a card needs both a primary navigation and its own buttons, leave
+    Href unset and put a ZenButton in the Actions slot.
+*@
+
+@if (IsLink)
+{
+    <a class="@RootClass(CardClass)" style="@Style" href="@Href" @attributes="AttributesWithoutClass">
+        @Body
+    </a>
+}
+else
+{
+    @* Razor markup cannot take a dynamic element name, so the root is built by hand. *@
+    @Root
+}
+
+@code {
+    /// <summary>Main card content.</summary>
+    [Parameter]
+    public RenderFragment? ChildContent { get; set; }
+
+    /// <summary>
+    /// Header content, separated from the body by a rule. Rendered alongside
+    /// <see cref="Actions"/> on the same row.
+    /// </summary>
+    [Parameter]
+    public RenderFragment? Header { get; set; }
+
+    /// <summary>Controls aligned to the end of the header row.</summary>
+    [Parameter]
+    public RenderFragment? Actions { get; set; }
+
+    /// <summary>Footer content, separated from the body by a rule.</summary>
+    [Parameter]
+    public RenderFragment? Footer { get; set; }
+
+    /// <summary>Convenience heading rendered inside the header when <see cref="Header"/> is not set.</summary>
+    [Parameter]
+    public string? Title { get; set; }
+
+    /// <summary>Secondary line under <see cref="Title"/>.</summary>
+    [Parameter]
+    public string? Subtitle { get; set; }
+
+    /// <summary>
+    /// Heading level used for <see cref="Title"/>. Pick the one that fits the page outline -
+    /// a card's title is rarely an <c>h2</c> just because it is a card.
+    /// </summary>
+    [Parameter]
+    public int TitleLevel { get; set; } = 3;
+
+    /// <summary>Root element name. Defaults to <c>article</c>.</summary>
+    [Parameter]
+    public string Element { get; set; } = "article";
+
+    /// <summary>Turns the entire card into a link. Do not combine with interactive content inside.</summary>
+    [Parameter]
+    public string? Href { get; set; }
+
+    /// <summary>Shadow depth.</summary>
+    [Parameter]
+    public ZenElevation Elevation { get; set; } = ZenElevation.Low;
+
+    /// <summary>Internal padding applied to the body and to the header and footer rows.</summary>
+    [Parameter]
+    public ZenSize Padding { get; set; } = ZenSize.Medium;
+
+    /// <summary>Draws the outer border. Off suits a card sitting on an already-bounded surface.</summary>
+    [Parameter]
+    public bool Bordered { get; set; } = true;
+
+    /// <summary>
+    /// Removes the body padding, for a card whose content manages its own insets - a table or an
+    /// edge-to-edge image.
+    /// </summary>
+    [Parameter]
+    public bool Flush { get; set; }
+
+    private bool IsLink => !string.IsNullOrEmpty(Href);
+
+    private bool HasHeader => Header is not null || Actions is not null || Title is not null;
+
+    private string PaddingClass => Padding switch
+    {
+        ZenSize.Small => "p-3",
+        ZenSize.Large => "p-6",
+        _ => "p-5",
+    };
+
+    private string InlinePaddingClass => Padding switch
+    {
+        ZenSize.Small => "px-3 py-2",
+        ZenSize.Large => "px-6 py-4",
+        _ => "px-5 py-3",
+    };
+
+    private string CardClass => CssBuilder
+        .Default("block overflow-hidden rounded-zen-lg bg-surface-raised text-content")
+        .AddClass("border border-border", Bordered)
+        .AddClass(Elevation switch
+        {
+            ZenElevation.None => null,
+            ZenElevation.Medium => "shadow-zen-md",
+            ZenElevation.High => "shadow-zen-lg",
+            _ => "shadow-zen-sm",
+        })
+        .AddClass("zen-focus transition-colors hover:bg-surface-sunken", IsLink)
+        .Build()!;
+
+    private RenderFragment Root => builder =>
+    {
+        builder.OpenElement(0, Element);
+        builder.AddAttribute(1, "class", RootClass(CardClass));
+        builder.AddAttribute(2, "style", Style);
+        builder.AddMultipleAttributes(3, AttributesWithoutClass);
+        builder.AddContent(4, Body);
+        builder.CloseElement();
+    };
+
+    private RenderFragment Body => builder =>
+    {
+        var seq = 0;
+
+        if (HasHeader)
+        {
+            builder.OpenElement(seq++, "div");
+            builder.AddAttribute(seq++, "class", $"flex items-start justify-between gap-3 border-b border-border {InlinePaddingClass}");
+
+            builder.OpenElement(seq++, "div");
+            builder.AddAttribute(seq++, "class", "min-w-0");
+
+            if (Header is not null)
+            {
+                builder.AddContent(seq++, Header);
+            }
+            else
+            {
+                if (Title is not null)
+                {
+                    builder.OpenElement(seq++, HeadingTag);
+                    builder.AddAttribute(seq++, "class", "truncate text-sm font-semibold");
+                    builder.AddContent(seq++, Title);
+                    builder.CloseElement();
+                }
+
+                if (Subtitle is not null)
+                {
+                    builder.OpenElement(seq++, "p");
+                    builder.AddAttribute(seq++, "class", "mt-0.5 text-sm text-content-muted");
+                    builder.AddContent(seq++, Subtitle);
+                    builder.CloseElement();
+                }
+            }
+
+            builder.CloseElement();
+
+            if (Actions is not null)
+            {
+                builder.OpenElement(seq++, "div");
+                builder.AddAttribute(seq++, "class", "flex shrink-0 items-center gap-2");
+                builder.AddContent(seq++, Actions);
+                builder.CloseElement();
+            }
+
+            builder.CloseElement();
+        }
+
+        if (ChildContent is not null)
+        {
+            builder.OpenElement(seq++, "div");
+            builder.AddAttribute(seq++, "class", Flush ? null : PaddingClass);
+            builder.AddContent(seq++, ChildContent);
+            builder.CloseElement();
+        }
+
+        if (Footer is not null)
+        {
+            builder.OpenElement(seq++, "div");
+            builder.AddAttribute(seq++, "class", $"border-t border-border bg-surface-sunken {InlinePaddingClass}");
+            builder.AddContent(seq++, Footer);
+            builder.CloseElement();
+        }
+    };
+
+    private string HeadingTag => $"h{Math.Clamp(TitleLevel, 1, 6)}";
+}

@@ -1,0 +1,181 @@
+@namespace ZenithUI
+
+@inherits ZenComponentBase
+
+@*
+    A KPI tile: a label, a large value, and an optional change indicator.
+
+    Two accessibility points that matter more here than they look:
+
+    1. The value is marked up as a <dl>/<dt>/<dd> pair, not two <div>s. The association between
+       "Revenue" and "$48,120" is the entire content of this component; a description list is the
+       markup that states it.
+
+    2. Trend direction is never carried by colour alone. Green-up/red-down is invisible to a
+       significant share of users, so the arrow glyph and a screen-reader-only word ("increased" /
+       "decreased") carry it too.
+*@
+
+<ZenCard Class="@Class"
+         Style="@Style"
+         Elevation="Elevation"
+         Bordered="Bordered"
+         Href="@Href"
+         Flush="true"
+         @attributes="AttributesWithoutClass">
+    <div class="@PaddingClass">
+        <div class="flex items-start justify-between gap-3">
+            <dl class="min-w-0">
+                <dt class="truncate text-xs font-semibold uppercase tracking-wide text-content-subtle">
+                    @Label
+                </dt>
+                <dd class="mt-1.5 text-2xl font-bold tabular-nums text-content">
+                    @if (Loading)
+                    {
+                        <ZenSkeleton Width="5rem" Height="1.75rem" />
+                    }
+                    else
+                    {
+                        @Value
+                    }
+                </dd>
+            </dl>
+
+            @if (Icon is not null)
+            {
+                <span class="@IconTileClass">
+                    <ZenIcon Path="@Icon" Size="ZenSize.Medium" />
+                </span>
+            }
+        </div>
+
+        @if (Trend != ZenTrend.None && !Loading)
+        {
+            <p class="mt-3 flex items-center gap-1.5 text-sm">
+                <span class="@TrendClass">
+                    <ZenIcon Path="@TrendIcon" Size="ZenSize.Small" class="size-3.5" />
+                    <span class="zen-sr-only">@TrendDescription</span>
+                    <span class="font-medium tabular-nums">@Delta</span>
+                </span>
+
+                @if (Comparison is not null)
+                {
+                    <span class="text-content-muted">@Comparison</span>
+                }
+            </p>
+        }
+
+        @if (ChildContent is not null)
+        {
+            <div class="mt-3">@ChildContent</div>
+        }
+    </div>
+</ZenCard>
+
+@code {
+    /// <summary>What is being measured, for example <c>"Revenue"</c>.</summary>
+    [Parameter, EditorRequired]
+    public string Label { get; set; } = string.Empty;
+
+    /// <summary>The measurement itself, already formatted for display.</summary>
+    [Parameter]
+    public string? Value { get; set; }
+
+    /// <summary>The change, already formatted, for example <c>"12.4%"</c>.</summary>
+    [Parameter]
+    public string? Delta { get; set; }
+
+    /// <summary>
+    /// Direction of change. Drives the arrow glyph, the colour, and the screen-reader wording.
+    /// </summary>
+    [Parameter]
+    public ZenTrend Trend { get; set; } = ZenTrend.None;
+
+    /// <summary>
+    /// Whether a rising value is good. Inverted for metrics like churn or error rate, where up is
+    /// bad - the arrow still points up, but it is coloured as a problem.
+    /// </summary>
+    [Parameter]
+    public bool HigherIsBetter { get; set; } = true;
+
+    /// <summary>What the delta is measured against, for example <c>"vs. last month"</c>.</summary>
+    [Parameter]
+    public string? Comparison { get; set; }
+
+    /// <summary>Optional icon markup shown in a tinted tile.</summary>
+    [Parameter]
+    public string? Icon { get; set; }
+
+    /// <summary>Colour role for the icon tile.</summary>
+    [Parameter]
+    public ZenIntent Intent { get; set; } = ZenIntent.Neutral;
+
+    /// <summary>Replaces the value with a placeholder and hides the trend.</summary>
+    [Parameter]
+    public bool Loading { get; set; }
+
+    /// <summary>Turns the whole tile into a link to a detail view.</summary>
+    [Parameter]
+    public string? Href { get; set; }
+
+    /// <summary>Shadow depth, forwarded to the underlying card.</summary>
+    [Parameter]
+    public ZenElevation Elevation { get; set; } = ZenElevation.Low;
+
+    /// <summary>Draws the card border.</summary>
+    [Parameter]
+    public bool Bordered { get; set; } = true;
+
+    /// <summary>Internal padding.</summary>
+    [Parameter]
+    public ZenSize Padding { get; set; } = ZenSize.Medium;
+
+    /// <summary>Extra content below the trend line - a sparkline, a secondary figure.</summary>
+    [Parameter]
+    public RenderFragment? ChildContent { get; set; }
+
+    private string PaddingClass => Padding switch
+    {
+        ZenSize.Small => "p-3",
+        ZenSize.Large => "p-6",
+        _ => "p-5",
+    };
+
+    private string IconTileClass => CssBuilder
+        .Default("grid shrink-0 place-items-center rounded-zen-md p-2")
+        .AddClass(ZenStyles.SoftSurface(Intent))
+        .AddClass(ZenStyles.Foreground(Intent))
+        .Build()!;
+
+    private string TrendIcon => Trend switch
+    {
+        ZenTrend.Up => ZenIcons.TrendUp,
+        ZenTrend.Down => ZenIcons.TrendDown,
+        _ => ZenIcons.TrendFlat,
+    };
+
+    /// <summary>
+    /// Whether this movement should read as good or bad. Direction and sentiment are separate:
+    /// churn rising is an upward arrow and a bad outcome.
+    /// </summary>
+    private ZenIntent TrendIntent => Trend switch
+    {
+        ZenTrend.Up => HigherIsBetter ? ZenIntent.Success : ZenIntent.Danger,
+        ZenTrend.Down => HigherIsBetter ? ZenIntent.Danger : ZenIntent.Success,
+        _ => ZenIntent.Neutral,
+    };
+
+    private string TrendClass => CssBuilder
+        .Default("inline-flex items-center gap-1")
+        .AddClass(ZenStyles.Foreground(TrendIntent))
+        .AddClass("text-content-muted", TrendIntent == ZenIntent.Neutral)
+        .Build()!;
+
+    // Announced instead of the arrow, which a screen reader would otherwise skip silently.
+    private string TrendDescription => Trend switch
+    {
+        ZenTrend.Up => "Increased by",
+        ZenTrend.Down => "Decreased by",
+        _ => "Unchanged at",
+    };
+}

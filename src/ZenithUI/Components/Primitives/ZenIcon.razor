@@ -1,0 +1,71 @@
+@namespace ZenithUI
+
+@inherits ZenComponentBase
+
+@*
+    An inline SVG wrapper. Supply either `Path` (raw inner markup, e.g. one of the ZenIcons
+    constants) or `ChildContent` for arbitrary SVG.
+
+    The library forces no icon font on consumers, which is why this takes markup rather than a
+    name from a fixed set. ZenIcons exists only for the handful of glyphs ZenithUI's own
+    components need.
+
+    Accessibility: decorative by default. An icon sitting next to its own label - which is the
+    common case - must be hidden from assistive technology, or a screen reader announces the label
+    twice. Give it a Title only when the icon is the sole carrier of meaning.
+*@
+
+<svg class="@RootClass(IconClass)"
+     style="@Style"
+     viewBox="0 0 24 24"
+     fill="none"
+     stroke="currentColor"
+     stroke-width="@StrokeWidth"
+     stroke-linecap="round"
+     stroke-linejoin="round"
+     role="@(Title is null ? null : "img")"
+     aria-hidden="@(Title is null ? "true" : null)"
+     aria-label="@Title"
+     @attributes="AttributesWithoutClass">
+    @if (Path is not null)
+    {
+        @((MarkupString)Path)
+    }
+    @ChildContent
+</svg>
+
+@code {
+    /// <summary>
+    /// Raw inner SVG markup drawn on a 24x24 grid, typically a <see cref="ZenIcons"/> constant.
+    /// </summary>
+    /// <remarks>
+    /// Rendered as a <see cref="MarkupString"/>, so it is inserted without encoding. Pass only
+    /// markup you control - never a value that originated from user input.
+    /// </remarks>
+    [Parameter]
+    public string? Path { get; set; }
+
+    /// <summary>Arbitrary SVG content, rendered after <see cref="Path"/>.</summary>
+    [Parameter]
+    public RenderFragment? ChildContent { get; set; }
+
+    /// <summary>Icon size. Matches the control sizes used across the library.</summary>
+    [Parameter]
+    public ZenSize Size { get; set; } = ZenSize.Medium;
+
+    /// <summary>
+    /// Accessible name. Supply this only when the icon carries meaning no adjacent text conveys;
+    /// leaving it null marks the icon decorative and hides it from assistive technology.
+    /// </summary>
+    [Parameter]
+    public string? Title { get; set; }
+
+    /// <summary>Stroke width. Raise it slightly for very small sizes on low-DPI displays.</summary>
+    [Parameter]
+    public double StrokeWidth { get; set; } = 1.75;
+
+    private string IconClass => CssBuilder
+        .Default(ZenStyles.IconSize(Size))
+        .AddClass("shrink-0")
+        .Build()!;
+}

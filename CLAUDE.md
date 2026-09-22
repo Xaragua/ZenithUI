@@ -21,7 +21,10 @@ Non-documentation files keep their conventional locations: `LICENSE`, `.gitignor
 - Never write `dark:` variants. The palette swaps through custom properties so that statically
   rendered markup repaints without a class change.
 - Never declare `@rendermode` inside `src/ZenithUI`. The consuming application decides.
-- Every component folder needs a `_Imports.razor` containing `@namespace ZenithUI`.
+- Every component `.razor` file starts with `@namespace ZenithUI`. Do **not** put that directive in
+  a folder-level `_Imports.razor`: two such files both generate a `ZenithUI._Imports` class and the
+  build fails with `CS0111`. Shared `@using` directives live in `Components/_Imports.razor`, which
+  deliberately has no `@namespace`.
 - Guard all JS interop behind `RendererInfo.IsInteractive`, in `OnAfterRenderAsync` only.
 
 See [`docs/plan.md`](docs/plan.md) for the reasoning behind each of these.

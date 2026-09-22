@@ -60,6 +60,51 @@ public enum ZenVariant
     Ghost,
 }
 
+/// <summary>Shadow depth, suggesting how far a surface sits above the page.</summary>
+public enum ZenElevation
+{
+    /// <summary>Flat. Relies on border and background alone.</summary>
+    None,
+
+    /// <summary>A hairline shadow. The default for cards.</summary>
+    Low,
+
+    /// <summary>A visible lift, for surfaces that float over content.</summary>
+    Medium,
+
+    /// <summary>A pronounced lift, for overlays, popovers and drawers.</summary>
+    High,
+}
+
+/// <summary>Silhouette drawn by a loading placeholder.</summary>
+public enum ZenSkeletonShape
+{
+    /// <summary>A short bar at text height. Multiple lines render the last one short.</summary>
+    Text,
+
+    /// <summary>A circle, for avatars and icon placeholders.</summary>
+    Circle,
+
+    /// <summary>A large block, for images, cards and chart areas.</summary>
+    Rectangle,
+}
+
+/// <summary>Direction of change shown by a stat card's delta.</summary>
+public enum ZenTrend
+{
+    /// <summary>No delta shown.</summary>
+    None,
+
+    /// <summary>Value rose.</summary>
+    Up,
+
+    /// <summary>Value fell.</summary>
+    Down,
+
+    /// <summary>Value held steady.</summary>
+    Flat,
+}
+
 /// <summary>The theme a user can choose.</summary>
 public enum ZenThemeMode
 {

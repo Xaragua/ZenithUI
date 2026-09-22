@@ -1,0 +1,74 @@
+@namespace ZenithUI
+
+@inherits ZenComponentBase
+
+@*
+    An indeterminate loading indicator.
+
+    Accessibility: a spinner with no accessible name is a silent element to a screen reader - the
+    page simply appears to stop. `role="status"` with a Label announces politely, without stealing
+    focus or interrupting. When a spinner sits inside a control that already announces its busy
+    state (ZenButton sets aria-busy), pass Label="" to suppress the duplicate.
+*@
+
+<span class="@RootClass(WrapperClass)"
+      style="@Style"
+      role="@(HasLabel ? "status" : null)"
+      aria-hidden="@(HasLabel ? null : "true")"
+      @attributes="AttributesWithoutClass">
+    <svg class="@SpinnerClass"
+         viewBox="0 0 24 24"
+         fill="none"
+         stroke="currentColor"
+         stroke-width="2.25"
+         stroke-linecap="round"
+         aria-hidden="true">
+        @* A three-quarter arc, not a ring: a full circle looks motionless while it rotates. *@
+        @((MarkupString)ZenIcons.Spinner)
+    </svg>
+
+    @if (HasLabel)
+    {
+        <span class="@(ShowLabel ? LabelClass : "zen-sr-only")">@Label</span>
+    }
+</span>
+
+@code {
+    /// <summary>Spinner size.</summary>
+    [Parameter]
+    public ZenSize Size { get; set; } = ZenSize.Medium;
+
+    /// <summary>
+    /// Accessible status text. Set to an empty string when an ancestor already announces the busy
+    /// state, to avoid a screen reader saying it twice.
+    /// </summary>
+    [Parameter]
+    public string? Label { get; set; } = "Loading";
+
+    /// <summary>Render <see cref="Label"/> visibly next to the spinner instead of only to screen readers.</summary>
+    [Parameter]
+    public bool ShowLabel { get; set; }
+
+    /// <summary>Colour role. Defaults to inheriting the surrounding text colour.</summary>
+    [Parameter]
+    public ZenIntent Intent { get; set; } = ZenIntent.Neutral;
+
+    private bool HasLabel => !string.IsNullOrEmpty(Label);
+
+    private string WrapperClass => CssBuilder
+        .Default("inline-flex items-center gap-2")
+        .AddClass(ZenStyles.Foreground(Intent), Intent != ZenIntent.Neutral)
+        .Build()!;
+
+    private string SpinnerClass => CssBuilder
+        .Default("animate-spin")
+        .AddClass(ZenStyles.IconSize(Size))
+        .Build()!;
+
+    private string LabelClass => Size switch
+    {
+        ZenSize.Small => "text-xs",
+        ZenSize.Large => "text-base",
+        _ => "text-sm",
+    };
+}

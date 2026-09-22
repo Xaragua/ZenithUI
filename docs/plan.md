@@ -1,6 +1,6 @@
 # ZenithUI — implementation plan
 
-> **Status:** M0 complete (2026-09-22). M1 not started.
+> **Status:** M0 and M1 complete (2026-09-22). M2 not started.
 > This is the plan of record. It is kept current: where implementation contradicted the original
 > plan, the plan was corrected and the change noted under [Deviations](#deviations-from-the-original-plan).
 
@@ -101,7 +101,7 @@ c:\code\2026\ZenithUI\
     Core/                         ZenComponentBase, ZenJsComponentBase, CssBuilder, enums
     Services/                     IZenThemeService + implementation
     Extensions/                   AddZenithUI()
-    Components/<Category>/*.razor + a _Imports.razor per folder (see below)
+    Components/<Category>/*.razor each opening with @namespace ZenithUI (see below)
     wwwroot/                      GENERATED css + js/
   samples/ZenithUI.Demo/          Blazor Web App host
   samples/ZenithUI.Demo.Client/   WebAssembly half — proves render-mode agnosticism
@@ -110,12 +110,16 @@ c:\code\2026\ZenithUI\
 
 ### Namespace convention
 
-Every component folder carries a `_Imports.razor` containing `@namespace ZenithUI`, which flattens
-all components into one namespace so consumers need exactly one `@using`.
+Every component `.razor` file opens with `@namespace ZenithUI`, which flattens all components into
+one namespace so consumers need exactly one `@using` and folders stay free to move.
 
-The shared using directives live in `Components/_Imports.razor`, deliberately **not** at the project
-root: a root `_Imports.razor` generates its class as `ZenithUI._Imports`, colliding with the
-folder-level files that declare `@namespace ZenithUI`.
+The directive goes in each **file**, not in a folder-level `_Imports.razor`. Razor generates a class
+per `_Imports.razor`, so two folders both declaring `@namespace ZenithUI` produce two
+`ZenithUI._Imports` classes and the build fails with `CS0111`. The convention only looks like it
+works while the library has a single component folder.
+
+Shared `@using` directives live in `Components/_Imports.razor`, which has no `@namespace` of its own
+and therefore generates the unique `ZenithUI.Components._Imports`.
 
 ---
 
@@ -305,7 +309,7 @@ component's bUnit test asserts its required ARIA attributes.
 | # | Scope | Done when | Status |
 | --- | --- | --- | --- |
 | **M0** | Repo scaffold, Tailwind v4 pipeline, tokens, theme service/provider/toggle, `ZenComponentBase`, `ZenJsComponentBase`, `CssBuilder`, demo, tests, CI | Demo runs; light/dark/system repaints via CSS variables alone; CI green | ✅ |
-| **M1** | `ZenIcon`, `ZenButton`, `ZenBadge`, `ZenSpinner`, `ZenSkeleton`, `ZenCard`, `ZenStatCard`, `ZenField`, `ZenInputBase<T>` | A demo page per primitive, verified in both palettes | |
+| **M1** | `ZenIcon`, `ZenButton`, `ZenBadge`, `ZenSpinner`, `ZenSkeleton`, `ZenCard`, `ZenStatCard`, `ZenField`, `ZenInputBase<T>` | A demo page per primitive, verified in both palettes | ✅ |
 | **M2** | Text, textarea, number, currency, date, search, checkbox (+group), radio group, native select, `ZenForm` | A demo form binds an `EditForm` + `DataAnnotationsValidator` and shows per-field errors; the same inputs also work **without** an `EditForm` | |
 | **M3** | `ZenPopover`, `ZenCombobox<TItem>`, `ZenList<TItem>` | Combobox passes keyboard + ARIA tests; prerenders as a closed labelled field with JS disabled | |
 | **M4** | `ZenTable<TItem>` (sort/page/select/hierarchy/responsive collapse), `ZenTree<TItem>`, `ZenTimeline` | Demo renders a 3-level hierarchical table and a lazy-loading tree | |

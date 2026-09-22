@@ -1,0 +1,104 @@
+@namespace ZenithUI
+
+@inherits ZenComponentBase
+
+@*
+    A placeholder block for content that has not loaded yet.
+
+    Accessibility: always aria-hidden. A skeleton is a picture of absent content - announcing it
+    tells a screen reader user nothing except that some shapes exist. Put the accessible status on
+    the region that is loading (aria-busy, or a ZenSpinner with a label), not on the shapes.
+*@
+
+@if (Shape == ZenSkeletonShape.Text && Lines > 1)
+{
+    <div class="@RootClass("flex flex-col gap-2")" style="@Style" aria-hidden="true" @attributes="AttributesWithoutClass">
+        @for (var i = 0; i < Lines; i++)
+        {
+            @* The last line is short. Uniform-length lines read as a table, not as prose. *@
+            <span class="@LineClass" style="@LineStyle(i)"></span>
+        }
+    </div>
+}
+else
+{
+    <span class="@RootClass(ShapeClass)" style="@CombinedStyle" aria-hidden="true" @attributes="AttributesWithoutClass"></span>
+}
+
+@code {
+    /// <summary>The silhouette to draw.</summary>
+    [Parameter]
+    public ZenSkeletonShape Shape { get; set; } = ZenSkeletonShape.Text;
+
+    /// <summary>
+    /// Number of text lines. Only meaningful for <see cref="ZenSkeletonShape.Text"/>; the last
+    /// line is rendered short so the block reads as prose rather than as a table.
+    /// </summary>
+    [Parameter]
+    public int Lines { get; set; } = 1;
+
+    /// <summary>CSS width, for example <c>"12rem"</c> or <c>"60%"</c>. Defaults to filling the container.</summary>
+    [Parameter]
+    public string? Width { get; set; }
+
+    /// <summary>CSS height. Defaults to a value appropriate for <see cref="Shape"/>.</summary>
+    [Parameter]
+    public string? Height { get; set; }
+
+    /// <summary>Whether to animate. Turn off for a long list, where dozens of pulsing blocks are noise.</summary>
+    [Parameter]
+    public bool Animate { get; set; } = true;
+
+    private string BaseClass => CssBuilder
+        .Default("block bg-surface-sunken")
+        // motion-safe: the pulse is decoration, and a viewer who asked for reduced motion should
+        // get a static block rather than a page that breathes at them.
+        .AddClass("motion-safe:animate-pulse", Animate)
+        .Build()!;
+
+    private string ShapeClass => CssBuilder
+        .Default(BaseClass)
+        .AddClass(Shape switch
+        {
+            ZenSkeletonShape.Circle => "rounded-full aspect-square",
+            ZenSkeletonShape.Rectangle => "rounded-zen-md w-full",
+            _ => "rounded-zen-sm w-full",
+        })
+        .AddClass(Shape switch
+        {
+            ZenSkeletonShape.Circle => "size-10",
+            ZenSkeletonShape.Rectangle => "h-24",
+            _ => "h-4",
+        }, Height is null && Width is null)
+        .Build()!;
+
+    private string LineClass => CssBuilder.Default(BaseClass).AddClass("h-4 rounded-zen-sm").Build()!;
+
+    private string? CombinedStyle
+    {
+        get
+        {
+            var builder = new StringBuilder();
+
+            if (Width is not null)
+            {
+                builder.Append("width:").Append(Width).Append(';');
+            }
+
+            if (Height is not null)
+            {
+                builder.Append("height:").Append(Height).Append(';');
+            }
+
+            if (Style is not null)
+            {
+                builder.Append(Style);
+            }
+
+            return builder.Length == 0 ? null : builder.ToString();
+        }
+    }
+
+    private string LineStyle(int index) =>
+        index == Lines - 1 ? "width:60%" : $"width:{Width ?? "100%"}";
+}

@@ -1,0 +1,305 @@
+@page "/primitives"
+@rendermode InteractiveServer
+
+@*
+    Interactive Server so the button click handlers and the loading-state demo actually do
+    something. Everything on this page also renders correctly with no render mode at all - the
+    static-SSR route group covers that.
+*@
+
+<PageTitle>Primitives &middot; ZenithUI</PageTitle>
+
+<header class="max-w-3xl">
+    <h1 class="text-3xl font-bold tracking-tight">Primitives</h1>
+    <p class="mt-3 text-content-muted">
+        The building blocks every other component composes from. Each one honours the token roles
+        strictly: <code>-{intent}</code> only fills, <code>-content</code> only sits on a fill, and
+        <code>-strong</code> only ever carries a foreground.
+    </p>
+</header>
+
+<!-- ---------------------------------------------------------------- Buttons -->
+<section class="mt-10">
+    <h2 class="text-lg font-semibold">ZenButton</h2>
+
+    <div class="mt-4 space-y-4">
+        @foreach (var variant in Variants)
+        {
+            <ZenCard Title="@variant.ToString()" TitleLevel="3" Padding="ZenSize.Medium">
+                <div class="flex flex-wrap items-center gap-2">
+                    @foreach (var intent in Intents)
+                    {
+                        <ZenButton Intent="intent" Variant="variant">@intent.ToString()</ZenButton>
+                    }
+                </div>
+            </ZenCard>
+        }
+
+        <ZenCard Title="Sizes, icons and state" TitleLevel="3">
+            <div class="flex flex-wrap items-center gap-3">
+                @foreach (var size in Sizes)
+                {
+                    <ZenButton Intent="ZenIntent.Primary" Size="size">@size.ToString()</ZenButton>
+                }
+            </div>
+
+            <div class="mt-4 flex flex-wrap items-center gap-3 border-t border-border pt-4">
+                <ZenButton Intent="ZenIntent.Primary" Icon="@ZenIcons.Check">Leading icon</ZenButton>
+                <ZenButton Variant="ZenVariant.Outline" TrailingIcon="@ZenIcons.ChevronRight">Trailing icon</ZenButton>
+                <ZenButton Variant="ZenVariant.Ghost" IconOnly="true" Icon="@ZenIcons.Search" AriaLabel="Search" />
+                <ZenButton Intent="ZenIntent.Danger" Disabled="true">Disabled</ZenButton>
+                <ZenButton Href="/tokens" Variant="ZenVariant.Soft" Intent="ZenIntent.Info">Link to tokens</ZenButton>
+                <ZenButton Href="/tokens" Variant="ZenVariant.Soft" Disabled="true">Disabled link</ZenButton>
+            </div>
+
+            <div class="mt-4 flex flex-wrap items-center gap-3 border-t border-border pt-4">
+                <ZenButton Intent="ZenIntent.Primary" Loading="@_saving" OnClick="SimulateSaveAsync">
+                    @(_saving ? "Saving" : "Click to load for 2s")
+                </ZenButton>
+                <span class="text-sm text-content-muted">
+                    The label stays in place while loading, so the button does not resize under the pointer.
+                </span>
+            </div>
+        </ZenCard>
+    </div>
+</section>
+
+<!-- ----------------------------------------------------------------- Badges -->
+<section class="mt-12">
+    <h2 class="text-lg font-semibold">ZenBadge</h2>
+
+    <div class="mt-4 grid gap-4 md:grid-cols-2">
+        <ZenCard Title="Variants" TitleLevel="3">
+            <div class="space-y-3">
+                @foreach (var variant in Variants)
+                {
+                    <div class="flex flex-wrap items-center gap-2">
+                        <span class="w-16 shrink-0 text-xs text-content-subtle">@variant</span>
+                        @foreach (var intent in Intents)
+                        {
+                            <ZenBadge Intent="intent" Variant="variant">@intent.ToString()</ZenBadge>
+                        }
+                    </div>
+                }
+            </div>
+        </ZenCard>
+
+        <ZenCard Title="Dots, icons and sizes" TitleLevel="3">
+            <div class="flex flex-wrap items-center gap-2">
+                <ZenBadge Intent="ZenIntent.Success" Dot="true">Active</ZenBadge>
+                <ZenBadge Intent="ZenIntent.Warning" Dot="true">Pending</ZenBadge>
+                <ZenBadge Intent="ZenIntent.Danger" Icon="@ZenIcons.Danger">Failed</ZenBadge>
+                <ZenBadge Intent="ZenIntent.Info" Pill="false">Squared</ZenBadge>
+            </div>
+
+            <div class="mt-4 flex flex-wrap items-center gap-2 border-t border-border pt-4">
+                @foreach (var size in Sizes)
+                {
+                    <ZenBadge Intent="ZenIntent.Primary" Size="size">@size.ToString()</ZenBadge>
+                }
+            </div>
+
+            <p class="mt-4 text-sm text-content-muted">
+                The dot is reinforcement, never the message. A badge whose only difference is colour
+                is invisible to a significant share of users, so the text always states the status.
+            </p>
+        </ZenCard>
+    </div>
+</section>
+
+<!-- ------------------------------------------------------------ Stat cards -->
+<section class="mt-12">
+    <h2 class="text-lg font-semibold">ZenStatCard</h2>
+
+    <div class="mt-4 grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
+        <ZenStatCard Label="Revenue"
+                     Value="$48,120"
+                     Delta="12.4%"
+                     Trend="ZenTrend.Up"
+                     Comparison="vs. last month"
+                     Icon="@ZenIcons.TrendUp"
+                     Intent="ZenIntent.Primary" />
+
+        <ZenStatCard Label="Active users"
+                     Value="2,841"
+                     Delta="3.1%"
+                     Trend="ZenTrend.Down"
+                     Comparison="vs. last month"
+                     Icon="@ZenIcons.Success"
+                     Intent="ZenIntent.Info" />
+
+        @* HigherIsBetter=false: churn rising is an upward arrow and a bad outcome. Direction and
+           sentiment are separate concerns. *@
+        <ZenStatCard Label="Churn"
+                     Value="1.8%"
+                     Delta="0.4pp"
+                     Trend="ZenTrend.Up"
+                     HigherIsBetter="false"
+                     Comparison="vs. last month"
+                     Icon="@ZenIcons.Warning"
+                     Intent="ZenIntent.Warning" />
+
+        <ZenStatCard Label="Open tickets" Loading="true" Icon="@ZenIcons.Info" />
+    </div>
+
+    <p class="mt-3 text-sm text-content-muted">
+        The third tile inverts the sentiment: the arrow still points up, but rising churn is
+        coloured as a problem. The fourth is in its loading state.
+    </p>
+</section>
+
+<!-- ------------------------------------------------------- Cards & surfaces -->
+<section class="mt-12">
+    <h2 class="text-lg font-semibold">ZenCard</h2>
+
+    <div class="mt-4 grid gap-4 md:grid-cols-2 xl:grid-cols-3">
+        <ZenCard Title="With actions" Subtitle="Header, body and footer slots">
+            <Actions>
+                <ZenButton Size="ZenSize.Small" Variant="ZenVariant.Ghost" IconOnly="true"
+                           Icon="@ZenIcons.Close" AriaLabel="Dismiss" />
+            </Actions>
+            <ChildContent>
+                <p class="text-sm text-content-muted">
+                    Renders as an <code>&lt;article&gt;</code> by default, which gives screen reader
+                    users a landmark to navigate by for free.
+                </p>
+            </ChildContent>
+            <Footer>
+                <div class="flex items-center justify-end gap-2">
+                    <ZenButton Size="ZenSize.Small" Variant="ZenVariant.Ghost">Cancel</ZenButton>
+                    <ZenButton Size="ZenSize.Small" Intent="ZenIntent.Primary">Save</ZenButton>
+                </div>
+            </Footer>
+        </ZenCard>
+
+        <ZenCard Title="Elevations" TitleLevel="3">
+            <div class="space-y-3">
+                @foreach (var elevation in Elevations)
+                {
+                    <ZenCard Elevation="elevation" Padding="ZenSize.Small">
+                        <span class="text-sm text-content-muted">@elevation</span>
+                    </ZenCard>
+                }
+            </div>
+        </ZenCard>
+
+        <ZenCard Href="/tokens" Title="Linked card" Subtitle="The whole surface is the link">
+            <p class="text-sm text-content-muted">
+                Deliberately exclusive with interactive content inside: nesting a button in a linked
+                card produces invalid HTML and overlapping click targets.
+            </p>
+        </ZenCard>
+    </div>
+</section>
+
+<!-- ---------------------------------------------------- Spinner & skeleton -->
+<section class="mt-12 grid gap-4 md:grid-cols-2">
+    <ZenCard Title="ZenSpinner" TitleLevel="2">
+        <div class="flex flex-wrap items-center gap-6">
+            @foreach (var size in Sizes)
+            {
+                <ZenSpinner Size="size" />
+            }
+            <ZenSpinner Intent="ZenIntent.Primary" ShowLabel="true" Label="Loading results" />
+        </div>
+
+        <p class="mt-4 text-sm text-content-muted">
+            <code>role="status"</code> with an accessible name, so the page does not simply appear
+            to stop for a screen reader user.
+        </p>
+    </ZenCard>
+
+    <ZenCard Title="ZenSkeleton" TitleLevel="2">
+        <div class="flex items-start gap-3">
+            <ZenSkeleton Shape="ZenSkeletonShape.Circle" Width="2.5rem" />
+            <div class="flex-1">
+                <ZenSkeleton Lines="3" />
+            </div>
+        </div>
+
+        <div class="mt-4">
+            <ZenSkeleton Shape="ZenSkeletonShape.Rectangle" Height="4rem" />
+        </div>
+
+        <p class="mt-4 text-sm text-content-muted">
+            Always <code>aria-hidden</code>. The last line is short so a block reads as prose rather
+            than as a table.
+        </p>
+    </ZenCard>
+</section>
+
+<!-- ------------------------------------------------------------- ZenField -->
+<section class="mt-12">
+    <h2 class="text-lg font-semibold">ZenField</h2>
+    <p class="mt-1 max-w-3xl text-sm text-content-muted">
+        The label / help / error wrapper every form control renders through. It hands the control
+        its ids through a context object, because a wrapper cannot reach into arbitrary child markup
+        to set <code>aria-describedby</code> — and guessing at "the first descendant input" breaks
+        the moment a control renders something composite. The real inputs arrive in M2.
+    </p>
+
+    <div class="mt-4 grid gap-4 md:grid-cols-3">
+        <ZenCard Title="Help text" TitleLevel="3">
+            <ZenField Label="Workspace name" HelpText="Letters, numbers and dashes." Required="true">
+                <input id="@context.InputId"
+                       aria-describedby="@context.DescribedBy"
+                       aria-required="@context.AriaRequired"
+                       class="@DemoInputClass"
+                       placeholder="acme-production" />
+            </ZenField>
+        </ZenCard>
+
+        <ZenCard Title="Error state" TitleLevel="3">
+            <ZenField Label="Email" Error="Enter a valid email address." Required="true">
+                <input id="@context.InputId"
+                       aria-describedby="@context.DescribedBy"
+                       aria-invalid="@context.AriaInvalid"
+                       aria-required="@context.AriaRequired"
+                       class="@DemoInputClass"
+                       value="not-an-email" />
+            </ZenField>
+        </ZenCard>
+
+        <ZenCard Title="Optional hint" TitleLevel="3">
+            <ZenField Label="Display name" OptionalHint="(optional)" HelpText="Shown to teammates.">
+                <input id="@context.InputId"
+                       aria-describedby="@context.DescribedBy"
+                       class="@DemoInputClass" />
+            </ZenField>
+        </ZenCard>
+    </div>
+</section>
+
+@code {
+    private static readonly ZenIntent[] Intents =
+    [
+        ZenIntent.Neutral, ZenIntent.Primary, ZenIntent.Secondary, ZenIntent.Accent,
+        ZenIntent.Success, ZenIntent.Warning, ZenIntent.Danger, ZenIntent.Info,
+    ];
+
+    private static readonly ZenVariant[] Variants =
+    [
+        ZenVariant.Solid, ZenVariant.Soft, ZenVariant.Outline, ZenVariant.Ghost,
+    ];
+
+    private static readonly ZenSize[] Sizes = [ZenSize.Small, ZenSize.Medium, ZenSize.Large];
+
+    private static readonly ZenElevation[] Elevations =
+    [
+        ZenElevation.None, ZenElevation.Low, ZenElevation.Medium, ZenElevation.High,
+    ];
+
+    // Placeholder styling only. M2 replaces these raw inputs with ZenTextInput.
+    private const string DemoInputClass =
+        "zen-focus h-9 w-full rounded-zen-md border border-border bg-surface px-3 text-sm " +
+        "text-content placeholder:text-content-subtle aria-invalid:border-danger";
+
+    private bool _saving;
+
+    private async Task SimulateSaveAsync()
+    {
+        _saving = true;
+        await Task.Delay(2000);
+        _saving = false;
+    }
+}

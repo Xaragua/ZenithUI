@@ -1,0 +1,160 @@
+@namespace ZenithUI
+
+@inherits ZenComponentBase
+
+@*
+    The label + control + help + error wrapper every ZenithUI form control renders through. One
+    place owns field layout and, more importantly, the aria-describedby / aria-invalid wiring -
+    which is the part that is easy to omit and impossible to notice without a screen reader.
+
+    The control receives its ids through the context object rather than having them injected:
+
+        <ZenField Label="Email" HelpText="We never share it.">
+            <input id="@context.InputId"
+                   aria-describedby="@context.DescribedBy"
+                   aria-invalid="@context.AriaInvalid" />
+        </ZenField>
+
+    A wrapper cannot reach into arbitrary child markup to set attributes, and guessing at "the
+    first descendant input" breaks as soon as a control renders something composite.
+*@
+
+<div class="@RootClass(FieldClass)" style="@Style" @attributes="AttributesWithoutClass">
+    @if (!string.IsNullOrEmpty(Label))
+    {
+        <label for="@InputId" class="@LabelClass">
+            @Label
+
+            @if (Required)
+            {
+                @* aria-hidden because aria-required on the control already states this; the
+                   asterisk is a visual echo, and announcing "star" helps nobody. *@
+                <span class="text-danger-strong" aria-hidden="true">*</span>
+            }
+
+            @if (OptionalHint is not null && !Required)
+            {
+                <span class="font-normal text-content-subtle">@OptionalHint</span>
+            }
+        </label>
+    }
+
+    @ChildContent(Context)
+
+    @if (HasError)
+    {
+        @* role="alert" so the message is announced when it appears after a failed submit,
+           rather than sitting silently below a control the user has already left. *@
+        <p id="@ErrorId" class="@MessageClass" role="alert">
+            <ZenIcon Path="@ZenIcons.Danger" Size="ZenSize.Small" class="mt-px size-3.5 text-danger-strong" />
+            <span class="text-danger-strong">@ErrorText</span>
+        </p>
+    }
+    else if (!string.IsNullOrEmpty(HelpText))
+    {
+        <p id="@HelpId" class="@MessageClass">
+            <span class="text-content-muted">@HelpText</span>
+        </p>
+    }
+</div>
+
+@code {
+    /// <summary>
+    /// The control, given the ids and ARIA state it must apply to itself.
+    /// </summary>
+    [Parameter, EditorRequired]
+    public RenderFragment<ZenFieldContext> ChildContent { get; set; } = default!;
+
+    /// <summary>Visible label. Omit for a control that is labelled some other way.</summary>
+    [Parameter]
+    public string? Label { get; set; }
+
+    /// <summary>Guidance shown below the control, hidden while an error is displayed.</summary>
+    [Parameter]
+    public string? HelpText { get; set; }
+
+    /// <summary>
+    /// Validation messages. Only the first is shown — a stack of messages for one field is more
+    /// noise than help, and the rest are usually consequences of the first.
+    /// </summary>
+    [Parameter]
+    public IEnumerable<string>? Errors { get; set; }
+
+    /// <summary>A single error message, merged with <see cref="Errors"/>.</summary>
+    [Parameter]
+    public string? Error { get; set; }
+
+    /// <summary>Shows the required indicator and sets <c>aria-required</c> on the control.</summary>
+    [Parameter]
+    public bool Required { get; set; }
+
+    /// <summary>Marks the control disabled in the context passed to the child.</summary>
+    [Parameter]
+    public bool Disabled { get; set; }
+
+    /// <summary>
+    /// Text appended to the label for non-required fields, for example <c>"(optional)"</c>.
+    /// Marking what is optional is usually kinder than marking what is required.
+    /// </summary>
+    [Parameter]
+    public string? OptionalHint { get; set; }
+
+    /// <summary>
+    /// Id for the control. Defaults to this component's generated id, so label association works
+    /// with no configuration.
+    /// </summary>
+    [Parameter]
+    public string? For { get; set; }
+
+    /// <summary>Label size. Should match the control it labels.</summary>
+    [Parameter]
+    public ZenSize Size { get; set; } = ZenSize.Medium;
+
+    private string InputId => For ?? Id;
+
+    private string HelpId => $"{InputId}-help";
+
+    private string ErrorId => $"{InputId}-error";
+
+    // Whitespace-only entries are skipped, not just empty ones. A validator that yields " " would
+    // otherwise produce an alert region containing nothing - announced, but with no message.
+    private string? ErrorText =>
+        !string.IsNullOrWhiteSpace(Error)
+            ? Error
+            : Errors?.FirstOrDefault(e => !string.IsNullOrWhiteSpace(e));
+
+    private bool HasError => !string.IsNullOrWhiteSpace(ErrorText);
+
+    /// <summary>
+    /// The context handed to the control. <c>aria-describedby</c> points at whichever message is
+    /// actually rendered — help text is replaced by the error, not stacked with it, so only one id
+    /// is ever live.
+    /// </summary>
+    private ZenFieldContext Context => new(
+        InputId,
+        HasError ? ErrorId : (!string.IsNullOrEmpty(HelpText) ? HelpId : null),
+        HasError,
+        Required,
+        Disabled);
+
+    private string FieldClass => CssBuilder
+        .Default("flex flex-col")
+        .AddClass(Size == ZenSize.Small ? "gap-1" : "gap-1.5")
+        .Build()!;
+
+    private string LabelClass => CssBuilder
+        .Default("inline-flex items-center gap-1 font-medium text-content")
+        .AddClass(Size switch
+        {
+            ZenSize.Small => "text-xs",
+            ZenSize.Large => "text-base",
+            _ => "text-sm",
+        })
+        .AddClass("opacity-60", Disabled)
+        .Build()!;
+
+    private string MessageClass => CssBuilder
+        .Default("flex items-start gap-1.5")
+        .AddClass(Size == ZenSize.Large ? "text-sm" : "text-xs")
+        .Build()!;
+}

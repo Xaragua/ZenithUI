@@ -6,6 +6,53 @@ All notable changes to ZenithUI are documented here. The format follows
 
 ## [Unreleased]
 
+### Added — M1, the primitives
+
+**Components**
+- `ZenIcon` — inline SVG wrapper, decorative by default and only announced when given a `Title`.
+- `ZenButton` — intent x variant x size, loading state, leading/trailing icons, icon-only, and
+  renders an `<a>` when `Href` is set.
+- `ZenBadge` — status chips, soft by default, with an optional decorative dot.
+- `ZenSpinner` — `role="status"` with an accessible name, suppressible when an ancestor already
+  announces its busy state.
+- `ZenSkeleton` — text/circle/rectangle placeholders, always `aria-hidden`, honouring
+  `prefers-reduced-motion`.
+- `ZenCard` — header/body/footer/actions slots, elevation, and an optional whole-card link.
+- `ZenStatCard` — KPI tile with a trend indicator whose direction and sentiment are separate, so
+  rising churn reads as an up arrow in a bad colour.
+- `ZenField` — label/help/error wrapper owning the `aria-describedby` and `aria-invalid` wiring.
+
+**Core**
+- `ZenStyles` — the intent x variant x size matrix as literal Tailwind class strings, so the
+  scanner can see them. One place owns the visual language.
+- `ZenIcons` — the inline SVG paths the library needs, so installing ZenithUI does not drag in an
+  icon font.
+- `ZenInputBase<TValue>` — binding, validation and shared field parameters, with an **optional**
+  `EditContext`. Deliberately not derived from `InputBase<TValue>`, which throws without a
+  cascading `EditContext` and would make every control unusable outside an `EditForm`.
+
+**Design decisions worth knowing**
+- `ZenButton` defaults `type="button"`. An HTML button inside a form defaults to `submit`, so a
+  "Cancel" button with no explicit type submits the form.
+- A disabled `ZenButton` with an `Href` drops the `href` entirely. A disabled link is not a thing
+  in HTML — the browser follows it regardless — so rendering one that looks dead and still
+  navigates is worse than rendering no link.
+- While loading, the button label stays in the DOM at zero opacity rather than being swapped for
+  the spinner, so the control does not resize under the pointer mid-click.
+- An icon-only button without an accessible name throws. It is a development-time mistake with no
+  runtime recovery.
+
+**Verification**
+- 127 tests, up from 69.
+
+### Fixed during M1
+
+- **The per-folder `@namespace` convention did not survive a second folder.** Razor generates a
+  class per `_Imports.razor`, so two folders both declaring `@namespace ZenithUI` produced two
+  `ZenithUI._Imports` classes and a `CS0111`. The directive moved into each component file.
+- **`ZenField` treated a whitespace-only validation message as real**, producing an alert region
+  that was announced but contained nothing.
+
 ### Added — M0, the foundation
 
 **Design tokens**

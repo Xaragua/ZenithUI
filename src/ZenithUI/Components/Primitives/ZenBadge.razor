@@ -1,0 +1,78 @@
+@namespace ZenithUI
+
+@inherits ZenComponentBase
+
+@*
+    A small status or category label. Soft variant by default, which is the right weight for the
+    common case - a status chip in a table row should not shout louder than the row.
+
+    Accessibility: colour alone must never carry the meaning. The badge's text is what conveys
+    status; the Dot is decoration on top of that, never a replacement for it.
+*@
+
+<span class="@RootClass(BadgeClass)" style="@Style" @attributes="AttributesWithoutClass">
+    @if (Dot)
+    {
+        <span class="@DotClass" aria-hidden="true"></span>
+    }
+
+    @if (Icon is not null)
+    {
+        <ZenIcon Path="@Icon" Size="ZenSize.Small" class="@IconClass" />
+    }
+
+    @ChildContent
+</span>
+
+@code {
+    /// <summary>Badge text.</summary>
+    [Parameter]
+    public RenderFragment? ChildContent { get; set; }
+
+    /// <summary>Semantic colour role.</summary>
+    [Parameter]
+    public ZenIntent Intent { get; set; } = ZenIntent.Neutral;
+
+    /// <summary>Visual weight. Soft is the default and suits status chips.</summary>
+    [Parameter]
+    public ZenVariant Variant { get; set; } = ZenVariant.Soft;
+
+    /// <summary>Badge size.</summary>
+    [Parameter]
+    public ZenSize Size { get; set; } = ZenSize.Medium;
+
+    /// <summary>Fully rounded rather than softly rounded.</summary>
+    [Parameter]
+    public bool Pill { get; set; } = true;
+
+    /// <summary>
+    /// Show a small filled dot before the text. Decorative reinforcement only - the text must
+    /// still say what the status is.
+    /// </summary>
+    [Parameter]
+    public bool Dot { get; set; }
+
+    /// <summary>Optional leading icon markup, typically a <see cref="ZenIcons"/> constant.</summary>
+    [Parameter]
+    public string? Icon { get; set; }
+
+    private string BadgeClass => CssBuilder
+        .Default("inline-flex items-center font-medium whitespace-nowrap")
+        // interactive: false - a badge is a label, and a hover state would suggest otherwise.
+        .AddClass(ZenStyles.Variant(Intent, Variant, interactive: false))
+        .AddClass(Pill ? "rounded-full" : "rounded-zen-sm")
+        .AddClass(Size switch
+        {
+            ZenSize.Small => "gap-1 px-1.5 py-0.5 text-[0.6875rem] leading-4",
+            ZenSize.Large => "gap-2 px-3 py-1 text-sm",
+            _ => "gap-1.5 px-2 py-0.5 text-xs",
+        })
+        .Build()!;
+
+    private string DotClass => CssBuilder
+        .Default("rounded-full bg-current")
+        .AddClass(Size == ZenSize.Small ? "size-1" : "size-1.5")
+        .Build()!;
+
+    private string IconClass => Size == ZenSize.Small ? "size-3" : "size-3.5";
+}
