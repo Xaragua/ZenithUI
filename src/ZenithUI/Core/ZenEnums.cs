@@ -155,3 +155,61 @@ public enum ZenTheme
     /// <summary>The dark palette from <c>tokens/dark.css</c>.</summary>
     Dark,
 }
+
+/// <summary>
+/// Where a floating panel sits relative to the element it is anchored to.
+/// </summary>
+/// <remarks>
+/// <para>
+/// Named logically, so a component does not have to know the writing direction: <c>Start</c> and
+/// <c>End</c> are the sides text begins and ends at, which swap under <c>dir="rtl"</c>. The
+/// resolution to physical sides happens in <c>zen-popover.js</c>, because the browser is the only
+/// party that knows the direction in force - it can come from a <c>dir</c> attribute anywhere up
+/// the tree or from a stylesheet.
+/// </para>
+/// <para>
+/// The second word is the alignment along the chosen side. A bare side centres.
+/// </para>
+/// <para>
+/// A placement is a preference, not a guarantee. A panel that would leave the viewport flips to
+/// the opposite side and shifts along its axis to stay visible.
+/// </para>
+/// </remarks>
+public enum ZenPlacement
+{
+    /// <summary>Below the anchor, leading edges aligned. The default for menus and listboxes.</summary>
+    BottomStart,
+
+    /// <summary>Below the anchor, centred.</summary>
+    Bottom,
+
+    /// <summary>Below the anchor, trailing edges aligned.</summary>
+    BottomEnd,
+
+    /// <summary>Above the anchor, leading edges aligned.</summary>
+    TopStart,
+
+    /// <summary>Above the anchor, centred.</summary>
+    Top,
+
+    /// <summary>Above the anchor, trailing edges aligned.</summary>
+    TopEnd,
+
+    /// <summary>On the side text starts from, top edges aligned.</summary>
+    StartTop,
+
+    /// <summary>On the side text starts from, centred.</summary>
+    Start,
+
+    /// <summary>On the side text starts from, bottom edges aligned.</summary>
+    StartBottom,
+
+    /// <summary>On the side text ends at, top edges aligned.</summary>
+    EndTop,
+
+    /// <summary>On the side text ends at, centred.</summary>
+    End,
+
+    /// <summary>On the side text ends at, bottom edges aligned.</summary>
+    EndBottom,
+}

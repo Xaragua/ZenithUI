@@ -307,4 +307,15 @@ public static class ZenStyles
 
     /// <summary>Corner radius matching an input size. Mirrors <see cref="ControlRadius"/>.</summary>
     public static string InputRadius(ZenSize size) => ControlRadius(size);
+
+    /// <summary>Shadow for a surface raised above the page.</summary>
+    /// <param name="elevation">How far above the page the surface sits.</param>
+    /// <returns>A shadow utility, or <see langword="null"/> for <see cref="ZenElevation.None"/>.</returns>
+    public static string? Elevation(ZenElevation elevation) => elevation switch
+    {
+        ZenElevation.None => null,
+        ZenElevation.Medium => "shadow-zen-md",
+        ZenElevation.High => "shadow-zen-lg",
+        _ => "shadow-zen-sm",
+    };
 }

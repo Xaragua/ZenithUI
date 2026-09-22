@@ -403,3 +403,51 @@
     transition: none !important;
   }
 }
+
+@layer components {
+  /*
+   * ZenPopover's panel.
+   *
+   * The UA stylesheet gives `[popover]` a border, padding, a fixed position and `inset: 0` with
+   * `margin: auto`, which centres it in the viewport. All of that has to be cleared or the panel
+   * is centred on the page before the positioner ever measures it - a visible jump on open. The
+   * coordinates themselves are written as inline styles by zen-popover.js.
+   */
+  .zen-popover {
+    border: none;
+    background: none;
+    color: inherit;
+  }
+
+  /*
+   * `inset: auto` is the load-bearing line. Without it the UA's `inset: 0` plus `margin: auto`
+   * centres the panel in the viewport, and the `left`/`top` the positioner writes are fighting an
+   * equally specific `right`/`bottom`.
+   *
+   * The fade covers a frame. The browser shows the popover, and only then does the positioner
+   * measure and write coordinates - so without an animation the panel is briefly visible in the
+   * wrong place. Starting from zero opacity means it appears already where it belongs.
+   */
+  .zen-popover:popover-open {
+    position: fixed;
+    inset: auto;
+    overflow: visible;
+    animation: zen-popover-in 120ms ease-out;
+  }
+
+  @media (prefers-reduced-motion: reduce) {
+    .zen-popover:popover-open {
+      animation: none;
+    }
+  }
+}
+
+@keyframes zen-popover-in {
+  from {
+    opacity: 0;
+  }
+
+  to {
+    opacity: 1;
+  }
+}

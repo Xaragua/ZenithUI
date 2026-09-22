@@ -111,13 +111,7 @@ else
     private string CardClass => CssBuilder
         .Default("block overflow-hidden rounded-zen-lg bg-surface-raised text-content")
         .AddClass("border border-border", Bordered)
-        .AddClass(Elevation switch
-        {
-            ZenElevation.None => null,
-            ZenElevation.Medium => "shadow-zen-md",
-            ZenElevation.High => "shadow-zen-lg",
-            _ => "shadow-zen-sm",
-        })
+        .AddClass(ZenStyles.Elevation(Elevation))
         // A linked card states "you are about to activate this" by turning its own border the ring
         // colour at --zen-ring-width, on hover and on keyboard focus alike - the same treatment a
         // focused input gets. The outline is drawn inside the element, so the card never changes

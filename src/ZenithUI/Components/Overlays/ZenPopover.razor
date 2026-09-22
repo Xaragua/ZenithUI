@@ -1,0 +1,252 @@
+@namespace ZenithUI
+@inherits ZenJsComponentBase
+@implements IAsyncDisposable
+
+@*
+    An anchored floating panel: a menu, a listbox, a date grid, a tooltip-sized card.
+
+    Why the top layer. The obvious implementation - `position: absolute` inside a `relative`
+    wrapper, which ZenDatePicker still uses - has two failure modes that cannot be styled away. Any
+    ancestor with `overflow: hidden` clips the panel, and the panel cannot move when it runs out of
+    room at the bottom of the viewport. The HTML `popover` attribute puts the panel in the top
+    layer, where neither applies. CSS Anchor Positioning would remove the JavaScript too, but is
+    not in Firefox yet, so the coordinates are still computed in zen-popover.js.
+
+    Why not <dialog>. A popover is explicitly non-modal: the page behind stays interactive and
+    keeps its focus. That is the whole point for a combobox, whose text input must keep focus while
+    the listbox is open. ZenModal uses <dialog> precisely because it wants the opposite.
+
+    What renders without JavaScript. The `popover` attribute is only emitted once the renderer is
+    interactive. That is not a detail: a popover is `display: none` until `showPopover()` is called,
+    so emitting it unconditionally would render an open panel that is permanently invisible under
+    static SSR. Without it the panel is ordinary flow content directly after the anchor - unstyled
+    by the positioner, but present, readable and operable. Anything that must be *fully* correct
+    with no JavaScript should use a native control: ZenSelect rather than ZenCombobox.
+*@
+
+@*
+    `display: contents` so the wrapper is a positioning handle and nothing else: the anchor's own
+    element keeps whatever layout the caller gave it, and a wrapper does not appear as a stray box
+    inside a flex or grid parent.
+
+    `Class` deliberately goes to the panel rather than here. A caller styling a ZenPopover means
+    the floating surface - a width, a max-height on a long menu - and applying it to a `contents`
+    wrapper would silently do nothing.
+*@
+<div id="@AnchorId" class="contents" @attributes="AttributesWithoutClass">
+    @Anchor
+</div>
+
+@if (Open)
+{
+    @*
+        `popover="manual"` rather than "auto": auto popovers come with light-dismiss and Escape
+        handling built in, which sounds helpful but takes the decision away from the component.
+        A combobox must not close on Escape without first clearing its own active option, and
+        light-dismiss fires after the click has already landed on whatever was underneath. Both
+        behaviours are implemented deliberately instead - dismissal in zen-popover.js on
+        pointerdown, Escape in whatever component owns the keyboard.
+
+        The panel is also NOT inside the anchor element. In the top layer its DOM position no
+        longer affects painting, and keeping it a sibling means an `overflow: hidden` anchor
+        cannot clip it even on the no-JavaScript path.
+    *@
+    <div id="@PanelId"
+         popover="@PopoverMode"
+         class="@PanelClass"
+         style="@Style"
+         role="@Role"
+         aria-labelledby="@LabelledBy"
+         aria-label="@Label"
+         @onkeydown="HandleKeyDownAsync">
+        @ChildContent
+    </div>
+}
+
+@code {
+    private DotNetObjectReference<ZenPopover>? _self;
+    private bool _attached;
+    private bool _openLastRender;
+
+    /// <inheritdoc />
+    protected override string? ModulePath => "./_content/ZenithUI/js/zen-popover.js";
+
+    /// <summary>The element the panel is positioned against. Always rendered.</summary>
+    [Parameter]
+    public RenderFragment? Anchor { get; set; }
+
+    /// <summary>The panel's contents. Rendered only while open.</summary>
+    [Parameter]
+    public RenderFragment? ChildContent { get; set; }
+
+    /// <summary>Whether the panel is showing.</summary>
+    [Parameter]
+    public bool Open { get; set; }
+
+    /// <summary>Raised when the panel asks to close - Escape, or a click outside it.</summary>
+    /// <remarks>
+    /// The component does not close itself. The owner holds the state, so a combobox can decide
+    /// that Escape should first clear its filter and only close on a second press.
+    /// </remarks>
+    [Parameter]
+    public EventCallback<bool> OpenChanged { get; set; }
+
+    /// <summary>Where the panel sits relative to the anchor.</summary>
+    [Parameter]
+    public ZenPlacement Placement { get; set; } = ZenPlacement.BottomStart;
+
+    /// <summary>Gap between anchor and panel, in CSS pixels.</summary>
+    [Parameter]
+    public int Offset { get; set; } = 4;
+
+    /// <summary>Allow the panel to move to the opposite side when it would leave the viewport.</summary>
+    [Parameter]
+    public bool Flip { get; set; } = true;
+
+    /// <summary>Allow the panel to slide along its axis to stay inside the viewport.</summary>
+    [Parameter]
+    public bool Shift { get; set; } = true;
+
+    /// <summary>Give the panel at least the anchor's width. What a combobox listbox wants.</summary>
+    [Parameter]
+    public bool MatchWidth { get; set; }
+
+    /// <summary>Close when the user clicks outside the panel and anchor.</summary>
+    [Parameter]
+    public bool CloseOnOutsideClick { get; set; } = true;
+
+    /// <summary>Close when Escape is pressed inside the panel.</summary>
+    [Parameter]
+    public bool CloseOnEscape { get; set; } = true;
+
+    /// <summary>ARIA role for the panel. <c>dialog</c>, <c>listbox</c> and <c>menu</c> are the usual ones.</summary>
+    [Parameter]
+    public string? Role { get; set; } = "dialog";
+
+    /// <summary>Id of the element naming the panel.</summary>
+    [Parameter]
+    public string? LabelledBy { get; set; }
+
+    /// <summary>Accessible name, when no element carries it.</summary>
+    [Parameter]
+    public string? Label { get; set; }
+
+    /// <summary>Elevation of the panel surface.</summary>
+    [Parameter]
+    public ZenElevation Elevation { get; set; } = ZenElevation.High;
+
+    /// <summary>Drop the panel's own surface, border and padding, for a caller that supplies its own.</summary>
+    [Parameter]
+    public bool Bare { get; set; }
+
+    /// <summary>The panel element's id, for the anchor's <c>aria-controls</c>.</summary>
+    public string PanelId => SubId("panel");
+
+    /// <summary>
+    /// The <c>popover</c> attribute value, or <see langword="null"/> before the renderer is
+    /// interactive.
+    /// </summary>
+    /// <remarks>
+    /// A popover is <c>display: none</c> until <c>showPopover()</c> runs, so emitting the
+    /// attribute during prerender would produce an open panel nobody can see. Blazor patches the
+    /// attribute in when the circuit connects and the component re-renders.
+    /// </remarks>
+    private string? PopoverMode => RendererInfo.IsInteractive ? "manual" : null;
+
+    /// <summary>The anchor wrapper's id.</summary>
+    public string AnchorId => SubId("anchor");
+
+    /// <inheritdoc />
+    protected override Task OnModuleReadyAsync() => SyncAsync();
+
+    /// <inheritdoc />
+    protected override async Task OnAfterRenderAsync(bool firstRender)
+    {
+        await base.OnAfterRenderAsync(firstRender);
+
+        // Base class handles the first interactive render. Afterwards the panel has to be attached
+        // and detached as Open changes, which can happen on any render.
+        if (!firstRender && IsJsReady && _openLastRender != Open)
+        {
+            await SyncAsync();
+        }
+    }
+
+    /// <summary>Re-measures an open panel. For content that changed without a resize.</summary>
+    public ValueTask RepositionAsync() => InvokeModuleVoidAsync("reposition", PanelId);
+
+    private async Task SyncAsync()
+    {
+        _openLastRender = Open;
+
+        if (Open)
+        {
+            _self ??= DotNetObjectReference.Create(this);
+
+            var options = new ZenPopoverOptions(
+                Placement.Side(),
+                Placement.Align(),
+                Offset,
+                Flip,
+                Shift,
+                MatchWidth);
+
+            // The reference is passed only when the caller wants outside-click dismissal, so the
+            // module can skip installing a document-level listener no one is listening to.
+            await InvokeModuleVoidAsync(
+                "open", AnchorId, PanelId, options, CloseOnOutsideClick ? _self : null);
+
+            _attached = true;
+        }
+        else if (_attached)
+        {
+            await InvokeModuleVoidAsync("close", PanelId);
+            _attached = false;
+        }
+    }
+
+    /// <summary>Invoked from JavaScript when the pointer goes down outside the panel.</summary>
+    [JSInvokable]
+    public async Task OnOutsideClick()
+    {
+        if (Open)
+        {
+            await OpenChanged.InvokeAsync(false);
+        }
+    }
+
+    private async Task HandleKeyDownAsync(KeyboardEventArgs args)
+    {
+        if (CloseOnEscape && args.Key == "Escape" && Open)
+        {
+            await OpenChanged.InvokeAsync(false);
+        }
+    }
+
+    /// <inheritdoc />
+    protected override async ValueTask DisposeAsyncCore()
+    {
+        // Ordered deliberately: the module must be told to close - which removes its document
+        // listener - before the base class disposes the module reference. Reversing the two
+        // leaves a pointerdown handler on the document holding a reference to a dead component.
+        if (_attached)
+        {
+            await InvokeModuleVoidAsync("close", PanelId);
+            _attached = false;
+        }
+
+        await base.DisposeAsyncCore();
+
+        _self?.Dispose();
+        _self = null;
+    }
+
+    // ---- Styling -----------------------------------------------------------------------------
+
+    private string PanelClass => CssBuilder
+        .Default("zen-popover m-0 p-0")
+        .AddClass("rounded-zen-lg border border-border bg-surface-overlay p-1", !Bare)
+        .AddClass(ZenStyles.Elevation(Elevation), !Bare)
+        .AddClass(Class)
+        .Build()!;
+}
