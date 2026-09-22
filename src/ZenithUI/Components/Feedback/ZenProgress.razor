@@ -1,0 +1,207 @@
+@namespace ZenithUI
+
+@inherits ZenComponentBase
+
+@*
+    A progress bar, linear or circular, determinate or not.
+
+    The accessibility rule that matters here: when progress is indeterminate, aria-valuenow must be
+    OMITTED, not set to 0. Omitting it is precisely how the ARIA spec says "in progress, amount
+    unknown"; setting zero announces "0 percent", which claims a fact that is not known and reads
+    as a stalled operation.
+*@
+
+@if (Shape == ZenProgressShape.Circular)
+{
+    <div class="@RootClass(CircularWrapperClass)"
+         style="@Style"
+         role="progressbar"
+         aria-valuemin="0"
+         aria-valuemax="@Max.ToString(CultureInfo.InvariantCulture)"
+         aria-valuenow="@AriaValueNow"
+         aria-valuetext="@ValueText"
+         aria-label="@Label"
+         @attributes="AttributesWithoutClass">
+        <svg class="@CircleSizeClass" viewBox="0 0 36 36" aria-hidden="true">
+            <circle class="text-border" cx="18" cy="18" r="@Radius"
+                    fill="none" stroke="currentColor" stroke-width="@StrokeWidth" />
+            <circle class="@IndicatorColorClass @(IsIndeterminate ? "origin-center animate-spin" : null)"
+                    cx="18" cy="18" r="@Radius"
+                    fill="none" stroke="currentColor" stroke-width="@StrokeWidth"
+                    stroke-linecap="round"
+                    stroke-dasharray="@Circumference"
+                    stroke-dashoffset="@DashOffset"
+                    transform="rotate(-90 18 18)" />
+        </svg>
+
+        @if (ShowValue && !IsIndeterminate)
+        {
+            <span class="absolute inset-0 grid place-items-center text-xs font-medium tabular-nums text-content">
+                @ValueText
+            </span>
+        }
+    </div>
+}
+else
+{
+    <div class="@RootClass(LinearWrapperClass)" style="@Style">
+        @if (Label is not null || (ShowValue && !IsIndeterminate))
+        {
+            <div class="mb-1.5 flex items-baseline justify-between gap-3">
+                @if (Label is not null)
+                {
+                    <span class="text-sm font-medium text-content">@Label</span>
+                }
+
+                @if (ShowValue && !IsIndeterminate)
+                {
+                    <span class="text-xs tabular-nums text-content-muted">@ValueText</span>
+                }
+            </div>
+        }
+
+        <div class="@TrackClass"
+             role="progressbar"
+             aria-valuemin="0"
+             aria-valuemax="@Max.ToString(CultureInfo.InvariantCulture)"
+             aria-valuenow="@AriaValueNow"
+             aria-valuetext="@ValueText"
+             aria-label="@Label"
+             @attributes="AttributesWithoutClass">
+            <div class="@BarClass" style="@BarStyle"></div>
+        </div>
+    </div>
+}
+
+@code {
+    /// <summary>Linear or circular.</summary>
+    [Parameter]
+    public ZenProgressShape Shape { get; set; } = ZenProgressShape.Linear;
+
+    /// <summary>
+    /// Current progress. <see langword="null"/> means indeterminate: the operation is running but
+    /// its extent is unknown.
+    /// </summary>
+    [Parameter]
+    public double? Value { get; set; }
+
+    /// <summary>The value representing completion.</summary>
+    [Parameter]
+    public double Max { get; set; } = 100;
+
+    /// <summary>
+    /// Accessible name, and the visible caption on the linear shape. Describe the operation -
+    /// "Uploading files" beats "Progress".
+    /// </summary>
+    [Parameter]
+    public string? Label { get; set; }
+
+    /// <summary>Show the numeric value.</summary>
+    [Parameter]
+    public bool ShowValue { get; set; }
+
+    /// <summary>Formats the value. Defaults to a whole percentage.</summary>
+    [Parameter]
+    public Func<double, double, string>? Format { get; set; }
+
+    /// <summary>Colour role of the indicator.</summary>
+    [Parameter]
+    public ZenIntent Intent { get; set; } = ZenIntent.Primary;
+
+    /// <summary>Control size.</summary>
+    [Parameter]
+    public ZenSize Size { get; set; } = ZenSize.Medium;
+
+    private bool IsIndeterminate => Value is null;
+
+    private double Clamped => Math.Clamp(Value ?? 0, 0, Max);
+
+    private double Fraction => Max <= 0 ? 0 : Clamped / Max;
+
+    /// <summary>
+    /// Omitted entirely when indeterminate. See the note at the top of this file - this is the
+    /// single most important line in the component.
+    /// </summary>
+    private string? AriaValueNow =>
+        IsIndeterminate ? null : Clamped.ToString("0.##", CultureInfo.InvariantCulture);
+
+    private string? ValueText =>
+        IsIndeterminate
+            ? null
+            : Format?.Invoke(Clamped, Max) ?? $"{Math.Round(Fraction * 100)}%";
+
+    // ---- Linear ----------------------------------------------------------------------------
+
+    private string LinearWrapperClass => "w-full";
+
+    private string TrackClass => CssBuilder
+        .Default("w-full overflow-hidden rounded-full bg-surface-sunken")
+        .AddClass(Size switch
+        {
+            ZenSize.Small => "h-1",
+            ZenSize.Large => "h-3",
+            _ => "h-2",
+        })
+        .Build()!;
+
+    private string BarClass => CssBuilder
+        .Default("h-full rounded-full transition-[width] duration-300")
+        .AddClass(IndicatorBgClass)
+        // An indeterminate bar slides a short segment back and forth. motion-safe so a viewer who
+        // asked for reduced motion gets a static partial bar instead of a shuttling one.
+        .AddClass("w-1/3 motion-safe:animate-[zen-indeterminate_1.4s_ease-in-out_infinite]", IsIndeterminate)
+        .Build()!;
+
+    private string? BarStyle =>
+        IsIndeterminate ? null : $"width:{(Fraction * 100).ToString("0.##", CultureInfo.InvariantCulture)}%";
+
+    // ---- Circular --------------------------------------------------------------------------
+
+    private const double Radius = 16;
+
+    private static readonly string Circumference =
+        (2 * Math.PI * Radius).ToString("0.###", CultureInfo.InvariantCulture);
+
+    private string StrokeWidth => Size switch
+    {
+        ZenSize.Small => "3",
+        ZenSize.Large => "4",
+        _ => "3.5",
+    };
+
+    private string DashOffset
+    {
+        get
+        {
+            var circumference = 2 * Math.PI * Radius;
+
+            // A quarter-arc for the indeterminate spinner; otherwise the remaining fraction.
+            var offset = IsIndeterminate ? circumference * 0.75 : circumference * (1 - Fraction);
+
+            return offset.ToString("0.###", CultureInfo.InvariantCulture);
+        }
+    }
+
+    private string CircularWrapperClass => "relative inline-grid place-items-center";
+
+    private string CircleSizeClass => Size switch
+    {
+        ZenSize.Small => "size-8 -rotate-0",
+        ZenSize.Large => "size-16",
+        _ => "size-12",
+    };
+
+    private string IndicatorColorClass => ZenStyles.Foreground(Intent);
+
+    private string IndicatorBgClass => Intent switch
+    {
+        ZenIntent.Secondary => "bg-secondary",
+        ZenIntent.Accent => "bg-accent",
+        ZenIntent.Success => "bg-success",
+        ZenIntent.Warning => "bg-warning",
+        ZenIntent.Danger => "bg-danger",
+        ZenIntent.Info => "bg-info",
+        ZenIntent.Neutral => "bg-content-muted",
+        _ => "bg-primary",
+    };
+}

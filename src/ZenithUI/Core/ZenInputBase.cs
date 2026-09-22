@@ -40,6 +40,7 @@ public abstract class ZenInputBase<TValue> : ZenComponentBase, IDisposable
     private bool _hasInitializedParameters;
     private EditContext? _subscribedEditContext;
     private Type? _nullableUnderlyingType;
+    private CancellationTokenSource? _debounceCts;
 
     /// <summary>Initializes a new instance.</summary>
     protected ZenInputBase() =>
@@ -116,6 +117,33 @@ public abstract class ZenInputBase<TValue> : ZenComponentBase, IDisposable
     /// <summary>Stretches the control to its container's width. On by default for form fields.</summary>
     [Parameter]
     public bool FullWidth { get; set; } = true;
+
+    /// <summary>
+    /// Update the bound value on every keystroke rather than when the control loses focus.
+    /// </summary>
+    /// <remarks>
+    /// Off by default, and that default is deliberate. Committing on every keystroke re-runs
+    /// validation mid-word, so a half-typed email address is reported as invalid while the user is
+    /// still typing it. Turn it on for a control whose whole purpose is live response - a search
+    /// box, a filter - and pair it with <see cref="DebounceMilliseconds"/>.
+    /// </remarks>
+    [Parameter]
+    public bool Immediate { get; set; }
+
+    /// <summary>
+    /// How long to wait after the last keystroke before committing, when <see cref="Immediate"/>
+    /// is set. Zero commits synchronously.
+    /// </summary>
+    [Parameter]
+    public int DebounceMilliseconds { get; set; }
+
+    /// <summary>Extra classes for the surrounding field wrapper, as opposed to the control itself.</summary>
+    /// <remarks>
+    /// <see cref="ZenComponentBase.Class"/> lands on the control, because that is the element a
+    /// caller almost always means. This is the escape hatch for the layout around it.
+    /// </remarks>
+    [Parameter]
+    public string? FieldClass { get; set; }
 
     /// <summary>
     /// The effective <see cref="Microsoft.AspNetCore.Components.Forms.EditContext"/>, or <see langword="null"/> when the control is
@@ -283,6 +311,57 @@ public abstract class ZenInputBase<TValue> : ZenComponentBase, IDisposable
         }
     }
 
+    /// <summary>
+    /// Handler for the DOM <c>change</c> event: commits when the control loses focus.
+    /// </summary>
+    protected void HandleChange(ChangeEventArgs args) =>
+        CurrentValueAsString = args.Value?.ToString();
+
+    /// <summary>
+    /// Handler for the DOM <c>input</c> event: commits on each keystroke, optionally debounced.
+    /// </summary>
+    /// <remarks>
+    /// Each keystroke cancels the previous pending commit. The cancellation is swallowed rather
+    /// than propagated - a superseded keystroke is the normal case here, not an error - and the
+    /// value is re-checked after the delay so a commit that lost the race never lands.
+    /// </remarks>
+    protected async Task HandleInputAsync(ChangeEventArgs args)
+    {
+        var value = args.Value?.ToString();
+
+        if (DebounceMilliseconds <= 0)
+        {
+            CurrentValueAsString = value;
+            return;
+        }
+
+        _debounceCts?.Cancel();
+        _debounceCts?.Dispose();
+
+        var cts = new CancellationTokenSource();
+        _debounceCts = cts;
+
+        try
+        {
+            await Task.Delay(DebounceMilliseconds, cts.Token);
+        }
+        catch (OperationCanceledException)
+        {
+            return;
+        }
+
+        if (cts.IsCancellationRequested)
+        {
+            return;
+        }
+
+        CurrentValueAsString = value;
+        StateHasChanged();
+    }
+
+    /// <summary>The DOM event a control should bind to, given <see cref="Immediate"/>.</summary>
+    protected string ValueEventName => Immediate ? "oninput" : "onchange";
+
     /// <summary>The field's human name, used in generated validation messages.</summary>
     protected string DisplayName =>
         Label ?? (ValueExpression is not null ? FieldIdentifier.FieldName : "value");
@@ -348,5 +427,10 @@ public abstract class ZenInputBase<TValue> : ZenComponentBase, IDisposable
     /// <summary>Releases resources held by a derived control.</summary>
     protected virtual void DisposeCore()
     {
+        // A pending debounce holds a timer and a callback into this component. Left running, it
+        // fires against a disposed component and its renderer.
+        _debounceCts?.Cancel();
+        _debounceCts?.Dispose();
+        _debounceCts = null;
     }
 }

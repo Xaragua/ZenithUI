@@ -41,6 +41,8 @@
     <Using Include="Xunit" />
     <Using Include="Bunit" />
     <Using Include="Shouldly" />
+    <Using Include="System.Globalization" />
+    <Using Include="System.Linq.Expressions" />
     <Using Include="Microsoft.AspNetCore.Components" />
     <Using Include="ZenithUI.Core" />
     <Using Include="ZenithUI.Services" />

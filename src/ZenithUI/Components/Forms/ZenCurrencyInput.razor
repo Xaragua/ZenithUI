@@ -1,0 +1,213 @@
+@namespace ZenithUI
+
+@inherits ZenInputBase<decimal?>
+
+@*
+    A money field.
+
+    No JavaScript masking. The usual approach - rewriting the input's value on every keystroke to
+    insert group separators - has to restore the caret afterwards, and every implementation gets
+    that subtly wrong somewhere: typing in the middle of a number, selecting and replacing a range,
+    undo. It also fights the browser's own undo stack.
+
+    Instead the field shows a plain editable number while focused and a fully formatted one when
+    not. The user types digits; formatting appears when they leave. Nothing ever moves under the
+    caret because nothing is rewritten while they are typing.
+
+    Parsing is deliberately forgiving: currency symbols, group separators and whitespace are
+    stripped before parsing, so pasting "$1,234.56" works. Parentheses are read as negative, which
+    is how accounting software exports negatives.
+*@
+
+<ZenField Label="@Label"
+          HelpText="@HelpText"
+          Errors="AllMessages"
+          Required="Required"
+          Disabled="Disabled"
+          For="@Id"
+          Size="Size"
+          Class="@FieldClass">
+    <div class="@WrapperClass">
+        <span class="shrink-0 select-none text-content-subtle" aria-hidden="true">@SymbolText</span>
+
+        <input id="@context.InputId"
+               type="text"
+               inputmode="decimal"
+               class="@RootClass(InnerClass)"
+               style="@Style"
+               value="@DisplayValue"
+               placeholder="@Placeholder"
+               disabled="@Disabled"
+               readonly="@ReadOnly"
+               aria-describedby="@context.DescribedBy"
+               aria-invalid="@context.AriaInvalid"
+               aria-required="@context.AriaRequired"
+               @attributes="AttributesWithoutClass"
+               @onfocus="HandleFocus"
+               @onblur="HandleBlur"
+               @onchange="HandleRawChange" />
+
+        @if (TrailingContent is not null)
+        {
+            <span class="flex shrink-0 items-center text-content-subtle">@TrailingContent</span>
+        }
+    </div>
+</ZenField>
+
+@code {
+    private bool _focused;
+    private string? _raw;
+
+    /// <summary>
+    /// Culture used for formatting and parsing. Defaults to the thread's current culture.
+    /// </summary>
+    [Parameter]
+    public CultureInfo? Culture { get; set; }
+
+    /// <summary>
+    /// Currency symbol shown as a prefix. Defaults to the culture's own.
+    /// </summary>
+    /// <remarks>
+    /// Rendered <c>aria-hidden</c>: it is a visual affix, and the field's label is what should say
+    /// which currency this is. A screen reader announcing "dollar sign, edit, 1234" is noise.
+    /// </remarks>
+    [Parameter]
+    public string? Symbol { get; set; }
+
+    /// <summary>Decimal places used when formatting. Defaults to the culture's currency precision.</summary>
+    [Parameter]
+    public int? Decimals { get; set; }
+
+    private CultureInfo EffectiveCulture => Culture ?? CultureInfo.CurrentCulture;
+
+    private int EffectiveDecimals => Decimals ?? EffectiveCulture.NumberFormat.CurrencyDecimalDigits;
+
+    private string SymbolText => Symbol ?? EffectiveCulture.NumberFormat.CurrencySymbol;
+
+    private IEnumerable<string> AllMessages =>
+        _parseFailed ? ValidationMessages.Append($"The {DisplayName} field is not a valid amount.")
+                     : ValidationMessages;
+
+    private bool _parseFailed;
+
+    /// <summary>
+    /// Bare digits while focused so the value is straightforward to edit, fully grouped once the
+    /// field is left.
+    /// </summary>
+    private string? DisplayValue
+    {
+        get
+        {
+            if (_focused)
+            {
+                return _raw ?? CurrentValue?.ToString(EffectiveCulture);
+            }
+
+            return CurrentValue?.ToString($"N{EffectiveDecimals}", EffectiveCulture);
+        }
+    }
+
+    private void HandleFocus(FocusEventArgs args)
+    {
+        _focused = true;
+
+        // Seed the editable text from the current value, unformatted. Without this the user would
+        // start editing the grouped string and have to delete the separators themselves.
+        _raw = CurrentValue?.ToString(EffectiveCulture);
+    }
+
+    private void HandleBlur(FocusEventArgs args)
+    {
+        _focused = false;
+        Commit(_raw);
+        _raw = null;
+    }
+
+    private void HandleRawChange(ChangeEventArgs args)
+    {
+        _raw = args.Value?.ToString();
+
+        // A change event also fires on Enter, which does not blur. Committing here means the value
+        // is stored either way.
+        if (!_focused)
+        {
+            Commit(_raw);
+        }
+    }
+
+    private void Commit(string? text)
+    {
+        if (string.IsNullOrWhiteSpace(text))
+        {
+            _parseFailed = false;
+            CurrentValue = null;
+            return;
+        }
+
+        if (TryParseAmount(text, EffectiveCulture, out var amount))
+        {
+            _parseFailed = false;
+            CurrentValue = Math.Round(amount, EffectiveDecimals, MidpointRounding.AwayFromZero);
+        }
+        else
+        {
+            // The text is kept so the user can see and fix what they typed, rather than having it
+            // silently discarded.
+            _parseFailed = true;
+        }
+    }
+
+    /// <summary>
+    /// Parses an amount, tolerating the shapes money actually arrives in: currency symbols, group
+    /// separators, spaces, and accounting-style parentheses for negatives.
+    /// </summary>
+    internal static bool TryParseAmount(string text, CultureInfo culture, out decimal amount)
+    {
+        var trimmed = text.Trim();
+        var negative = false;
+
+        if (trimmed.StartsWith('(') && trimmed.EndsWith(')'))
+        {
+            negative = true;
+            trimmed = trimmed[1..^1];
+        }
+
+        const NumberStyles Styles =
+            NumberStyles.AllowLeadingSign
+            | NumberStyles.AllowDecimalPoint
+            | NumberStyles.AllowThousands
+            | NumberStyles.AllowCurrencySymbol
+            | NumberStyles.AllowLeadingWhite
+            | NumberStyles.AllowTrailingWhite;
+
+        if (!decimal.TryParse(trimmed, Styles, culture, out amount))
+        {
+            // Fall back to the invariant culture so a value typed or pasted as "1234.56" still
+            // parses for a user whose culture uses a comma as the decimal separator.
+            if (!decimal.TryParse(trimmed, Styles, CultureInfo.InvariantCulture, out amount))
+            {
+                return false;
+            }
+        }
+
+        if (negative)
+        {
+            amount = -amount;
+        }
+
+        return true;
+    }
+
+    private string WrapperClass => CssBuilder
+        .Default(ZenStyles.InputWrapperBase)
+        .AddClass(ZenStyles.InputSize(Size))
+        .AddClass(ZenStyles.InputRadius(Size))
+        .AddClass("gap-1.5")
+        .AddClass("w-auto", !FullWidth)
+        .Build()!;
+
+    private string InnerClass => CssBuilder
+        .Default(ZenStyles.InputInnerBase)
+        .AddClass("tabular-nums text-right")
+        .Build()!;
+}

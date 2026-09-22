@@ -1,0 +1,166 @@
+@namespace ZenithUI
+
+@inherits ZenInputBase<bool>
+
+@*
+    A switch.
+
+    Rendered as <button role="switch"> rather than a restyled checkbox, because the two mean
+    different things and screen readers announce them differently. A switch takes effect the moment
+    it is flipped - "Wi-Fi on" - while a checkbox is a value that will be submitted with a form
+    later. Getting this wrong tells a screen reader user that a setting which has already applied
+    is merely "checked, pending".
+
+    If the value belongs to a form, use ZenCheckbox instead. A switch inside a form that only takes
+    effect on Save is a switch that lied.
+*@
+
+<div class="@RootClass(WrapperClass)" style="@Style">
+    <button type="button"
+            id="@Id"
+            role="switch"
+            aria-checked="@(CurrentValue ? "true" : "false")"
+            aria-labelledby="@(HasLabel ? LabelId : null)"
+            aria-describedby="@DescribedBy"
+            aria-label="@(HasLabel ? null : AriaLabel)"
+            disabled="@Disabled"
+            class="@TrackClass"
+            @attributes="AttributesWithoutClass"
+            @onclick="ToggleAsync">
+        <span class="@ThumbClass" aria-hidden="true"></span>
+    </button>
+
+    @if (HasLabel)
+    {
+        <div class="min-w-0">
+            @* A <label for> pointing at a button does nothing, so the association is made with
+               aria-labelledby and the click is forwarded by hand. *@
+            <span id="@LabelId" class="@LabelClass" @onclick="ToggleAsync">
+                @if (ChildContent is not null)
+                {
+                    @ChildContent
+                }
+                else
+                {
+                    @Label
+                }
+            </span>
+
+            @if (HelpText is not null)
+            {
+                <p id="@HelpId" class="mt-0.5 text-xs text-content-muted">@HelpText</p>
+            }
+        </div>
+    }
+</div>
+
+@code {
+    /// <summary>Label content, for when a plain string is not enough.</summary>
+    [Parameter]
+    public RenderFragment? ChildContent { get; set; }
+
+    /// <summary>Accessible name when there is no visible label.</summary>
+    [Parameter]
+    public string? AriaLabel { get; set; }
+
+    /// <summary>Colour role of the track when on.</summary>
+    [Parameter]
+    public ZenIntent Intent { get; set; } = ZenIntent.Primary;
+
+    /// <summary>Place the label before the switch rather than after it.</summary>
+    [Parameter]
+    public bool LabelFirst { get; set; }
+
+    private bool HasLabel => Label is not null || ChildContent is not null;
+
+    private string LabelId => $"{Id}-label";
+
+    private string HelpId => $"{Id}-help";
+
+    private string? DescribedBy => HelpText is not null ? HelpId : null;
+
+    private async Task ToggleAsync()
+    {
+        if (Disabled || ReadOnly)
+        {
+            return;
+        }
+
+        CurrentValue = !CurrentValue;
+        await OnToggled.InvokeAsync(CurrentValue);
+    }
+
+    /// <summary>Raised after the value flips. The new value is the argument.</summary>
+    [Parameter]
+    public EventCallback<bool> OnToggled { get; set; }
+
+    private string WrapperClass => CssBuilder
+        .Default("flex items-start gap-3")
+        .AddClass("flex-row-reverse justify-end", LabelFirst)
+        .AddClass(FieldClass)
+        .Build()!;
+
+    private string TrackClass => CssBuilder
+        .Default("zen-focus relative inline-flex shrink-0 cursor-pointer items-center rounded-full border-2 border-transparent transition-colors")
+        .AddClass("disabled:cursor-not-allowed disabled:opacity-50")
+        .AddClass(CurrentValue ? OnTrackClass : "bg-border-strong")
+        .AddClass(Size switch
+        {
+            ZenSize.Small => "h-5 w-9",
+            ZenSize.Large => "h-7 w-13",
+            _ => "h-6 w-11",
+        })
+        .Build()!;
+
+    private string OnTrackClass => Intent switch
+    {
+        ZenIntent.Secondary => "bg-secondary",
+        ZenIntent.Accent => "bg-accent",
+        ZenIntent.Success => "bg-success",
+        ZenIntent.Warning => "bg-warning",
+        ZenIntent.Danger => "bg-danger",
+        ZenIntent.Info => "bg-info",
+        ZenIntent.Neutral => "bg-content-muted",
+        _ => "bg-primary",
+    };
+
+    private string LabelClass => CssBuilder
+        .Default("cursor-pointer select-none text-content")
+        .AddClass(Size switch
+        {
+            ZenSize.Small => "text-xs",
+            ZenSize.Large => "text-base",
+            _ => "text-sm",
+        })
+        .AddClass("cursor-not-allowed opacity-60", Disabled)
+        .Build()!;
+
+    private string ThumbClass => CssBuilder
+        .Default("pointer-events-none inline-block rounded-full bg-surface-raised shadow-zen-sm ring-0 transition-transform")
+        .AddClass(Size switch
+        {
+            ZenSize.Small => "size-4",
+            ZenSize.Large => "size-6",
+            _ => "size-5",
+        })
+        .AddClass(CurrentValue
+            ? Size switch
+            {
+                ZenSize.Small => "translate-x-4",
+                ZenSize.Large => "translate-x-6",
+                _ => "translate-x-5",
+            }
+            : "translate-x-0")
+        .Build()!;
+
+    protected override void OnParametersSet()
+    {
+        if (!HasLabel && string.IsNullOrWhiteSpace(AriaLabel)
+            && (AdditionalAttributes is null || !AdditionalAttributes.ContainsKey("aria-label")))
+        {
+            throw new InvalidOperationException(
+                $"{nameof(ZenToggle)} requires either {nameof(Label)} or {nameof(AriaLabel)}. A " +
+                "switch with no accessible name is announced as just \"switch\".");
+        }
+    }
+}

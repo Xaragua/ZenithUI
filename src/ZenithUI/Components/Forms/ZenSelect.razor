@@ -1,0 +1,70 @@
+@namespace ZenithUI
+
+@typeparam TValue
+@inherits ZenInputBase<TValue>
+
+@*
+    A native <select>.
+
+    Native on purpose. It is the only dropdown that works with zero JavaScript, which means it is
+    the only one that functions under static SSR - and on mobile it opens the platform's own
+    picker, which beats any custom list in a scrolling viewport. ZenCombobox (M3) exists for the
+    cases this cannot serve: typeahead, async loading, multi-select with chips.
+
+    The placeholder option is disabled rather than merely empty, so "Choose a country" cannot be
+    chosen and submitted as a value.
+*@
+
+<ZenField Label="@Label"
+          HelpText="@HelpText"
+          Errors="ValidationMessages"
+          Required="Required"
+          Disabled="Disabled"
+          For="@Id"
+          Size="Size"
+          Class="@FieldClass">
+    <div class="@ShellClass">
+        <select id="@context.InputId"
+                class="@RootClass(SelectClass)"
+                style="@Style"
+                value="@CurrentValueAsString"
+                disabled="@Disabled"
+                aria-describedby="@context.DescribedBy"
+                aria-invalid="@context.AriaInvalid"
+                aria-required="@context.AriaRequired"
+                @attributes="AttributesWithoutClass"
+                @onchange="HandleChange">
+            @if (Placeholder is not null)
+            {
+                <option value="" disabled selected="@(CurrentValue is null)">@Placeholder</option>
+            }
+
+            @ChildContent
+        </select>
+
+        @* The UA's own arrow is suppressed by appearance-none so the control can be themed;
+           this replaces it. pointer-events-none keeps clicks going to the select underneath. *@
+        <ZenIcon Path="@ZenIcons.ChevronDown"
+                 Size="ZenSize.Small"
+                 class="pointer-events-none absolute end-3 top-1/2 -translate-y-1/2 text-content-subtle" />
+    </div>
+</ZenField>
+
+@code {
+    /// <summary>The <c>option</c> and <c>optgroup</c> elements.</summary>
+    [Parameter]
+    public RenderFragment? ChildContent { get; set; }
+
+    private string ShellClass => CssBuilder
+        .Default("relative")
+        .AddClass(FullWidth ? "w-full" : "w-auto")
+        .Build()!;
+
+    private string SelectClass => CssBuilder
+        .Default(ZenStyles.InputBase)
+        .AddClass(ZenStyles.InputSize(Size))
+        .AddClass(ZenStyles.InputRadius(Size))
+        // appearance-none removes the UA arrow; the end padding leaves room for the one drawn above.
+        .AddClass("cursor-pointer appearance-none pe-9")
+        .Build()!;
+}

@@ -24,6 +24,16 @@
     <PackageReference Include="Microsoft.AspNetCore.Components.Web" />
   </ItemGroup>
 
+  <!--
+    Lets the test project reach helpers that are deliberately not public API - currency parsing
+    being the case in point. Testing it through the rendered control would exercise focus and blur
+    handling to assert a parsing rule, which makes the test about the wrong thing and fails for
+    reasons unrelated to what it is checking.
+  -->
+  <ItemGroup>
+    <InternalsVisibleTo Include="ZenithUI.Tests" />
+  </ItemGroup>
+
   <ItemGroup>
     <None Include="..\..\README.md" Pack="true" PackagePath="\" Visible="false" />
   </ItemGroup>

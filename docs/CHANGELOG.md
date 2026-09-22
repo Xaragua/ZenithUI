@@ -6,6 +6,56 @@ All notable changes to ZenithUI are documented here. The format follows
 
 ## [Unreleased]
 
+### Added — M2, form controls and feedback primitives
+
+**Text entry** — `ZenTextInput`, `ZenTextArea`, `ZenNumberInput<T>`, `ZenCurrencyInput`,
+`ZenSearchInput`, `ZenDateInput<T>`.
+
+**Choice** — `ZenCheckbox`, `ZenRadioGroup<T>` + `ZenRadio<T>`, `ZenSelect<T>`, `ZenToggle`.
+
+**Other** — `ZenRangeSlider`, `ZenProgress`, `ZenIndicator`, `ZenForm`.
+
+`ZenInputBase<T>` gained `Immediate` and `DebounceMilliseconds` (each keystroke cancels the
+previous pending commit), a `FieldClass` escape hatch for the wrapper, and disposal of any pending
+debounce.
+
+**Decisions worth knowing**
+
+- **Native elements wherever one exists.** Checkbox, radio, select, date and range all wrap the
+  platform control rather than rebuilding it. Each brings keyboard handling, form participation and
+  correct announcement for free, and the re-implementations that replace them usually drop at least
+  one of the three. `ZenCombobox` (M3) exists for what native genuinely cannot do.
+- **`ZenCurrencyInput` does not mask.** Rewriting the value on every keystroke to insert separators
+  means restoring the caret afterwards, and every implementation gets that wrong somewhere — typing
+  mid-number, replacing a selection, undo. Instead the field shows plain digits while focused and
+  formats on blur, so nothing moves under the caret. Parsing accepts symbols, separators and
+  accounting-style parentheses for negatives.
+- **`ZenTextArea` auto-grows with CSS `field-sizing`,** not by writing `scrollHeight` back on each
+  keystroke. The JS approach does nothing during prerender, so a textarea with existing content
+  renders at one row until the circuit connects.
+- **`ZenNumberInput` blurs on wheel.** A focused `type="number"` steps its value while the user
+  scrolls the page past it, silently corrupting a field they were not looking at.
+- **`ZenToggle` is `<button role="switch">`,** not a restyled checkbox. A switch takes effect
+  immediately; a checkbox is a value to be submitted later, and screen readers announce them
+  differently.
+- **`ZenProgress` omits `aria-valuenow` when indeterminate.** That omission is precisely how ARIA
+  says "in progress, amount unknown"; setting zero announces "0 percent", claiming a fact that is
+  not known and reading as a stalled operation.
+- **`ZenDateInput` parses and formats with the invariant culture.** The native control's value is
+  always ISO regardless of what the user sees — using the current culture works in `en-US` and
+  breaks wherever the separator differs.
+
+**Verification** — 327 tests, up from 260.
+
+### Fixed during M2
+
+- **`ZenForm` passed both `EditContext` and `Model` to `EditForm`,** which rejects the combination
+  outright, so every page using it returned a 500. Every unit test passed, because none of them had
+  rendered a `ZenForm` — caught on first load of the demo page.
+- **`ZenIndicator`'s fill was sliced out of `ZenStyles.Solid()`,** whose `Neutral` background is
+  `surface-raised`. A neutral badge therefore rendered white on a white page. A marker's entire job
+  is to be noticed.
+
 ### Changed — focus treatment for input controls
 
 Text-entry controls now signal focus by recolouring **their own border** to the ring colour, with no

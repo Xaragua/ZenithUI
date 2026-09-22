@@ -1,0 +1,133 @@
+@namespace ZenithUI
+
+@inherits ZenInputBase<string>
+
+@*
+    A search field: magnifier affix, debounced live updates, and a clear button that appears once
+    there is something to clear.
+
+    `type="search"` rather than `type="text"` - it is what makes Escape clear the field and puts
+    the query in the browser's search history. The UA's own clear widget is suppressed in WebKit so
+    there are not two X buttons.
+
+    Defaults differ from ZenTextInput on purpose: Immediate is on and debounced. A search box that
+    only reacts on blur is not a search box.
+*@
+
+<ZenField Label="@Label"
+          HelpText="@HelpText"
+          Errors="ValidationMessages"
+          Required="Required"
+          Disabled="Disabled"
+          For="@Id"
+          Size="Size"
+          Class="@FieldClass">
+    <div class="@WrapperClass">
+        <ZenIcon Path="@ZenIcons.Search" Size="ZenSize.Small" class="shrink-0 text-content-subtle" />
+
+        <input id="@context.InputId"
+               type="search"
+               role="searchbox"
+               class="@RootClass(InnerClass)"
+               style="@Style"
+               value="@CurrentValueAsString"
+               placeholder="@Placeholder"
+               disabled="@Disabled"
+               readonly="@ReadOnly"
+               autocomplete="off"
+               aria-describedby="@context.DescribedBy"
+               aria-required="@context.AriaRequired"
+               @attributes="AttributesWithoutClass"
+               @onchange="HandleChange"
+               @oninput="HandleInputAsync"
+               @onkeydown="HandleKeyDownAsync" />
+
+        @if (HasValue && !Disabled && !ReadOnly)
+        {
+            @* type="button" so it cannot submit an enclosing form, and an explicit label because
+               an X glyph names nothing. *@
+            <button type="button"
+                    class="@ClearButtonClass"
+                    aria-label="@ClearLabel"
+                    @onclick="ClearAsync">
+                <ZenIcon Path="@ZenIcons.Close" Size="ZenSize.Small" class="size-3.5" />
+            </button>
+        }
+
+        @if (Busy)
+        {
+            <ZenSpinner Size="ZenSize.Small" Label="@BusyLabel" />
+        }
+    </div>
+</ZenField>
+
+@code {
+    /// <summary>Accessible name for the clear button.</summary>
+    [Parameter]
+    public string ClearLabel { get; set; } = "Clear search";
+
+    /// <summary>
+    /// Shows a spinner inside the field while results are loading. The caller owns this - the
+    /// control cannot know when a search has finished.
+    /// </summary>
+    [Parameter]
+    public bool Busy { get; set; }
+
+    /// <summary>Accessible status text for the busy spinner.</summary>
+    [Parameter]
+    public string BusyLabel { get; set; } = "Searching";
+
+    /// <summary>Raised when the field is cleared, by the button or by Escape.</summary>
+    [Parameter]
+    public EventCallback OnCleared { get; set; }
+
+    private bool HasValue => !string.IsNullOrEmpty(CurrentValue);
+
+    protected override void OnInitialized()
+    {
+        // A search box that only reacts on blur is not a search box. The debounce keeps a request
+        // per keystroke from being fired while still feeling live.
+        Immediate = true;
+
+        if (DebounceMilliseconds == 0)
+        {
+            DebounceMilliseconds = 250;
+        }
+    }
+
+    private async Task HandleKeyDownAsync(KeyboardEventArgs args)
+    {
+        // Browsers already clear a type="search" on Escape, but only some of them, and the bound
+        // value would not follow. Handling it here makes the behaviour uniform and keeps .NET
+        // state in step with the DOM.
+        if (args.Key == "Escape" && HasValue)
+        {
+            await ClearAsync();
+        }
+    }
+
+    private async Task ClearAsync()
+    {
+        CurrentValue = string.Empty;
+        await OnCleared.InvokeAsync();
+    }
+
+    private string WrapperClass => CssBuilder
+        .Default(ZenStyles.InputWrapperBase)
+        .AddClass(ZenStyles.InputSize(Size))
+        .AddClass(ZenStyles.InputRadius(Size))
+        .AddClass("gap-2")
+        .AddClass("w-auto", !FullWidth)
+        .Build()!;
+
+    private string InnerClass => CssBuilder
+        .Default(ZenStyles.InputInnerBase)
+        // Suppress WebKit's own clear widget so there are not two X buttons side by side.
+        .AddClass("[&::-webkit-search-cancel-button]:appearance-none")
+        .Build()!;
+
+    private string ClearButtonClass => CssBuilder
+        .Default("zen-focus grid shrink-0 place-items-center rounded-full p-0.5")
+        .AddClass("text-content-subtle transition-colors hover:text-content")
+        .Build()!;
+}

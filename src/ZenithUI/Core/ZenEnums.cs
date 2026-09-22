@@ -89,6 +89,34 @@ public enum ZenSkeletonShape
     Rectangle,
 }
 
+/// <summary>Shape drawn by a progress indicator.</summary>
+public enum ZenProgressShape
+{
+    /// <summary>A horizontal bar. The default, and the right choice when there is width to spare.</summary>
+    Linear,
+
+    /// <summary>A ring. For tight spaces and inline use.</summary>
+    Circular,
+}
+
+/// <summary>
+/// A corner of an element, in logical terms so the anchor follows the writing direction.
+/// </summary>
+public enum ZenCorner
+{
+    /// <summary>Top, on the side text starts from.</summary>
+    TopStart,
+
+    /// <summary>Top, on the side text ends at. The default for a notification badge.</summary>
+    TopEnd,
+
+    /// <summary>Bottom, on the side text starts from.</summary>
+    BottomStart,
+
+    /// <summary>Bottom, on the side text ends at.</summary>
+    BottomEnd,
+}
+
 /// <summary>Direction of change shown by a stat card's delta.</summary>
 public enum ZenTrend
 {

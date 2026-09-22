@@ -1,0 +1,185 @@
+@namespace ZenithUI
+
+@inherits ZenComponentBase
+
+@*
+    A thin wrapper over EditForm: layout, an optional error summary, and submit state.
+
+    Thin on purpose. EditForm already handles model binding, validation triggering and the
+    EditContext cascade, and replacing any of that would mean reimplementing framework behaviour
+    that third-party validators depend on. What this adds is the part EditForm leaves to every
+    application to rebuild: consistent spacing, a summary that appears only after a failed submit,
+    and a submit button that cannot be double-fired.
+*@
+
+@* EditContext only, never alongside Model - EditForm rejects being given both. The context is
+   built here from Model so that its lifetime is controlled (see OnParametersSet), which is what
+   keeps validation state from being discarded on unrelated re-renders. *@
+<EditForm EditContext="@_editContext"
+          OnValidSubmit="HandleValidSubmitAsync"
+          OnInvalidSubmit="HandleInvalidSubmitAsync"
+          FormName="@FormName"
+          class="@RootClass(FormClass)"
+          @attributes="AttributesWithoutClass">
+    @if (Validator is not null)
+    {
+        @Validator
+    }
+    else if (UseDataAnnotations)
+    {
+        <DataAnnotationsValidator />
+    }
+
+    @if (ShowSummary && _submitAttempted && _errors.Count > 0)
+    {
+        @*
+            role="alert" and tabindex="-1": the summary is both announced when it appears and
+            focusable, so the submit handler can move focus here. A failed submit that leaves focus
+            on the button, with the reason rendered somewhere above the fold, is the single most
+            common way forms fail keyboard and screen reader users.
+        *@
+        <div class="@SummaryClass" role="alert" tabindex="-1" id="@SummaryId">
+            <div class="flex items-start gap-2">
+                <ZenIcon Path="@ZenIcons.Danger" Size="ZenSize.Small" class="mt-0.5 text-danger-strong" />
+                <div class="min-w-0">
+                    <p class="text-sm font-medium text-danger-strong">@SummaryTitle</p>
+                    <ul class="mt-1.5 list-disc space-y-0.5 ps-4 text-sm text-danger-strong">
+                        @foreach (var error in _errors)
+                        {
+                            <li>@error</li>
+                        }
+                    </ul>
+                </div>
+            </div>
+        </div>
+    }
+
+    @ChildContent
+
+    @if (Actions is not null)
+    {
+        <div class="@ActionsClass">@Actions</div>
+    }
+</EditForm>
+
+@code {
+    private EditContext? _editContext;
+    private object? _boundModel;
+    private bool _submitAttempted;
+    private List<string> _errors = [];
+
+    /// <summary>The model being edited.</summary>
+    [Parameter, EditorRequired]
+    public object Model { get; set; } = default!;
+
+    /// <summary>The fields.</summary>
+    [Parameter]
+    public RenderFragment? ChildContent { get; set; }
+
+    /// <summary>Submit and cancel controls, laid out in a row below the fields.</summary>
+    [Parameter]
+    public RenderFragment? Actions { get; set; }
+
+    /// <summary>
+    /// A validator component. Supply <c>&lt;FluentValidationValidator /&gt;</c> or similar here;
+    /// leave it unset to use <see cref="UseDataAnnotations"/>.
+    /// </summary>
+    [Parameter]
+    public RenderFragment? Validator { get; set; }
+
+    /// <summary>Add a <c>DataAnnotationsValidator</c> when no explicit <see cref="Validator"/> is given.</summary>
+    [Parameter]
+    public bool UseDataAnnotations { get; set; } = true;
+
+    /// <summary>Raised when the model passes validation.</summary>
+    [Parameter]
+    public EventCallback<EditContext> OnValidSubmit { get; set; }
+
+    /// <summary>Raised when submission is attempted with validation errors.</summary>
+    [Parameter]
+    public EventCallback<EditContext> OnInvalidSubmit { get; set; }
+
+    /// <summary>Show a summary of all errors after a failed submit.</summary>
+    [Parameter]
+    public bool ShowSummary { get; set; } = true;
+
+    /// <summary>Heading for the error summary.</summary>
+    [Parameter]
+    public string SummaryTitle { get; set; } = "Please correct the following";
+
+    /// <summary>Vertical gap between fields.</summary>
+    [Parameter]
+    public ZenSize Spacing { get; set; } = ZenSize.Medium;
+
+    /// <summary>Form name, for static SSR form posts.</summary>
+    [Parameter]
+    public string? FormName { get; set; }
+
+    /// <summary>
+    /// <see langword="true"/> while a submit handler is running. Bind a button's
+    /// <c>Loading</c> to it.
+    /// </summary>
+    public bool IsSubmitting { get; private set; }
+
+    private string SummaryId => $"{Id}-summary";
+
+    protected override void OnParametersSet()
+    {
+        // Rebuild the context only when the model instance actually changes. Recreating it on
+        // every parameter set would discard validation state on each render - so a message would
+        // vanish the moment anything else on the page updated.
+        if (!ReferenceEquals(Model, _boundModel))
+        {
+            _boundModel = Model;
+            _editContext = new EditContext(Model);
+            _submitAttempted = false;
+            _errors = [];
+        }
+    }
+
+    private async Task HandleValidSubmitAsync(EditContext context)
+    {
+        _submitAttempted = true;
+        _errors = [];
+
+        if (IsSubmitting)
+        {
+            return;
+        }
+
+        IsSubmitting = true;
+
+        try
+        {
+            await OnValidSubmit.InvokeAsync(context);
+        }
+        finally
+        {
+            // finally, so a handler that throws does not leave the form permanently disabled.
+            IsSubmitting = false;
+        }
+    }
+
+    private async Task HandleInvalidSubmitAsync(EditContext context)
+    {
+        _submitAttempted = true;
+        _errors = context.GetValidationMessages().Distinct().ToList();
+
+        await OnInvalidSubmit.InvokeAsync(context);
+    }
+
+    private string FormClass => CssBuilder
+        .Default("flex flex-col")
+        .AddClass(Spacing switch
+        {
+            ZenSize.Small => "gap-3",
+            ZenSize.Large => "gap-6",
+            _ => "gap-4",
+        })
+        .Build()!;
+
+    private string SummaryClass =>
+        "zen-focus rounded-zen-md border border-danger bg-danger-soft p-3";
+
+    private string ActionsClass => "flex flex-wrap items-center justify-end gap-2 pt-1";
+}

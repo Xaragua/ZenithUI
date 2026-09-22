@@ -1,0 +1,119 @@
+@namespace ZenithUI
+
+@typeparam TValue
+@inherits ZenComponentBase
+
+@*
+    One option inside a ZenRadioGroup.
+
+    This does not derive from ZenInputBase: it holds no value of its own and has nothing to
+    validate. The group owns the binding; an option only reports that it was chosen.
+
+    Focus keeps the ring rather than the border treatment, for the same reason as ZenCheckbox - a
+    selected radio is filled with the accent colour, so a coloured border on it would be invisible.
+*@
+
+<div class="@RootClass(WrapperClass)" style="@Style">
+    <div class="flex h-5 shrink-0 items-center">
+        <input id="@Id"
+               type="radio"
+               name="@Group.GroupName"
+               value="@Value?.ToString()"
+               checked="@IsSelected"
+               disabled="@IsDisabled"
+               class="@RadioClass"
+               @attributes="AttributesWithoutClass"
+               @onchange="HandleChange" />
+    </div>
+
+    <div class="min-w-0">
+        <label for="@Id" class="@LabelClass">
+            @if (ChildContent is not null)
+            {
+                @ChildContent
+            }
+            else
+            {
+                @Label
+            }
+        </label>
+
+        @if (HelpText is not null)
+        {
+            <p class="mt-0.5 text-xs text-content-muted">@HelpText</p>
+        }
+    </div>
+</div>
+
+@code {
+    /// <summary>
+    /// The enclosing group. Supplied by cascade; a radio outside a group is a programming error
+    /// rather than a state to degrade gracefully from, so this is required.
+    /// </summary>
+    [CascadingParameter]
+    private ZenRadioGroup<TValue> Group { get; set; } = default!;
+
+    /// <summary>The value this option selects.</summary>
+    [Parameter, EditorRequired]
+    public TValue? Value { get; set; }
+
+    /// <summary>Option label.</summary>
+    [Parameter]
+    public string? Label { get; set; }
+
+    /// <summary>Label content, for when a plain string is not enough.</summary>
+    [Parameter]
+    public RenderFragment? ChildContent { get; set; }
+
+    /// <summary>Secondary line under the label.</summary>
+    [Parameter]
+    public string? HelpText { get; set; }
+
+    /// <summary>Disables this option alone. The group can disable them all.</summary>
+    [Parameter]
+    public bool Disabled { get; set; }
+
+    private bool IsSelected => Group.IsSelected(Value);
+
+    private bool IsDisabled => Disabled || Group.GroupDisabled;
+
+    private void HandleChange(ChangeEventArgs args) => Group.Select(Value);
+
+    protected override void OnInitialized()
+    {
+        if (Group is null)
+        {
+            throw new InvalidOperationException(
+                $"{nameof(ZenRadio<TValue>)} must be placed inside a {nameof(ZenRadioGroup<TValue>)}. " +
+                "The group owns the binding, the shared name and the validation state.");
+        }
+    }
+
+    private string WrapperClass => CssBuilder
+        .Default("flex items-start gap-2.5")
+        .Build()!;
+
+    private string RadioClass => CssBuilder
+        // zen-focus, not zen-focus-border: a selected radio is filled, so a coloured border on it
+        // would be invisible.
+        .Default("zen-focus cursor-pointer border-border-strong accent-primary")
+        .AddClass("disabled:cursor-not-allowed disabled:opacity-50")
+        .AddClass(Group.GroupSize switch
+        {
+            ZenSize.Small => "size-4",
+            ZenSize.Large => "size-6",
+            _ => "size-5",
+        })
+        .Build()!;
+
+    private string LabelClass => CssBuilder
+        .Default("cursor-pointer text-content")
+        .AddClass(Group.GroupSize switch
+        {
+            ZenSize.Small => "text-xs",
+            ZenSize.Large => "text-base",
+            _ => "text-sm",
+        })
+        .AddClass("cursor-not-allowed opacity-60", IsDisabled)
+        .Build()!;
+}

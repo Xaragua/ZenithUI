@@ -1,0 +1,145 @@
+@namespace ZenithUI
+
+@inherits ZenInputBase<double>
+
+@*
+    A slider over a native <input type="range">.
+
+    Native underneath because the platform already provides arrow-key and Home/End handling, a
+    touch target that meets the 24px minimum, drag behaviour that matches the OS, and correct
+    announcement of the value as it changes. Every hand-rolled slider has to rebuild all of that,
+    and most get the keyboard wrong.
+
+    The filled portion of the track is drawn with a gradient whose stop position is bound to the
+    current value. It is the one way to show progress on a native range without covering it with
+    an overlay - which would swallow the pointer events the native element needs.
+*@
+
+<ZenField Label="@Label"
+          HelpText="@HelpText"
+          Errors="ValidationMessages"
+          Required="Required"
+          Disabled="Disabled"
+          For="@Id"
+          Size="Size"
+          Class="@FieldClass">
+    <div class="flex w-full items-center gap-3">
+        @if (ShowBounds)
+        {
+            <span class="shrink-0 text-xs tabular-nums text-content-subtle" aria-hidden="true">@FormatValue(Min)</span>
+        }
+
+        <input id="@context.InputId"
+               type="range"
+               class="@RootClass(SliderClass)"
+               style="@TrackStyle"
+               value="@CurrentValueAsString"
+               min="@Min.ToString(CultureInfo.InvariantCulture)"
+               max="@Max.ToString(CultureInfo.InvariantCulture)"
+               step="@Step.ToString(CultureInfo.InvariantCulture)"
+               disabled="@Disabled"
+               aria-describedby="@context.DescribedBy"
+               aria-valuetext="@ValueText"
+               @attributes="AttributesWithoutClass"
+               @onchange="HandleChange"
+               @oninput="HandleInputAsync" />
+
+        @if (ShowBounds)
+        {
+            <span class="shrink-0 text-xs tabular-nums text-content-subtle" aria-hidden="true">@FormatValue(Max)</span>
+        }
+
+        @if (ShowValue)
+        {
+            @* aria-hidden: the native input already announces its own value, and the browser uses
+               aria-valuetext when we supply one. A second live region would double it up. *@
+            <output for="@context.InputId"
+                    class="w-12 shrink-0 text-end text-sm font-medium tabular-nums text-content"
+                    aria-hidden="true">
+                @FormatValue(CurrentValue)
+            </output>
+        }
+    </div>
+</ZenField>
+
+@code {
+    /// <summary>Lowest selectable value.</summary>
+    [Parameter]
+    public double Min { get; set; }
+
+    /// <summary>Highest selectable value.</summary>
+    [Parameter]
+    public double Max { get; set; } = 100;
+
+    /// <summary>Step granularity.</summary>
+    [Parameter]
+    public double Step { get; set; } = 1;
+
+    /// <summary>Show the current value beside the track.</summary>
+    [Parameter]
+    public bool ShowValue { get; set; } = true;
+
+    /// <summary>Show the minimum and maximum at each end.</summary>
+    [Parameter]
+    public bool ShowBounds { get; set; }
+
+    /// <summary>
+    /// Formats the value for display and for <c>aria-valuetext</c>.
+    /// </summary>
+    /// <remarks>
+    /// Worth supplying whenever the raw number is not what the value means. A screen reader
+    /// announcing "70" is far less useful than "70 percent" or "3 of 5" - which is exactly what
+    /// <c>aria-valuetext</c> exists for.
+    /// </remarks>
+    [Parameter]
+    public Func<double, string>? Format { get; set; }
+
+    /// <summary>Colour role of the filled portion of the track.</summary>
+    [Parameter]
+    public ZenIntent Intent { get; set; } = ZenIntent.Primary;
+
+    private string FormatValue(double value) =>
+        Format?.Invoke(value) ?? value.ToString("0.##", CultureInfo.CurrentCulture);
+
+    private string ValueText => FormatValue(CurrentValue);
+
+    /// <summary>Position of the thumb as a percentage, used to place the gradient stop.</summary>
+    private double Percent
+    {
+        get
+        {
+            var span = Max - Min;
+
+            // A zero span would divide by zero; treat a degenerate range as fully filled rather
+            // than letting it produce NaN and an invalid gradient.
+            return span <= 0 ? 100 : Math.Clamp((CurrentValue - Min) / span * 100, 0, 100);
+        }
+    }
+
+    private string TrackStyle
+    {
+        get
+        {
+            var percent = Percent.ToString("0.##", CultureInfo.InvariantCulture);
+            var fill = $"--zen-slider-fill:{percent}%";
+
+            return Style is null ? fill : $"{fill};{Style}";
+        }
+    }
+
+    private string SliderClass => CssBuilder
+        .Default("zen-slider w-full")
+        .AddClass(Intent switch
+        {
+            ZenIntent.Secondary => "accent-secondary",
+            ZenIntent.Accent => "accent-accent",
+            ZenIntent.Success => "accent-success",
+            ZenIntent.Warning => "accent-warning",
+            ZenIntent.Danger => "accent-danger",
+            ZenIntent.Info => "accent-info",
+            ZenIntent.Neutral => "accent-content",
+            _ => "accent-primary",
+        })
+        .AddClass("disabled:cursor-not-allowed disabled:opacity-50")
+        .Build()!;
+}

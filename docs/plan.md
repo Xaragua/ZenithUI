@@ -1,6 +1,6 @@
 # ZenithUI — implementation plan
 
-> **Status:** M0 and M1 complete (2026-09-22). M2 not started.
+> **Status:** M0, M1 and M2 complete (2026-09-22). M3 next: ZenModal + modal service, ZenToast + toast service.
 > This is the plan of record. It is kept current: where implementation contradicted the original
 > plan, the plan was corrected and the change noted under [Deviations](#deviations-from-the-original-plan).
 
@@ -142,7 +142,7 @@ replacing the component's own.
 Fluent conditional class composition. Returns `null` rather than `""` when empty, so Blazor omits
 the attribute entirely.
 
-### `Core/ZenInputBase<TValue>.cs` — **do not inherit `InputBase<TValue>`** *(M2)*
+### `Core/ZenInputBase<TValue>.cs` — **do not inherit `InputBase<TValue>`**
 
 `Microsoft.AspNetCore.Components.Forms.InputBase<T>` **throws** when no cascading `EditContext` is
 present, which would make every input unusable outside an `EditForm`. Write an equivalent base with
@@ -368,7 +368,7 @@ component's bUnit test asserts its required ARIA attributes.
 | --- | --- | --- | --- |
 | **M0** | Repo scaffold, Tailwind v4 pipeline, tokens, theme service/provider/toggle, `ZenComponentBase`, `ZenJsComponentBase`, `CssBuilder`, demo, tests, CI | Demo runs; light/dark/system repaints via CSS variables alone; CI green | ✅ |
 | **M1** | `ZenIcon`, `ZenButton`, `ZenBadge`, `ZenSpinner`, `ZenSkeleton`, `ZenCard`, `ZenStatCard`, `ZenField`, `ZenInputBase<T>` | A demo page per primitive, verified in both palettes | ✅ |
-| **M2** | Text, textarea, number, currency, date, search, checkbox (+group), radio group, native select, `ZenToggle`, `ZenRangeSlider`, `ZenForm`, plus the feedback primitives `ZenProgress` and `ZenIndicator` | A demo form binds an `EditForm` + `DataAnnotationsValidator` and shows per-field errors; the same inputs also work **without** an `EditForm` | |
+| **M2** ✅ | Text, textarea, number, currency, date, search, checkbox (+group), radio group, native select, `ZenToggle`, `ZenRangeSlider`, `ZenForm`, plus the feedback primitives `ZenProgress` and `ZenIndicator` | A demo form binds an `EditForm` + `DataAnnotationsValidator` and shows per-field errors; the same inputs also work **without** an `EditForm` | ✅ |
 | **M3** | `ZenModal` + `IZenModalService`, `ZenToast` + `IZenToastService`, `ZenPopover`, `ZenCombobox<TItem>`, `ZenList<TItem>` | A dialog can be raised and awaited from a service with no markup on the page; focus returns to the opener on close; combobox passes keyboard + ARIA tests and prerenders as a closed labelled field with JS disabled | |
 | **M4** | `ZenTable<TItem>` (sort/page/select/hierarchy/responsive collapse), `ZenTree<TItem>`, `ZenTimeline` | Demo renders a 3-level hierarchical table and a lazy-loading tree | |
 | **M5** | `ZenAppBar`, `ZenNavMenu`, `ZenSideNav`, `ZenFooter`, `ZenAppShell` | Shell demo usable at 360 / 768 / 1440 px; drawer traps focus and restores it on close | |

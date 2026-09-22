@@ -1,0 +1,270 @@
+@page "/forms"
+@rendermode InteractiveServer
+@using System.ComponentModel.DataAnnotations
+
+<PageTitle>Forms &middot; ZenithUI</PageTitle>
+
+<header class="max-w-3xl">
+    <h1 class="text-3xl font-bold tracking-tight">Form controls</h1>
+    <p class="mt-3 text-content-muted">
+        Every control here derives from <code>ZenInputBase&lt;T&gt;</code> and renders through
+        <code>ZenField</code>. They work inside an <code>EditForm</code> and, just as importantly,
+        outside one &mdash; which is why the base class does not derive from
+        <code>InputBase&lt;T&gt;</code>.
+    </p>
+</header>
+
+<!-- ------------------------------------------------------------- Real form -->
+<section class="mt-10 grid gap-6 lg:grid-cols-[minmax(0,1fr)_22rem]">
+    <ZenCard Title="Inside an EditForm" Subtitle="DataAnnotations drive the messages">
+        <ZenForm Model="_model" OnValidSubmit="HandleSubmitAsync" @ref="_form">
+            <ChildContent>
+                <div class="grid gap-4 sm:grid-cols-2">
+                    <ZenTextInput Label="Full name"
+                                  Placeholder="Ada Lovelace"
+                                  AutoComplete="name"
+                                  Required="true"
+                                  @bind-Value="_model.Name" />
+
+                    <ZenTextInput Label="Email"
+                                  Type="email"
+                                  Placeholder="ada@example.com"
+                                  AutoComplete="email"
+                                  Required="true"
+                                  @bind-Value="_model.Email">
+                        <LeadingContent>
+                            <ZenIcon Path="@ZenIcons.Info" Size="ZenSize.Small" />
+                        </LeadingContent>
+                    </ZenTextInput>
+
+                    <ZenNumberInput TValue="int"
+                                    Label="Quantity"
+                                    Min="1"
+                                    Max="10"
+                                    AllowNegative="false"
+                                    AllowDecimal="false"
+                                    @bind-Value="_model.Quantity" />
+
+                    <ZenCurrencyInput Label="Budget"
+                                      HelpText="Formats when you leave the field."
+                                      @bind-Value="_model.Budget" />
+
+                    <ZenDateInput TValue="DateOnly?"
+                                  Label="Start date"
+                                  @bind-Value="_model.StartDate" />
+
+                    <ZenSelect TValue="string"
+                               Label="Country"
+                               Placeholder="Choose a country"
+                               Required="true"
+                               @bind-Value="_model.Country">
+                        <option value="gb">United Kingdom</option>
+                        <option value="us">United States</option>
+                        <option value="de">Germany</option>
+                    </ZenSelect>
+                </div>
+
+                <ZenTextArea Label="Notes"
+                             Placeholder="Anything we should know?"
+                             MaxLength="200"
+                             ShowCounter="true"
+                             @bind-Value="_model.Notes" />
+
+                <ZenRadioGroup TValue="string" Label="Shipping" Horizontal="true" @bind-Value="_model.Shipping">
+                    <ZenRadio TValue="string" Value="@("standard")" Label="Standard" HelpText="3-5 days" />
+                    <ZenRadio TValue="string" Value="@("express")" Label="Express" HelpText="Next day" />
+                </ZenRadioGroup>
+
+                <ZenCheckbox Label="I accept the terms" Required="true" @bind-Value="_model.Accepted" />
+            </ChildContent>
+
+            <Actions>
+                <ZenButton Variant="ZenVariant.Ghost" OnClick="Reset">Reset</ZenButton>
+                <ZenButton ButtonType="submit"
+                           Intent="ZenIntent.Primary"
+                           Loading="@(_form?.IsSubmitting ?? false)">
+                    Submit
+                </ZenButton>
+            </Actions>
+        </ZenForm>
+    </ZenCard>
+
+    <aside class="space-y-4 lg:sticky lg:top-24 lg:self-start">
+        <ZenCard Title="Bound model" TitleLevel="2">
+            <dl class="space-y-2 text-sm">
+                @foreach (var (label, value) in ModelSnapshot)
+                {
+                    <div class="flex items-start justify-between gap-4">
+                        <dt class="text-content-muted">@label</dt>
+                        <dd class="min-w-0 truncate text-end font-medium">@value</dd>
+                    </div>
+                }
+            </dl>
+
+            @if (_submitted)
+            {
+                <p class="mt-4 border-t border-border pt-3 text-sm text-success-strong">
+                    Submitted successfully.
+                </p>
+            }
+        </ZenCard>
+
+        <ZenCard Title="Why not InputBase&lt;T&gt;?" TitleLevel="2">
+            <p class="text-sm text-content-muted">
+                The framework's <code>InputBase&lt;T&gt;</code> throws without a cascading
+                <code>EditContext</code>. Every control below the divider is outside a form and
+                still binds &mdash; a toolbar filter should not need a dummy
+                <code>&lt;EditForm&gt;</code> wrapped around it.
+            </p>
+        </ZenCard>
+    </aside>
+</section>
+
+<!-- --------------------------------------------------------- Outside a form -->
+<section class="mt-12">
+    <h2 class="text-lg font-semibold">The same controls, with no form</h2>
+    <p class="mt-1 max-w-3xl text-sm text-content-muted">
+        Identical components, bound to plain fields. No <code>EditForm</code>, no
+        <code>EditContext</code>, no validation &mdash; just two-way binding.
+    </p>
+
+    <div class="mt-4 grid gap-4 md:grid-cols-2 xl:grid-cols-3">
+        <ZenCard Title="Search" TitleLevel="3" Subtitle="live, debounced 250ms">
+            <ZenSearchInput Placeholder="Filter results" @bind-Value="_query" />
+            <p class="mt-3 text-sm text-content-muted">
+                Query: <span class="font-medium text-content">@(string.IsNullOrEmpty(_query) ? "(empty)" : _query)</span>
+            </p>
+        </ZenCard>
+
+        <ZenCard Title="Toggle" TitleLevel="3" Subtitle="role=switch, not a checkbox">
+            <div class="space-y-3">
+                <ZenToggle Label="Email notifications" @bind-Value="_notify" />
+                <ZenToggle Label="Beta features" HelpText="Applies immediately." Intent="ZenIntent.Success" @bind-Value="_beta" />
+                <ZenToggle Label="Disabled" Disabled="true" Value="true" />
+            </div>
+        </ZenCard>
+
+        <ZenCard Title="Range slider" TitleLevel="3" Subtitle="native input[type=range]">
+            <ZenRangeSlider Label="Volume"
+                            Min="0"
+                            Max="100"
+                            ShowBounds="true"
+                            Format="@(v => $"{v:0}%")"
+                            @bind-Value="_volume" />
+            <p class="mt-2 text-xs text-content-subtle">
+                Announced as "@($"{_volume:0}%")" rather than a bare number.
+            </p>
+        </ZenCard>
+    </div>
+</section>
+
+<!-- --------------------------------------------------- Progress & indicator -->
+<section class="mt-12 grid gap-4 md:grid-cols-2">
+    <ZenCard Title="ZenProgress" TitleLevel="2">
+        <div class="space-y-5">
+            <ZenProgress Label="Uploading files" Value="@_volume" ShowValue="true" />
+            <ZenProgress Label="Indeterminate" Value="null" />
+
+            <div class="flex items-center gap-6 border-t border-border pt-4">
+                <ZenProgress Shape="ZenProgressShape.Circular" Value="@_volume" ShowValue="true" Label="Upload" />
+                <ZenProgress Shape="ZenProgressShape.Circular" Value="null" Label="Working" />
+                <ZenProgress Shape="ZenProgressShape.Circular" Value="72" Intent="ZenIntent.Success" Label="Health" />
+            </div>
+        </div>
+
+        <p class="mt-4 text-sm text-content-muted">
+            An indeterminate bar omits <code>aria-valuenow</code> entirely. Setting it to zero would
+            announce "0 percent" &mdash; a fact that is not known, and one that reads as a stalled
+            operation.
+        </p>
+    </ZenCard>
+
+    <ZenCard Title="ZenIndicator" TitleLevel="2">
+        <div class="flex flex-wrap items-center gap-8">
+            <ZenIndicator Count="3">
+                <ZenButton Variant="ZenVariant.Outline" Icon="@ZenIcons.Info">Inbox</ZenButton>
+            </ZenIndicator>
+
+            <ZenIndicator Count="1234" MaxCount="99">
+                <ZenButton Variant="ZenVariant.Outline">Alerts</ZenButton>
+            </ZenIndicator>
+
+            <ZenIndicator Label="Online" Intent="ZenIntent.Success" Corner="ZenCorner.BottomEnd">
+                <span class="grid size-10 place-items-center rounded-full bg-surface-sunken text-sm font-medium">AL</span>
+            </ZenIndicator>
+
+            <ZenIndicator Count="0" ShowZero="true" Intent="ZenIntent.Neutral">
+                <ZenButton Variant="ZenVariant.Outline">Archive</ZenButton>
+            </ZenIndicator>
+        </div>
+
+        <p class="mt-5 text-sm text-content-muted">
+            A count is announced; a bare dot is <code>aria-hidden</code> and carries its meaning in
+            visually hidden text instead, because "bullet" tells a screen reader user nothing.
+        </p>
+    </ZenCard>
+</section>
+
+@code {
+    private sealed class SignupModel
+    {
+        [Required(ErrorMessage = "Enter your name.")]
+        public string? Name { get; set; }
+
+        [Required(ErrorMessage = "Enter an email address.")]
+        [EmailAddress(ErrorMessage = "That does not look like an email address.")]
+        public string? Email { get; set; }
+
+        [Range(1, 10, ErrorMessage = "Quantity must be between 1 and 10.")]
+        public int Quantity { get; set; } = 1;
+
+        public decimal? Budget { get; set; }
+
+        public DateOnly? StartDate { get; set; }
+
+        [Required(ErrorMessage = "Choose a country.")]
+        public string? Country { get; set; }
+
+        [StringLength(200)]
+        public string? Notes { get; set; }
+
+        public string? Shipping { get; set; } = "standard";
+
+        [Range(typeof(bool), "true", "true", ErrorMessage = "You must accept the terms.")]
+        public bool Accepted { get; set; }
+    }
+
+    private SignupModel _model = new();
+    private ZenForm? _form;
+    private bool _submitted;
+
+    private string _query = string.Empty;
+    private bool _notify = true;
+    private bool _beta;
+    private double _volume = 45;
+
+    private IEnumerable<(string Label, string Value)> ModelSnapshot =>
+    [
+        ("Name", _model.Name ?? "—"),
+        ("Email", _model.Email ?? "—"),
+        ("Quantity", _model.Quantity.ToString()),
+        ("Budget", _model.Budget?.ToString("C") ?? "—"),
+        ("Start date", _model.StartDate?.ToString("yyyy-MM-dd") ?? "—"),
+        ("Country", _model.Country ?? "—"),
+        ("Shipping", _model.Shipping ?? "—"),
+        ("Accepted", _model.Accepted ? "yes" : "no"),
+    ];
+
+    private async Task HandleSubmitAsync()
+    {
+        // Stands in for a real call, so the button's loading state is visible.
+        await Task.Delay(900);
+        _submitted = true;
+    }
+
+    private void Reset()
+    {
+        _model = new SignupModel();
+        _submitted = false;
+    }
+}

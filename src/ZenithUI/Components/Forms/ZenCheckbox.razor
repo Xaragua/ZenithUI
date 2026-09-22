@@ -1,0 +1,192 @@
+@namespace ZenithUI
+
+@inherits ZenInputBase<bool>
+
+@*
+    A checkbox.
+
+    The real <input type="checkbox"> is kept and restyled rather than replaced by a div with
+    role="checkbox". The native element brings keyboard handling, form participation, the
+    indeterminate state and correct screen-reader announcement for free; every re-implementation
+    has to rebuild those and usually misses at least one.
+
+    Focus keeps the RING rather than the border treatment used by text fields. A checked box is
+    filled with the primary colour, so a primary border on it would be invisible - the one case
+    where recolouring the border genuinely cannot work.
+*@
+
+<div class="@RootClass(WrapperClass)" style="@Style">
+    <div class="flex h-5 shrink-0 items-center">
+        <input id="@Id"
+               type="checkbox"
+               class="@BoxClass"
+               checked="@CurrentValue"
+               disabled="@Disabled"
+               aria-describedby="@DescribedBy"
+               aria-invalid="@(IsInvalid ? "true" : null)"
+               aria-required="@(Required ? "true" : null)"
+               @attributes="AttributesWithoutClass"
+               @onchange="HandleToggle" />
+    </div>
+
+    @if (Label is not null || ChildContent is not null || HelpText is not null)
+    {
+        <div class="min-w-0">
+            <label for="@Id" class="@LabelClass">
+                @if (ChildContent is not null)
+                {
+                    @ChildContent
+                }
+                else
+                {
+                    @Label
+                }
+
+                @if (Required)
+                {
+                    <span class="text-danger-strong" aria-hidden="true">*</span>
+                }
+            </label>
+
+            @if (HelpText is not null)
+            {
+                <p id="@HelpId" class="mt-0.5 text-xs text-content-muted">@HelpText</p>
+            }
+        </div>
+    }
+</div>
+
+@if (IsInvalid)
+{
+    <p id="@ErrorId" class="mt-1 flex items-start gap-1.5 text-xs" role="alert">
+        <ZenIcon Path="@ZenIcons.Danger" Size="ZenSize.Small" class="mt-px size-3.5 text-danger-strong" />
+        <span class="text-danger-strong">@ValidationMessages.First()</span>
+    </p>
+}
+
+@code {
+    /// <summary>Label content, when a plain string is not enough - a link in the consent text, say.</summary>
+    [Parameter]
+    public RenderFragment? ChildContent { get; set; }
+
+    /// <summary>
+    /// Renders the box in its indeterminate state: neither checked nor unchecked.
+    /// </summary>
+    /// <remarks>
+    /// Purely visual, and that is not a limitation of this component but of HTML - the DOM has no
+    /// indeterminate attribute, only a property, so it cannot be expressed in server-rendered
+    /// markup. A "select all" box above a partial selection is the case this exists for; the bound
+    /// value stays false.
+    /// </remarks>
+    [Parameter]
+    public bool Indeterminate { get; set; }
+
+    private string HelpId => $"{Id}-help";
+
+    private string ErrorId => $"{Id}-error";
+
+    private string? DescribedBy =>
+        IsInvalid ? ErrorId : (HelpText is not null ? HelpId : null);
+
+    private void HandleToggle(ChangeEventArgs args) =>
+        CurrentValue = args.Value is bool b && b;
+
+    [Inject]
+    private IJSRuntime JS { get; set; } = default!;
+
+    private IJSObjectReference? _dom;
+    private bool _appliedIndeterminate;
+
+    protected override async Task OnAfterRenderAsync(bool firstRender)
+    {
+        // `indeterminate` is a DOM property with no attribute equivalent, so it cannot be set from
+        // server-rendered markup at all. Skipped without an interactive renderer - which is
+        // correct: a static render has no way to express it.
+        if (!RendererInfo.IsInteractive)
+        {
+            return;
+        }
+
+        // Nothing to do until someone actually asks for the state, and nothing to undo until it
+        // has been applied at least once.
+        if (!Indeterminate && !_appliedIndeterminate)
+        {
+            return;
+        }
+
+        try
+        {
+            _dom ??= await JS.InvokeAsync<IJSObjectReference>(
+                "import", "./_content/ZenithUI/js/zen-dom.js");
+
+            await _dom.InvokeVoidAsync("setIndeterminate", Id, Indeterminate);
+            _appliedIndeterminate = Indeterminate;
+        }
+        catch (JSDisconnectedException)
+        {
+        }
+        catch (OperationCanceledException)
+        {
+        }
+    }
+
+    protected override void DisposeCore()
+    {
+        base.DisposeCore();
+
+        // Fire and forget: IDisposable cannot await, and a module reference left to the circuit's
+        // own teardown is harmless.
+        _ = DisposeModuleAsync();
+    }
+
+    private async Task DisposeModuleAsync()
+    {
+        if (_dom is null)
+        {
+            return;
+        }
+
+        try
+        {
+            await _dom.DisposeAsync();
+        }
+        catch (JSDisconnectedException)
+        {
+        }
+        catch (OperationCanceledException)
+        {
+        }
+    }
+
+    private string WrapperClass => CssBuilder
+        .Default("flex items-start gap-2.5")
+        .AddClass(FieldClass)
+        .Build()!;
+
+    private string BoxClass => CssBuilder
+        // zen-focus, not zen-focus-border: a checked box is filled with the primary colour, so a
+        // primary border on it would be invisible.
+        .Default("zen-focus rounded-zen-sm border border-border-strong bg-surface transition-colors")
+        .AddClass("text-primary accent-primary")
+        .AddClass(Size switch
+        {
+            ZenSize.Small => "size-4",
+            ZenSize.Large => "size-6",
+            _ => "size-5",
+        })
+        .AddClass("cursor-pointer")
+        .AddClass("disabled:cursor-not-allowed disabled:opacity-50")
+        .AddClass("aria-invalid:border-danger")
+        .Build()!;
+
+    private string LabelClass => CssBuilder
+        .Default("inline-flex cursor-pointer items-center gap-1 text-content")
+        .AddClass(Size switch
+        {
+            ZenSize.Small => "text-xs",
+            ZenSize.Large => "text-base",
+            _ => "text-sm",
+        })
+        .AddClass("cursor-not-allowed opacity-60", Disabled)
+        .Build()!;
+}

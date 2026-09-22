@@ -3,8 +3,8 @@
 A TailwindCSS component library for Blazor. Render-mode agnostic, themed entirely through CSS
 custom properties, with first-class light and dark palettes.
 
-> **Status: M1 — primitives.** Tokens, theming, core base types, and the visual primitives are in
-> place. Form controls, the hierarchical table, the tree and the app shell land in M2–M5.
+> **Status: M2 — form controls.** Tokens, theming, core base types, primitives and the full form
+> control set are in place. Modal and toast services land in M3; the table, tree and app shell in M4–M5.
 
 ## Why another Blazor component library
 
@@ -170,7 +170,7 @@ a palette fix is one edit rather than a guess-and-rerun loop:
 | --- | --- |
 | **M0** ✅ | Tokens, theming, `ZenComponentBase`, `ZenJsComponentBase`, `CssBuilder`, CI |
 | **M1** ✅ | `ZenIcon`, `ZenButton`, `ZenBadge`, `ZenSpinner`, `ZenSkeleton`, `ZenCard`, `ZenStatCard`, `ZenField`, `ZenInputBase<T>` |
-| **M2** | Text, textarea, number, currency, date, search, checkbox, radio, select, `ZenToggle`, `ZenRangeSlider`, `ZenForm`, `ZenProgress`, `ZenIndicator` |
+| **M2** ✅ | Text, textarea, number, currency, date, search, checkbox, radio, select, `ZenToggle`, `ZenRangeSlider`, `ZenForm`, `ZenProgress`, `ZenIndicator` |
 | **M3** | `ZenModal` + modal service, `ZenToast` + toast service, `ZenPopover`, `ZenCombobox`, `ZenList` |
 | **M4** | `ZenTable` (sorting, paging, selection, hierarchy), `ZenTree`, `ZenTimeline` |
 | **M5** | `ZenAppBar`, `ZenNavMenu`, `ZenSideNav`, `ZenFooter`, `ZenAppShell` |

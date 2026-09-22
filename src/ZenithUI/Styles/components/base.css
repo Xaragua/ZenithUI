@@ -172,6 +172,113 @@
   border-width: 0;
 }
 
+/*
+ * The indeterminate progress bar's travel. Declared here rather than as a Tailwind keyframe so the
+ * motion stays with the component rules it belongs to.
+ */
+@keyframes zen-indeterminate {
+  0% {
+    transform: translateX(-100%);
+  }
+
+  100% {
+    transform: translateX(300%);
+  }
+}
+
+@layer components {
+  /*
+   * ZenRangeSlider.
+   *
+   * A native <input type="range"> cannot be styled through utility classes alone: the track and
+   * thumb are shadow-DOM pseudo-elements, and the vendor prefixes are not interchangeable enough
+   * for Tailwind's arbitrary-variant syntax to stay readable. So the whole control lives here.
+   *
+   * The filled portion is a gradient rather than an overlay element. An overlay would sit on top
+   * of the input and swallow the pointer events the native control needs to work - so the fill is
+   * painted into the track's own background, with the stop position passed in as --zen-slider-fill.
+   */
+  .zen-slider {
+    appearance: none;
+    background: transparent;
+    cursor: pointer;
+  }
+
+  .zen-slider:disabled {
+    cursor: not-allowed;
+  }
+
+  /* --- Track ------------------------------------------------------------ */
+
+  .zen-slider::-webkit-slider-runnable-track {
+    height: 0.375rem;
+    border-radius: 9999px;
+    background: linear-gradient(
+      to right,
+      currentColor 0%,
+      currentColor var(--zen-slider-fill, 0%),
+      var(--zen-border) var(--zen-slider-fill, 0%),
+      var(--zen-border) 100%
+    );
+  }
+
+  .zen-slider::-moz-range-track {
+    height: 0.375rem;
+    border-radius: 9999px;
+    background: var(--zen-border);
+  }
+
+  /* Firefox paints the filled portion for us, so it needs no gradient. */
+  .zen-slider::-moz-range-progress {
+    height: 0.375rem;
+    border-radius: 9999px;
+    background: currentColor;
+  }
+
+  /* --- Thumb ------------------------------------------------------------ */
+
+  .zen-slider::-webkit-slider-thumb {
+    appearance: none;
+    width: 1.125rem;
+    height: 1.125rem;
+    border-radius: 9999px;
+    background: var(--zen-surface-raised);
+    border: 2px solid currentColor;
+    box-shadow: var(--zen-shadow-sm);
+
+    /* Centres an 18px thumb on a 6px track. */
+    margin-top: -0.375rem;
+  }
+
+  .zen-slider::-moz-range-thumb {
+    width: 1.125rem;
+    height: 1.125rem;
+    border-radius: 9999px;
+    background: var(--zen-surface-raised);
+    border: 2px solid currentColor;
+    box-shadow: var(--zen-shadow-sm);
+  }
+
+  /*
+   * Focus lands on the thumb, not the whole control. A ring around the entire track would be a
+   * 400px-wide box for an 18px target, which tells a keyboard user very little about where they
+   * are.
+   */
+  .zen-slider:focus-visible {
+    outline: none;
+  }
+
+  .zen-slider:focus-visible::-webkit-slider-thumb {
+    outline: var(--zen-ring-width) solid var(--zen-ring);
+    outline-offset: 2px;
+  }
+
+  .zen-slider:focus-visible::-moz-range-thumb {
+    outline: var(--zen-ring-width) solid var(--zen-ring);
+    outline-offset: 2px;
+  }
+}
+
 @media (prefers-reduced-motion: reduce) {
   .zen-theme-transition,
   .zen-theme-transition * {

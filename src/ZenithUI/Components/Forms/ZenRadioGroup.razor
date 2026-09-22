@@ -1,0 +1,121 @@
+@namespace ZenithUI
+
+@typeparam TValue
+@inherits ZenInputBase<TValue>
+
+@*
+    A group of mutually exclusive options.
+
+    The group, not the individual radio, is the component that binds - which matches how radios
+    actually work. A lone radio is meaningless; the group is the control, and the group is what
+    validation applies to.
+
+    <fieldset> + <legend> rather than a div and a label: it is the only markup that associates a
+    label with a *set* of controls, and it is what makes a screen reader announce "Shipping method,
+    group, Standard, 1 of 3" instead of reading three unrelated radios.
+*@
+
+<fieldset class="@RootClass(FieldsetClass)"
+          style="@Style"
+          disabled="@Disabled"
+          aria-describedby="@DescribedBy"
+          aria-invalid="@(IsInvalid ? "true" : null)"
+          aria-required="@(Required ? "true" : null)"
+          @attributes="AttributesWithoutClass">
+    @if (Label is not null)
+    {
+        <legend class="@LegendClass">
+            @Label
+            @if (Required)
+            {
+                <span class="text-danger-strong" aria-hidden="true">*</span>
+            }
+        </legend>
+    }
+
+    @if (HelpText is not null && !IsInvalid)
+    {
+        <p id="@HelpId" class="text-xs text-content-muted">@HelpText</p>
+    }
+
+    <div class="@OptionsClass">
+        @* A cascade rather than parameters on each child: the options need the group's name, its
+           current value and its change callback, and threading three parameters through every
+           ZenRadio would be noise at every call site. *@
+        <CascadingValue Value="this" IsFixed="true">
+            @ChildContent
+        </CascadingValue>
+    </div>
+
+    @if (IsInvalid)
+    {
+        <p id="@ErrorId" class="flex items-start gap-1.5 text-xs" role="alert">
+            <ZenIcon Path="@ZenIcons.Danger" Size="ZenSize.Small" class="mt-px size-3.5 text-danger-strong" />
+            <span class="text-danger-strong">@ValidationMessages.First()</span>
+        </p>
+    }
+</fieldset>
+
+@code {
+    /// <summary>The <see cref="ZenRadio{TValue}"/> options.</summary>
+    [Parameter]
+    public RenderFragment? ChildContent { get; set; }
+
+    /// <summary>Lay the options out in a row instead of a column.</summary>
+    [Parameter]
+    public bool Horizontal { get; set; }
+
+    /// <summary>
+    /// The shared <c>name</c> for the underlying inputs. Defaults to the group's generated id.
+    /// </summary>
+    /// <remarks>
+    /// This is what makes the browser treat the radios as one exclusive set, including arrow-key
+    /// navigation between them. Two groups sharing a name on one page would fight each other.
+    /// </remarks>
+    [Parameter]
+    public string? Name { get; set; }
+
+    /// <summary>The name applied to the child inputs.</summary>
+    internal string GroupName => Name ?? Id;
+
+    /// <summary>Whether a child option is the selected one.</summary>
+    internal bool IsSelected(TValue? value) =>
+        EqualityComparer<TValue>.Default.Equals(value, CurrentValue);
+
+    /// <summary>Called by a child when it is chosen.</summary>
+    internal void Select(TValue? value) => CurrentValue = value;
+
+    /// <summary>Whether children should render disabled.</summary>
+    internal bool GroupDisabled => Disabled;
+
+    /// <summary>Size children should render at.</summary>
+    internal ZenSize GroupSize => Size;
+
+    private string HelpId => $"{Id}-help";
+
+    private string ErrorId => $"{Id}-error";
+
+    private string? DescribedBy =>
+        IsInvalid ? ErrorId : (HelpText is not null ? HelpId : null);
+
+    private string FieldsetClass => CssBuilder
+        .Default("flex min-w-0 flex-col gap-1.5")
+        .AddClass(FieldClass)
+        .Build()!;
+
+    private string LegendClass => CssBuilder
+        .Default("inline-flex items-center gap-1 font-medium text-content")
+        .AddClass(Size switch
+        {
+            ZenSize.Small => "text-xs",
+            ZenSize.Large => "text-base",
+            _ => "text-sm",
+        })
+        .Build()!;
+
+    private string OptionsClass => CssBuilder
+        .Default("flex gap-x-5 gap-y-2")
+        .AddClass(Horizontal ? "flex-row flex-wrap items-center" : "flex-col")
+        .AddClass("mt-0.5")
+        .Build()!;
+}

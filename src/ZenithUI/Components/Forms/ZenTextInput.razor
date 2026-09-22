@@ -1,0 +1,126 @@
+@namespace ZenithUI
+
+@inherits ZenInputBase<string>
+
+@*
+    A single-line text field.
+
+    Two shapes, chosen automatically. With no LeadingContent or TrailingContent the <input> carries
+    the border itself. With either, the border moves to a wrapper and the input goes inside it
+    transparent - otherwise the icon would sit outside the field, or inside a second nested box.
+
+    The focus style follows the border wherever it lives, which is why the two shapes use different
+    utilities: zen-focus-border keys off :focus-visible on the element itself, while
+    zen-focus-border-within keys off :focus-within because the wrapper never receives focus.
+*@
+
+<ZenField Label="@Label"
+          HelpText="@HelpText"
+          Errors="ValidationMessages"
+          Required="Required"
+          Disabled="Disabled"
+          For="@Id"
+          Size="Size"
+          Class="@FieldClass">
+    @if (HasAffixes)
+    {
+        <div class="@WrapperClass">
+            @if (LeadingContent is not null)
+            {
+                <span class="flex shrink-0 items-center text-content-subtle">@LeadingContent</span>
+            }
+
+            <input id="@context.InputId"
+                   type="@Type"
+                   class="@RootClass(ZenStyles.InputInnerBase)"
+                   style="@Style"
+                   value="@CurrentValueAsString"
+                   placeholder="@Placeholder"
+                   disabled="@Disabled"
+                   readonly="@ReadOnly"
+                   aria-describedby="@context.DescribedBy"
+                   aria-invalid="@context.AriaInvalid"
+                   aria-required="@context.AriaRequired"
+                   autocomplete="@AutoComplete"
+                   maxlength="@MaxLength"
+                   @attributes="AttributesWithoutClass"
+                   @onchange="HandleChange"
+                   @oninput="HandleImmediateAsync" />
+
+            @if (TrailingContent is not null)
+            {
+                <span class="flex shrink-0 items-center text-content-subtle">@TrailingContent</span>
+            }
+        </div>
+    }
+    else
+    {
+        <input id="@context.InputId"
+               type="@Type"
+               class="@RootClass(StandaloneClass)"
+               style="@Style"
+               value="@CurrentValueAsString"
+               placeholder="@Placeholder"
+               disabled="@Disabled"
+               readonly="@ReadOnly"
+               aria-describedby="@context.DescribedBy"
+               aria-invalid="@context.AriaInvalid"
+               aria-required="@context.AriaRequired"
+               autocomplete="@AutoComplete"
+               maxlength="@MaxLength"
+               @attributes="AttributesWithoutClass"
+               @onchange="HandleChange"
+               @oninput="HandleImmediateAsync" />
+    }
+</ZenField>
+
+@code {
+    /// <summary>
+    /// The HTML <c>type</c>. Keep it meaningful - <c>email</c>, <c>tel</c> and <c>url</c> change
+    /// the on-screen keyboard a phone offers, which is free usability.
+    /// </summary>
+    [Parameter]
+    public string Type { get; set; } = "text";
+
+    /// <summary>
+    /// The <c>autocomplete</c> token, for example <c>"email"</c> or <c>"new-password"</c>.
+    /// </summary>
+    /// <remarks>
+    /// Worth setting on anything a browser could fill. It is also an accessibility requirement -
+    /// WCAG 1.3.5 asks that fields collecting the user's own information identify their purpose.
+    /// </remarks>
+    [Parameter]
+    public string? AutoComplete { get; set; }
+
+    /// <summary>Maximum character count enforced by the browser.</summary>
+    [Parameter]
+    public int? MaxLength { get; set; }
+
+    private bool HasAffixes => LeadingContent is not null || TrailingContent is not null;
+
+    /// <summary>
+    /// The <c>input</c> event only commits when <see cref="ZenInputBase{TValue}.Immediate"/> is set.
+    /// </summary>
+    /// <remarks>
+    /// Both handlers are always attached, rather than switching between them, because Blazor binds
+    /// event handlers at compile time from the markup. Gating inside the handler is what keeps a
+    /// single element definition instead of two near-identical branches.
+    /// </remarks>
+    private Task HandleImmediateAsync(ChangeEventArgs args) =>
+        Immediate ? HandleInputAsync(args) : Task.CompletedTask;
+
+    private string StandaloneClass => CssBuilder
+        .Default(ZenStyles.InputBase)
+        .AddClass(ZenStyles.InputSize(Size))
+        .AddClass(ZenStyles.InputRadius(Size))
+        .AddClass("w-auto", !FullWidth)
+        .Build()!;
+
+    private string WrapperClass => CssBuilder
+        .Default(ZenStyles.InputWrapperBase)
+        .AddClass(ZenStyles.InputSize(Size))
+        .AddClass(ZenStyles.InputRadius(Size))
+        .AddClass("gap-2")
+        .AddClass("w-auto", !FullWidth)
+        .Build()!;
+}

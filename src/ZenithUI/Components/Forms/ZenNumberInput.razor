@@ -1,0 +1,205 @@
+@namespace ZenithUI
+
+@typeparam TValue
+@inherits ZenInputBase<TValue>
+
+@*
+    A numeric field, generic over int, long, decimal, double, float and their nullable forms.
+
+    Two deliberate departures from <input type="number">:
+
+    1. `inputmode` is set explicitly. A bare type="number" offers a phone keyboard that often lacks
+       a minus sign, so a negative value becomes untypeable on mobile unless inputmode says so.
+
+    2. The scroll wheel is not allowed to change the value. A type="number" that has focus will
+       happily increment while the user is scrolling the page past it - silently corrupting a field
+       they were not even looking at. Blur-on-wheel is the standard defence.
+*@
+
+<ZenField Label="@Label"
+          HelpText="@HelpText"
+          Errors="AllMessages"
+          Required="Required"
+          Disabled="Disabled"
+          For="@Id"
+          Size="Size"
+          Class="@FieldClass">
+    <div class="@WrapperClass">
+        @if (LeadingContent is not null)
+        {
+            <span class="flex shrink-0 items-center text-content-subtle">@LeadingContent</span>
+        }
+
+        <input id="@context.InputId"
+               type="number"
+               inputmode="@InputMode"
+               class="@RootClass(InnerClass)"
+               style="@Style"
+               value="@CurrentValueAsString"
+               placeholder="@Placeholder"
+               disabled="@Disabled"
+               readonly="@ReadOnly"
+               min="@Min"
+               max="@Max"
+               step="@Step"
+               aria-describedby="@context.DescribedBy"
+               aria-invalid="@context.AriaInvalid"
+               aria-required="@context.AriaRequired"
+               @attributes="AttributesWithoutClass"
+               @onchange="HandleChange"
+               @oninput="HandleImmediateAsync"
+               @onwheel="HandleWheel" />
+
+        @if (TrailingContent is not null)
+        {
+            <span class="flex shrink-0 items-center text-content-subtle">@TrailingContent</span>
+        }
+    </div>
+</ZenField>
+
+@code {
+    /// <summary>Minimum accepted value, passed to the browser as <c>min</c>.</summary>
+    [Parameter]
+    public string? Min { get; set; }
+
+    /// <summary>Maximum accepted value, passed to the browser as <c>max</c>.</summary>
+    [Parameter]
+    public string? Max { get; set; }
+
+    /// <summary>Step granularity. <c>"any"</c> disables stepping.</summary>
+    [Parameter]
+    public string? Step { get; set; }
+
+    /// <summary>
+    /// Whether the value may be negative. Drives <c>inputmode</c>, which is what decides if a
+    /// mobile keyboard offers a minus sign.
+    /// </summary>
+    [Parameter]
+    public bool AllowNegative { get; set; } = true;
+
+    /// <summary>
+    /// Whether the value may have a fractional part. With integral <typeparamref name="TValue"/>
+    /// this is inferred, and setting it has no effect.
+    /// </summary>
+    [Parameter]
+    public bool AllowDecimal { get; set; } = true;
+
+    /// <summary>
+    /// Parse failures surface as a message on the field rather than being swallowed, so a field
+    /// left holding "12e" is not silently treated as empty.
+    /// </summary>
+    private IEnumerable<string> AllMessages =>
+        ParsingFailed && ParsingErrorMessage is not null
+            ? ValidationMessages.Append(ParsingErrorMessage)
+            : ValidationMessages;
+
+    private static bool IsIntegral
+    {
+        get
+        {
+            var type = Nullable.GetUnderlyingType(typeof(TValue)) ?? typeof(TValue);
+
+            return type == typeof(int) || type == typeof(long) || type == typeof(short)
+                || type == typeof(uint) || type == typeof(ulong) || type == typeof(ushort)
+                || type == typeof(byte) || type == typeof(sbyte);
+        }
+    }
+
+    // "numeric" is integers only; "decimal" adds a decimal separator. Neither offers a minus sign
+    // on most mobile keyboards, so a signed field falls back to the full text keypad.
+    private string InputMode =>
+        AllowNegative ? "text"
+        : IsIntegral || !AllowDecimal ? "numeric"
+        : "decimal";
+
+    private Task HandleImmediateAsync(ChangeEventArgs args) =>
+        Immediate ? HandleInputAsync(args) : Task.CompletedTask;
+
+    /// <summary>
+    /// Blurs the control when the wheel turns over it, which stops the browser from stepping the
+    /// value while the user is scrolling the page.
+    /// </summary>
+    /// <remarks>
+    /// The alternative - preventDefault on wheel - requires a non-passive listener and blocks
+    /// scrolling entirely when the pointer happens to be over the field. Dropping focus keeps the
+    /// page scrolling and costs the user nothing they wanted.
+    /// </remarks>
+    private void HandleWheel(WheelEventArgs args) => _blurOnNextRender = true;
+
+    private bool _blurOnNextRender;
+    private IJSObjectReference? _dom;
+
+    [Inject]
+    private IJSRuntime JS { get; set; } = default!;
+
+    protected override async Task OnAfterRenderAsync(bool firstRender)
+    {
+        if (!_blurOnNextRender || !RendererInfo.IsInteractive)
+        {
+            return;
+        }
+
+        _blurOnNextRender = false;
+
+        try
+        {
+            _dom ??= await JS.InvokeAsync<IJSObjectReference>(
+                "import", "./_content/ZenithUI/js/zen-dom.js");
+
+            await _dom.InvokeVoidAsync("blurElement", Id);
+        }
+        catch (JSDisconnectedException)
+        {
+            // The wheel guard is a nicety; a dropped circuit is not worth surfacing for it.
+        }
+        catch (OperationCanceledException)
+        {
+        }
+    }
+
+    protected override void DisposeCore()
+    {
+        base.DisposeCore();
+        _ = DisposeModuleAsync();
+    }
+
+    private async Task DisposeModuleAsync()
+    {
+        if (_dom is null)
+        {
+            return;
+        }
+
+        try
+        {
+            await _dom.DisposeAsync();
+        }
+        catch (JSDisconnectedException)
+        {
+        }
+        catch (OperationCanceledException)
+        {
+        }
+    }
+
+    private string WrapperClass => CssBuilder
+        .Default(ZenStyles.InputWrapperBase)
+        .AddClass(ZenStyles.InputSize(Size))
+        .AddClass(ZenStyles.InputRadius(Size))
+        .AddClass("gap-2")
+        .AddClass("w-auto", !FullWidth)
+        .Build()!;
+
+    private string InnerClass => CssBuilder
+        .Default(ZenStyles.InputInnerBase)
+        .AddClass("tabular-nums")
+        .AddClass("text-right", AlignEnd)
+        .Build()!;
+
+    /// <summary>
+    /// Right-align the value. Sensible in a table of figures, where digits should line up by place
+    /// value; off by default because a lone field reads better aligned with its label.
+    /// </summary>
+    [Parameter]
+    public bool AlignEnd { get; set; }
+}

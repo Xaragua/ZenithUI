@@ -1,0 +1,108 @@
+@namespace ZenithUI
+
+@inherits ZenInputBase<string>
+
+@*
+    A multi-line text field.
+
+    Auto-grow uses the CSS `field-sizing: content` property rather than the usual JavaScript trick
+    of writing scrollHeight back into the element's height. The JS approach needs a listener on
+    every keystroke, thrashes layout, and - the part that actually bites - does nothing at all
+    during prerender, so a textarea with existing content renders at one row until the circuit
+    connects. `field-sizing` has no such gap.
+
+    Browsers without it fall back to a fixed `rows` height, which is the behaviour they would have
+    had anyway.
+*@
+
+<ZenField Label="@Label"
+          HelpText="@HelpText"
+          Errors="ValidationMessages"
+          Required="Required"
+          Disabled="Disabled"
+          For="@Id"
+          Size="Size"
+          Class="@FieldClass">
+    <textarea id="@context.InputId"
+              class="@RootClass(TextAreaClass)"
+              style="@CombinedStyle"
+              rows="@Rows"
+              placeholder="@Placeholder"
+              disabled="@Disabled"
+              readonly="@ReadOnly"
+              maxlength="@MaxLength"
+              aria-describedby="@context.DescribedBy"
+              aria-invalid="@context.AriaInvalid"
+              aria-required="@context.AriaRequired"
+              @attributes="AttributesWithoutClass"
+              @onchange="HandleChange"
+              @oninput="HandleImmediateAsync">@CurrentValueAsString</textarea>
+</ZenField>
+
+@if (ShowCounter && MaxLength is { } max)
+{
+    @* aria-live="polite" so the remaining count is announced as it changes, but only when the user
+       pauses - an assertive region here would interrupt every keystroke. *@
+    <p class="mt-1 text-right text-xs text-content-subtle" aria-live="polite">
+        @(CurrentValueAsString?.Length ?? 0) / @max
+    </p>
+}
+
+@code {
+    /// <summary>Initial visible rows, and the fixed height when auto-grow is off.</summary>
+    [Parameter]
+    public int Rows { get; set; } = 3;
+
+    /// <summary>Grow with the content instead of scrolling.</summary>
+    [Parameter]
+    public bool AutoGrow { get; set; } = true;
+
+    /// <summary>Upper bound on auto-grow, for example <c>"12rem"</c>. Beyond it the control scrolls.</summary>
+    [Parameter]
+    public string? MaxHeight { get; set; }
+
+    /// <summary>Maximum character count enforced by the browser.</summary>
+    [Parameter]
+    public int? MaxLength { get; set; }
+
+    /// <summary>Show a live character counter. Requires <see cref="MaxLength"/>.</summary>
+    [Parameter]
+    public bool ShowCounter { get; set; }
+
+    private Task HandleImmediateAsync(ChangeEventArgs args) =>
+        Immediate ? HandleInputAsync(args) : Task.CompletedTask;
+
+    private string TextAreaClass => CssBuilder
+        .Default(ZenStyles.InputBase)
+        .AddClass(ZenStyles.TextAreaSize(Size))
+        .AddClass(ZenStyles.InputRadius(Size))
+        // resize-y even with auto-grow: the user may still want a bigger window than the content
+        // needs. resize-none would take that away for no benefit.
+        .AddClass("field-sizing-content resize-y", AutoGrow)
+        .AddClass("resize-y", !AutoGrow)
+        .AddClass("w-auto", !FullWidth)
+        .Build()!;
+
+    private string? CombinedStyle
+    {
+        get
+        {
+            if (MaxHeight is null)
+            {
+                return Style;
+            }
+
+            return Style is null ? $"max-height:{MaxHeight}" : $"max-height:{MaxHeight};{Style}";
+        }
+    }
+
+    protected override void OnParametersSet()
+    {
+        if (ShowCounter && MaxLength is null)
+        {
+            throw new InvalidOperationException(
+                $"{nameof(ZenTextArea)}: {nameof(ShowCounter)} requires {nameof(MaxLength)} - a " +
+                "counter with no limit has nothing to count towards.");
+        }
+    }
+}

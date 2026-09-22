@@ -1,0 +1,135 @@
+@namespace ZenithUI
+
+@typeparam TValue
+@inherits ZenInputBase<TValue>
+
+@*
+    A date field, generic over DateOnly, DateTime, DateTimeOffset and their nullable forms.
+
+    Native <input type="date"> rather than a custom calendar. The platform control already brings
+    a keyboard-accessible picker, locale-correct field order, screen-reader support and a sensible
+    mobile experience - all of which a hand-rolled calendar has to rebuild, and typically rebuilds
+    badly. A ZenDatePicker overlay may follow for cases the native control genuinely cannot serve,
+    but it will not be the default.
+
+    One thing the native control insists on: its value is always ISO (yyyy-MM-dd) regardless of
+    what the user sees, so parsing and formatting here use the invariant culture. Using the current
+    culture is the classic bug - it works in en-US and breaks everywhere the separator differs.
+*@
+
+<ZenField Label="@Label"
+          HelpText="@HelpText"
+          Errors="ValidationMessages"
+          Required="Required"
+          Disabled="Disabled"
+          For="@Id"
+          Size="Size"
+          Class="@FieldClass">
+    <input id="@context.InputId"
+           type="@InputType"
+           class="@RootClass(InputClass)"
+           style="@Style"
+           value="@CurrentValueAsString"
+           disabled="@Disabled"
+           readonly="@ReadOnly"
+           min="@Min"
+           max="@Max"
+           aria-describedby="@context.DescribedBy"
+           aria-invalid="@context.AriaInvalid"
+           aria-required="@context.AriaRequired"
+           @attributes="AttributesWithoutClass"
+           @onchange="HandleChange" />
+</ZenField>
+
+@code {
+    private const string DateFormat = "yyyy-MM-dd";
+    private const string DateTimeLocalFormat = "yyyy-MM-ddTHH:mm";
+
+    /// <summary>Include a time component, rendering <c>datetime-local</c> instead of <c>date</c>.</summary>
+    [Parameter]
+    public bool IncludeTime { get; set; }
+
+    /// <summary>Earliest selectable value, in ISO form.</summary>
+    [Parameter]
+    public string? Min { get; set; }
+
+    /// <summary>Latest selectable value, in ISO form.</summary>
+    [Parameter]
+    public string? Max { get; set; }
+
+    private string InputType => IncludeTime ? "datetime-local" : "date";
+
+    private string Format => IncludeTime ? DateTimeLocalFormat : DateFormat;
+
+    /// <inheritdoc />
+    protected override string? FormatValueAsString(TValue? value) => value switch
+    {
+        null => null,
+        DateOnly d => d.ToString(DateFormat, CultureInfo.InvariantCulture),
+        DateTime dt => dt.ToString(Format, CultureInfo.InvariantCulture),
+        DateTimeOffset dto => dto.ToString(Format, CultureInfo.InvariantCulture),
+        _ => value.ToString(),
+    };
+
+    /// <inheritdoc />
+    protected override bool TryParseValueFromString(
+        string? value,
+        [MaybeNullWhen(false)] out TValue result,
+        [NotNullWhen(false)] out string? validationErrorMessage)
+    {
+        var target = Nullable.GetUnderlyingType(typeof(TValue)) ?? typeof(TValue);
+
+        if (string.IsNullOrEmpty(value))
+        {
+            result = default!;
+            validationErrorMessage = null;
+
+            // An empty date is only valid if the bound type can actually hold "no date".
+            if (Nullable.GetUnderlyingType(typeof(TValue)) is not null)
+            {
+                return true;
+            }
+
+            validationErrorMessage = $"The {DisplayName} field is required.";
+            return false;
+        }
+
+        // Invariant, always: the native control's value is ISO no matter what the user sees.
+        var styles = DateTimeStyles.None;
+
+        if (target == typeof(DateOnly) && DateOnly.TryParse(value, CultureInfo.InvariantCulture, styles, out var dateOnly))
+        {
+            result = (TValue)(object)dateOnly;
+            validationErrorMessage = null;
+            return true;
+        }
+
+        if (target == typeof(DateTime) && DateTime.TryParse(value, CultureInfo.InvariantCulture, styles, out var dateTime))
+        {
+            result = (TValue)(object)dateTime;
+            validationErrorMessage = null;
+            return true;
+        }
+
+        if (target == typeof(DateTimeOffset) && DateTimeOffset.TryParse(value, CultureInfo.InvariantCulture, styles, out var offset))
+        {
+            result = (TValue)(object)offset;
+            validationErrorMessage = null;
+            return true;
+        }
+
+        result = default!;
+        validationErrorMessage = $"The {DisplayName} field is not a valid date.";
+        return false;
+    }
+
+    private string InputClass => CssBuilder
+        .Default(ZenStyles.InputBase)
+        .AddClass(ZenStyles.InputSize(Size))
+        .AddClass(ZenStyles.InputRadius(Size))
+        .AddClass("w-auto", !FullWidth)
+        // The UA calendar glyph is near-black in the dark palette and effectively invisible.
+        // Inverting it in dark mode is the least-bad fix short of hiding it entirely.
+        .AddClass("zen-dark:[&::-webkit-calendar-picker-indicator]:invert")
+        .Build()!;
+}

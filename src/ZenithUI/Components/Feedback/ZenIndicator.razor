@@ -1,0 +1,185 @@
+@namespace ZenithUI
+
+@inherits ZenComponentBase
+
+@*
+    A dot or count anchored to the corner of another element - an unread badge on a bell, a status
+    dot on an avatar.
+
+    It wraps its child rather than asking the caller to manage positioning, because the positioning
+    is the whole component: `relative` on the wrapper, `absolute` on the marker, and the right
+    translate for the chosen corner. Left to call sites, that is four classes to get right every
+    time and one to forget.
+
+    Accessibility. A COUNT is real text and is announced, so "Notifications" plus "3" reads
+    correctly. A bare DOT is aria-hidden - "bullet" tells a screen reader user nothing - which
+    means the meaning has to live in the child's own accessible name. Hence the guard below: a dot
+    with no Label and no explanation on the child is decoration pretending to be information.
+*@
+
+<span class="@RootClass("relative inline-flex")" style="@Style" @attributes="AttributesWithoutClass">
+    @ChildContent
+
+    @if (Visible)
+    {
+        <span class="@MarkerClass" aria-hidden="@(HasContent ? null : "true")">
+            @if (HasContent)
+            {
+                @DisplayText
+            }
+        </span>
+    }
+
+    @if (Visible && !HasContent && Label is not null)
+    {
+        <span class="zen-sr-only">@Label</span>
+    }
+</span>
+
+@code {
+    /// <summary>The element being marked.</summary>
+    [Parameter, EditorRequired]
+    public RenderFragment? ChildContent { get; set; }
+
+    /// <summary>
+    /// A count to display. <see langword="null"/> renders a bare dot.
+    /// </summary>
+    [Parameter]
+    public int? Count { get; set; }
+
+    /// <summary>
+    /// Counts above this are shown as "N+". Keeps a four-digit badge from stretching across the
+    /// element it is meant to mark.
+    /// </summary>
+    [Parameter]
+    public int MaxCount { get; set; } = 99;
+
+    /// <summary>
+    /// Whether a zero count still shows. Off by default: an unread badge reading "0" is worse than
+    /// no badge.
+    /// </summary>
+    [Parameter]
+    public bool ShowZero { get; set; }
+
+    /// <summary>Arbitrary marker content, taking precedence over <see cref="Count"/>.</summary>
+    [Parameter]
+    public string? Text { get; set; }
+
+    /// <summary>
+    /// Screen-reader text describing what a dot means. Required for a dot unless the child already
+    /// says it.
+    /// </summary>
+    [Parameter]
+    public string? Label { get; set; }
+
+    /// <summary>
+    /// Set when the child's own accessible name already conveys the state, which suppresses the
+    /// requirement for <see cref="Label"/>.
+    /// </summary>
+    [Parameter]
+    public bool LabelledByChild { get; set; }
+
+    /// <summary>Colour role.</summary>
+    [Parameter]
+    public ZenIntent Intent { get; set; } = ZenIntent.Danger;
+
+    /// <summary>Which corner to anchor to.</summary>
+    [Parameter]
+    public ZenCorner Corner { get; set; } = ZenCorner.TopEnd;
+
+    /// <summary>Marker size.</summary>
+    [Parameter]
+    public ZenSize Size { get; set; } = ZenSize.Medium;
+
+    /// <summary>Draw a ring in the surface colour, so the marker reads clearly over busy content.</summary>
+    [Parameter]
+    public bool Ring { get; set; } = true;
+
+    private bool HasContent => Text is not null || Count is not null;
+
+    private bool Visible =>
+        Text is not null
+        || Count is null
+        || Count > 0
+        || (Count == 0 && ShowZero);
+
+    private string? DisplayText =>
+        Text ?? (Count > MaxCount ? $"{MaxCount}+" : Count?.ToString(CultureInfo.CurrentCulture));
+
+    protected override void OnParametersSet()
+    {
+        if (!HasContent && Label is null && !LabelledByChild)
+        {
+            throw new InvalidOperationException(
+                $"{nameof(ZenIndicator)}: a dot with no {nameof(Count)} or {nameof(Text)} needs a " +
+                $"{nameof(Label)} so screen reader users learn what it means - or set " +
+                $"{nameof(LabelledByChild)} if the wrapped element already says so.");
+        }
+    }
+
+    private string MarkerClass => CssBuilder
+        .Default("pointer-events-none absolute z-10 inline-flex items-center justify-center rounded-full font-medium tabular-nums")
+        .AddClass(FillClass)
+        .AddClass(ContentColorClass, HasContent)
+        .AddClass("ring-2 ring-surface", Ring)
+        .AddClass(HasContent ? CountSizeClass : DotSizeClass)
+        .AddClass(CornerClass)
+        .Build()!;
+
+    /// <summary>
+    /// The marker's fill.
+    /// </summary>
+    /// <remarks>
+    /// Spelled out rather than taken from <c>ZenStyles.Solid</c>, which returns a background and a
+    /// text colour together and cannot be sliced safely: for <see cref="ZenIntent.Neutral"/> its
+    /// background is <c>surface-raised</c>, which would render a white badge on a white page. A
+    /// neutral marker needs a colour that contrasts with the surface, not one drawn from it.
+    /// </remarks>
+    private string FillClass => Intent switch
+    {
+        ZenIntent.Primary => "bg-primary",
+        ZenIntent.Secondary => "bg-secondary",
+        ZenIntent.Accent => "bg-accent",
+        ZenIntent.Success => "bg-success",
+        ZenIntent.Warning => "bg-warning",
+        ZenIntent.Info => "bg-info",
+        ZenIntent.Neutral => "bg-content-muted",
+        _ => "bg-danger",
+    };
+
+    private string ContentColorClass => Intent switch
+    {
+        ZenIntent.Secondary => "text-secondary-content",
+        ZenIntent.Accent => "text-accent-content",
+        ZenIntent.Success => "text-success-content",
+        ZenIntent.Warning => "text-warning-content",
+        ZenIntent.Info => "text-info-content",
+        ZenIntent.Neutral => "text-content-inverted",
+        ZenIntent.Primary => "text-primary-content",
+        _ => "text-danger-content",
+    };
+
+    private string DotSizeClass => Size switch
+    {
+        ZenSize.Small => "size-2",
+        ZenSize.Large => "size-3.5",
+        _ => "size-2.5",
+    };
+
+    private string CountSizeClass => Size switch
+    {
+        ZenSize.Small => "h-4 min-w-4 px-1 text-[0.625rem]",
+        ZenSize.Large => "h-6 min-w-6 px-1.5 text-sm",
+        _ => "h-5 min-w-5 px-1 text-xs",
+    };
+
+    // Logical properties (start/end) rather than left/right, so the marker lands on the correct
+    // side in a right-to-left layout without any extra work.
+    private string CornerClass => Corner switch
+    {
+        ZenCorner.TopStart => "top-0 start-0 -translate-x-1/2 -translate-y-1/2 rtl:translate-x-1/2",
+        ZenCorner.BottomStart => "bottom-0 start-0 -translate-x-1/2 translate-y-1/2 rtl:translate-x-1/2",
+        ZenCorner.BottomEnd => "bottom-0 end-0 translate-x-1/2 translate-y-1/2 rtl:-translate-x-1/2",
+        _ => "top-0 end-0 translate-x-1/2 -translate-y-1/2 rtl:-translate-x-1/2",
+    };
+}

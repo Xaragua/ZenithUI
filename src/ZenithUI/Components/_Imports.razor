@@ -2,11 +2,14 @@
    the directory tree, so each component folder inherits these and only has to declare its
    @namespace.
 
-   This file lives in Components/ rather than at the project root deliberately. A root
-   _Imports.razor would generate its class as `ZenithUI._Imports`, colliding with the folder-level
-   files that flatten their components into the `ZenithUI` namespace. Keeping it one level down
-   gives it the distinct `ZenithUI.Components` namespace and sidesteps the clash. *@
+   Note there is no @namespace here. Each component file declares `@namespace ZenithUI` itself,
+   which flattens the library into one namespace so consumers need a single @using. Putting that
+   directive in an _Imports.razor instead does not scale: Razor generates a class per
+   _Imports.razor, so a second folder declaring it produces a duplicate `ZenithUI._Imports` and the
+   build fails with CS0111. Leaving this file without one gives it the unique
+   `ZenithUI.Components` namespace. *@
 
+@using System.Diagnostics.CodeAnalysis
 @using System.Globalization
 @using System.Linq.Expressions
 @using Microsoft.AspNetCore.Components
