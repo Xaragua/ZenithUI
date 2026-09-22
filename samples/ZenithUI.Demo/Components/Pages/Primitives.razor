@@ -270,6 +270,50 @@
     </div>
 </section>
 
+<!-- --------------------------------------------------------------- Focus -->
+<section class="mt-12">
+    <h2 class="text-lg font-semibold">Focus treatment</h2>
+    <p class="mt-1 max-w-3xl text-sm text-content-muted">
+        Tab through the controls below. Text fields signal focus by recolouring <em>their own</em>
+        border; buttons and links draw a ring. A field already has a border in its resting state,
+        and an outline outside that border would show as two concentric lines &mdash; in a dense
+        form it makes adjacent fields look like they are colliding.
+    </p>
+
+    <div class="mt-4 grid gap-4 md:grid-cols-3">
+        <ZenCard Title="Simple control" TitleLevel="3" Subtitle="zen-focus-border">
+            <ZenField Label="Focus me">
+                <input id="@context.InputId" class="@DemoInputClass" placeholder="Tab here" />
+            </ZenField>
+        </ZenCard>
+
+        <ZenCard Title="Composite control" TitleLevel="3" Subtitle="zen-focus-border-within">
+            @* The border lives on the wrapper, so the focus style keys off :focus-within - the
+               bordered element never receives focus itself, its descendant does. *@
+            <ZenField Label="Search">
+                <div class="@DemoWrapperClass">
+                    <ZenIcon Path="@ZenIcons.Search" Size="ZenSize.Small" class="text-content-subtle" />
+                    <input id="@context.InputId" class="@ZenStyles.InputInnerBase" placeholder="Tab here too" />
+                </div>
+            </ZenField>
+        </ZenCard>
+
+        <ZenCard Title="Invalid keeps its colour" TitleLevel="3" Subtitle="error outranks focus">
+            <ZenField Label="Email" Error="Enter a valid email address.">
+                <input id="@context.InputId"
+                       aria-describedby="@context.DescribedBy"
+                       aria-invalid="@context.AriaInvalid"
+                       class="@DemoInputClass"
+                       value="not-an-email" />
+            </ZenField>
+            <p class="mt-3 text-xs text-content-muted">
+                Focusing this field keeps the danger border. Turning it primary would hide the state
+                the user is trying to fix.
+            </p>
+        </ZenCard>
+    </div>
+</section>
+
 @code {
     private static readonly ZenIntent[] Intents =
     [
@@ -289,10 +333,21 @@
         ZenElevation.None, ZenElevation.Low, ZenElevation.Medium, ZenElevation.High,
     ];
 
-    // Placeholder styling only. M2 replaces these raw inputs with ZenTextInput.
-    private const string DemoInputClass =
-        "zen-focus h-9 w-full rounded-zen-md border border-border bg-surface px-3 text-sm " +
-        "text-content placeholder:text-content-subtle aria-invalid:border-danger";
+    // Placeholder only. M2 replaces these raw inputs with ZenTextInput, which composes exactly
+    // these pieces - note zen-focus-border rather than zen-focus, so focus recolours the field's
+    // own border instead of drawing a ring outside it.
+    private static readonly string DemoInputClass = CssBuilder
+        .Default(ZenStyles.InputBase)
+        .AddClass(ZenStyles.InputSize(ZenSize.Medium))
+        .AddClass(ZenStyles.InputRadius(ZenSize.Medium))
+        .Build()!;
+
+    private static readonly string DemoWrapperClass = CssBuilder
+        .Default(ZenStyles.InputWrapperBase)
+        .AddClass(ZenStyles.InputSize(ZenSize.Medium))
+        .AddClass(ZenStyles.InputRadius(ZenSize.Medium))
+        .AddClass("gap-2")
+        .Build()!;
 
     private bool _saving;
 

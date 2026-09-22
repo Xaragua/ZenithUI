@@ -6,6 +6,32 @@ All notable changes to ZenithUI are documented here. The format follows
 
 ## [Unreleased]
 
+### Changed — focus treatment for input controls
+
+Text-entry controls now signal focus by recolouring **their own border** to the ring colour, with no
+outline drawn outside them. Buttons and links are unchanged and keep the ring.
+
+- New `zen-focus-border` utility for a control that carries its own border.
+- New `zen-focus-border-within` for a composite control, where the border sits on a wrapper and the
+  real input is nested inside it — `:focus-within`, because the bordered element never receives
+  focus itself.
+- `ZenStyles.InputBase`, `InputWrapperBase`, `InputInnerBase`, `InputSize` and `TextAreaSize`
+  codify the treatment so the M2 controls inherit it rather than each re-deciding.
+
+Why the two differ: a button is a solid shape with no resting border, so a ring reads cleanly. A
+text field already has a border, and an outline outside it renders as two concentric lines — in a
+dense form that makes adjacent fields look like they are colliding.
+
+Two details worth knowing:
+
+- The focused border is reinforced with an **inset** shadow, bringing it to `--zen-ring-width`
+  total. A 1px colour change is the bare minimum WCAG 2.4.7 accepts and falls short of the 2px
+  perimeter WCAG 2.4.13 asks for. Inset rather than outset means the control's outer dimensions
+  never change, so a focused field does not nudge its neighbours.
+- An invalid field **keeps its danger border while focused**. An error outranks a focus hint;
+  turning a failing field primary-coloured the moment it is focused hides the state the user is
+  trying to fix.
+
 ### Added — M1, the primitives
 
 **Components**

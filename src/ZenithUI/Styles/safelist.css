@@ -28,6 +28,11 @@
 @source inline("{bg,text,border,ring,divide}-{border,border-strong}");
 @source inline("ring-ring");
 
+/* Focus and validation state variants used by the form controls. */
+@source inline("aria-invalid:{bg,text,border}-danger");
+@source inline("has-aria-invalid:border-danger");
+@source inline("read-only:bg-surface-sunken");
+
 /* Shape and elevation. */
 @source inline("rounded-zen-{sm,md,lg,xl}");
 @source inline("rounded-{t,b,s,e,tl,tr,bl,br}-zen-{sm,md,lg,xl}");
@@ -41,6 +46,8 @@
 /* ZenithUI's own custom utilities. */
 @source inline("zen-focus");
 @source inline("zen-focus-always");
+@source inline("zen-focus-border");
+@source inline("zen-focus-border-within");
 @source inline("zen-indent");
 @source inline("zen-sr-only");
 @source inline("zen-root");

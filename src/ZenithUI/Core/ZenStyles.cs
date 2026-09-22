@@ -246,4 +246,65 @@ public static class ZenStyles
     public const string InteractiveBase =
         "zen-focus inline-flex shrink-0 items-center justify-center font-medium transition-colors " +
         "disabled:pointer-events-none disabled:opacity-50 aria-disabled:pointer-events-none aria-disabled:opacity-50";
+
+    // ---- Form controls ----------------------------------------------------------------------
+
+    /// <summary>
+    /// Classes shared by every text-entry control: surface, border, placeholder colour, and the
+    /// focus and invalid treatments.
+    /// </summary>
+    /// <remarks>
+    /// <para>
+    /// Note <c>zen-focus-border</c> rather than <c>zen-focus</c>. Input controls signal focus by
+    /// recolouring their own border, not by drawing a ring outside it - a field already has a
+    /// border in its resting state, and an outline around that produces two concentric lines.
+    /// Buttons and links keep the ring, where there is no border to recolour.
+    /// </para>
+    /// <para>
+    /// <c>aria-invalid:border-danger</c> is what makes a failing field read as failing before it is
+    /// ever focused; <c>zen-focus-border</c> then keeps that danger colour through focus rather
+    /// than replacing it with the ring colour.
+    /// </para>
+    /// </remarks>
+    public const string InputBase =
+        "zen-focus-border block w-full border border-border bg-surface text-content transition-colors " +
+        "placeholder:text-content-subtle aria-invalid:border-danger " +
+        "disabled:cursor-not-allowed disabled:opacity-50 read-only:bg-surface-sunken";
+
+    /// <summary>
+    /// The same treatment for a composite control whose border sits on a wrapper element, with the
+    /// real input nested inside alongside icons or affixes.
+    /// </summary>
+    public const string InputWrapperBase =
+        "zen-focus-border-within flex w-full items-center border border-border bg-surface text-content " +
+        "transition-colors has-aria-invalid:border-danger " +
+        "has-disabled:cursor-not-allowed has-disabled:opacity-50";
+
+    /// <summary>The bare input inside an <see cref="InputWrapperBase"/> wrapper.</summary>
+    /// <remarks>
+    /// Transparent and borderless: the wrapper owns every visual affordance, so a background or
+    /// border here would show as a second box inside the first.
+    /// </remarks>
+    public const string InputInnerBase =
+        "min-w-0 flex-1 border-0 bg-transparent p-0 text-inherit placeholder:text-content-subtle " +
+        "focus:outline-none disabled:cursor-not-allowed";
+
+    /// <summary>Height, horizontal padding and text size for a text-entry control.</summary>
+    public static string InputSize(ZenSize size) => size switch
+    {
+        ZenSize.Small => "h-8 px-2.5 text-sm",
+        ZenSize.Large => "h-11 px-4 text-base",
+        _ => "h-9 px-3 text-sm",
+    };
+
+    /// <summary>Padding and text size for a multi-line control, which has no fixed height.</summary>
+    public static string TextAreaSize(ZenSize size) => size switch
+    {
+        ZenSize.Small => "px-2.5 py-1.5 text-sm",
+        ZenSize.Large => "px-4 py-3 text-base",
+        _ => "px-3 py-2 text-sm",
+    };
+
+    /// <summary>Corner radius matching an input size. Mirrors <see cref="ControlRadius"/>.</summary>
+    public static string InputRadius(ZenSize size) => ControlRadius(size);
 }

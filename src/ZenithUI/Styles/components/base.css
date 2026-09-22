@@ -56,6 +56,64 @@
 }
 
 /*
+ * Focus treatment for text-entry controls: the control's OWN border turns the ring colour, with
+ * no outline drawn outside it.
+ *
+ * Why inputs differ from buttons. A button is a solid shape, so a ring around it reads clearly and
+ * costs nothing. A text field already has a visible border as part of its resting appearance, and
+ * an outline sitting outside that border produces two concentric lines - which looks like a defect,
+ * and in a dense form makes adjacent fields appear to collide. Recolouring the border the field
+ * already has is the cleaner signal.
+ *
+ * Keeping the indicator thick enough. A 1px colour change is a weak focus indicator: it is the
+ * minimum WCAG 2.4.7 accepts, but WCAG 2.4.13 asks for a perimeter at least 2px thick. So the
+ * border is reinforced with an INSET shadow rather than left at a hairline. Inset matters - it
+ * thickens the border inward, so the control's outer dimensions never change and a focused field
+ * does not nudge its neighbours. Total thickness comes to --zen-ring-width.
+ *
+ * Invalid fields keep their danger border when focused. An error outranks a focus hint: turning a
+ * failing field primary-coloured the moment it is focused hides the very state the user needs to
+ * see while fixing it.
+ */
+@utility zen-focus-border {
+  outline: none;
+
+  &:focus-visible {
+    border-color: var(--zen-ring);
+    box-shadow: inset 0 0 0 calc(var(--zen-ring-width) - 1px) var(--zen-ring);
+  }
+
+  &:focus-visible[aria-invalid="true"] {
+    border-color: var(--zen-danger);
+    box-shadow: inset 0 0 0 calc(var(--zen-ring-width) - 1px) var(--zen-danger);
+  }
+}
+
+/*
+ * The same treatment for a composite control, where the border lives on a wrapper and the real
+ * input sits inside it alongside icons or affixes.
+ *
+ * `:focus-within` rather than `:focus-visible`, because the element carrying the border never
+ * receives focus itself - its descendant does. The inner control's own outline is suppressed so
+ * the two indicators do not stack.
+ */
+@utility zen-focus-border-within {
+  & :is(input, textarea, select):focus {
+    outline: none;
+  }
+
+  &:focus-within {
+    border-color: var(--zen-ring);
+    box-shadow: inset 0 0 0 calc(var(--zen-ring-width) - 1px) var(--zen-ring);
+  }
+
+  &:focus-within:has(:is(input, textarea, select)[aria-invalid="true"]) {
+    border-color: var(--zen-danger);
+    box-shadow: inset 0 0 0 calc(var(--zen-ring-width) - 1px) var(--zen-danger);
+  }
+}
+
+/*
  * Indentation for nested rows (ZenTable hierarchy) and tree items. Depth is passed as the
  * `--zen-depth` custom property on the element, which keeps the class list static regardless
  * of how deep the data nests.

@@ -42,3 +42,17 @@ manifest at build time. A still-running process keeps serving the old fingerprin
 files behind them change it serves **empty responses** — the page loads with the library stylesheet
 applied but none of the app's own CSS, which looks exactly like a catastrophic styling bug and is
 not one. If the demo suddenly renders in Times New Roman with underlined links, this is why.
+
+## Focus treatment
+
+Two indicators, chosen by control type:
+
+- **Text-entry controls** (input, textarea, select, combobox) use `zen-focus-border` — the
+  control's own border turns the ring colour, with no outline outside it. Compose via
+  `ZenStyles.InputBase`. For a composite control whose border sits on a wrapper, use
+  `zen-focus-border-within` / `ZenStyles.InputWrapperBase`.
+- **Buttons, links and toggles** use `zen-focus` — an outline ring. They have no resting border to
+  recolour.
+
+An invalid field keeps its danger border while focused; do not let a focus style replace an error
+state.
