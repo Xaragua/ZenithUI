@@ -1,3 +1,4 @@
+using System.Text.RegularExpressions;
 using ZenithUI.Tests.Theming;
 
 namespace ZenithUI.Tests;
@@ -75,6 +76,28 @@ public class ThemeTokenTests
         }
 
         problems.ShouldBeEmpty(Report("The two dark blocks in tokens/dark.css have drifted", problems));
+    }
+
+    [Fact]
+    public void BothPalettes_DeclareAColorScheme()
+    {
+        // color-scheme is what makes the browser paint its OWN chrome to match: scrollbars, number
+        // spinners, the select popup, the native date picker. None of that is reachable from CSS,
+        // so a missing declaration shows up as a white scrollbar on a dark page with nothing in
+        // the stylesheet to blame.
+        //
+        // It has to be in both blocks. Declaring it only in dark leaves an explicit light choice
+        // on a dark OS inheriting dark chrome.
+        File.ReadAllText(TokenPaths.Base)
+            .Contains("color-scheme: light", StringComparison.Ordinal)
+            .ShouldBeTrue("tokens/base.css must declare color-scheme: light on :root.");
+
+        var darkCss = File.ReadAllText(TokenPaths.Dark);
+
+        // The lookbehind excludes `@media (prefers-color-scheme: dark)`, which contains the same
+        // text but is the condition rather than the declaration.
+        Regex.Matches(darkCss, @"(?<!prefers-)color-scheme:\s*dark").Count
+            .ShouldBe(2, "both dark blocks - the media query and the attribute - need it.");
     }
 
     [Fact]

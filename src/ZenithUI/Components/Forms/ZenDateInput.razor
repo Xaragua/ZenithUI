@@ -6,11 +6,15 @@
 @*
     A date field, generic over DateOnly, DateTime, DateTimeOffset and their nullable forms.
 
-    Native <input type="date"> rather than a custom calendar. The platform control already brings
-    a keyboard-accessible picker, locale-correct field order, screen-reader support and a sensible
-    mobile experience - all of which a hand-rolled calendar has to rebuild, and typically rebuilds
-    badly. A ZenDatePicker overlay may follow for cases the native control genuinely cannot serve,
-    but it will not be the default.
+    Native <input type="date">. The platform control brings a keyboard-accessible picker,
+    locale-correct field order, screen-reader support and a good mobile experience, all of which a
+    hand-rolled calendar has to rebuild.
+
+    Its one unfixable flaw is the dropdown: that calendar is painted by the browser and cannot be
+    themed, so on a dark page it is a white rectangle no stylesheet can reach. ZenDatePicker exists
+    for exactly that. Use ZenDatePicker when the popup has to match the page, and this when the
+    native experience matters more - on mobile especially, where the OS picker beats any web
+    calendar.
 
     One thing the native control insists on: its value is always ISO (yyyy-MM-dd) regardless of
     what the user sees, so parsing and formatting here use the invariant culture. Using the current

@@ -170,7 +170,7 @@ a palette fix is one edit rather than a guess-and-rerun loop:
 | --- | --- |
 | **M0** ✅ | Tokens, theming, `ZenComponentBase`, `ZenJsComponentBase`, `CssBuilder`, CI |
 | **M1** ✅ | `ZenIcon`, `ZenButton`, `ZenBadge`, `ZenSpinner`, `ZenSkeleton`, `ZenCard`, `ZenStatCard`, `ZenField`, `ZenInputBase<T>` |
-| **M2** ✅ | Text, textarea, number, currency, date, search, checkbox, radio, select, `ZenToggle`, `ZenRangeSlider`, `ZenForm`, `ZenProgress`, `ZenIndicator` |
+| **M2** ✅ | Text, textarea, number, currency, date, search, checkbox, radio, select, `ZenToggle`, `ZenRangeSlider`, `ZenForm`, `ZenProgress`, `ZenIndicator`, `ZenDatePicker` |
 | **M3** | `ZenModal` + modal service, `ZenToast` + toast service, `ZenPopover`, `ZenCombobox`, `ZenList` |
 | **M4** | `ZenTable` (sorting, paging, selection, hierarchy), `ZenTree`, `ZenTimeline` |
 | **M5** | `ZenAppBar`, `ZenNavMenu`, `ZenSideNav`, `ZenFooter`, `ZenAppShell` |

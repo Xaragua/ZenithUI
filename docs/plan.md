@@ -248,7 +248,7 @@ The requested set, plus the primitives the rest depend on.
 **Primitives** — `ZenIcon` (slot-based, so no icon font is forced on consumers), `ZenButton`,
 `ZenBadge`, `ZenSpinner`, `ZenSkeleton`, `ZenPopover`, `ZenField`, `ZenIndicator`, `ZenProgress`.
 
-**Inputs** — `ZenTextInput`, `ZenTextArea`, `ZenDateInput` (+ optional `ZenDatePicker`),
+**Inputs** — `ZenTextInput`, `ZenTextArea`, `ZenDateInput`, `ZenDatePicker` + `ZenCalendar`,
 `ZenNumberInput<TValue>`, `ZenCurrencyInput` (culture-aware, **formats on blur in C#** — no JS
 masking, which sidesteps caret-position bugs), `ZenSearchInput`, `ZenCheckbox`,
 `ZenCheckboxGroup<T>`, `ZenRadioGroup<T>` + `ZenRadio<T>`, `ZenToggle`, `ZenRangeSlider`.

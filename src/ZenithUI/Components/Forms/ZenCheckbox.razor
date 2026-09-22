@@ -164,19 +164,16 @@
         .Build()!;
 
     private string BoxClass => CssBuilder
-        // zen-focus, not zen-focus-border: a checked box is filled with the primary colour, so a
-        // primary border on it would be invisible.
-        .Default("zen-focus rounded-zen-sm border border-border-strong bg-surface transition-colors")
-        .AddClass("text-primary accent-primary")
+        // zen-check draws the whole control from --zen-* tokens (see components/base.css); the UA
+        // appearance is switched off. zen-focus, not zen-focus-border: a checked box is filled
+        // with the primary colour, so a primary border on it would be invisible.
+        .Default("zen-check zen-focus")
         .AddClass(Size switch
         {
             ZenSize.Small => "size-4",
             ZenSize.Large => "size-6",
             _ => "size-5",
         })
-        .AddClass("cursor-pointer")
-        .AddClass("disabled:cursor-not-allowed disabled:opacity-50")
-        .AddClass("aria-invalid:border-danger")
         .Build()!;
 
     private string LabelClass => CssBuilder

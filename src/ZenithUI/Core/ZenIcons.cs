@@ -33,6 +33,12 @@ public static class ZenIcons
     /// <summary>Chevron pointing up.</summary>
     public const string ChevronUp = """<path d="m6 15 6-6 6 6" />""";
 
+    /// <summary>Chevron pointing left. Previous month, previous page.</summary>
+    public const string ChevronLeft = """<path d="m15 6-6 6 6 6" />""";
+
+    /// <summary>Calendar. The date picker trigger.</summary>
+    public const string Calendar = """<rect x="3" y="4.5" width="18" height="16" rx="2" /><path d="M3 9.5h18M8 3v3m8-3v3" />""";
+
     /// <summary>Magnifier. Search inputs.</summary>
     public const string Search = """<circle cx="11" cy="11" r="7" /><path d="m20 20-3.5-3.5" />""";
 

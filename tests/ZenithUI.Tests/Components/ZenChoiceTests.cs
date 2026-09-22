@@ -52,6 +52,28 @@ public class ZenChoiceTests : BunitContext
         classes.ShouldNotContain("zen-focus-border");
     }
 
+    [Fact]
+    public void Checkbox_IsDrawnByTheLibraryNotTheUserAgent()
+    {
+        // Regression: the box relied on the UA's own rendering plus accent-color, so in the dark
+        // palette it stayed white. `color-scheme: dark` alone would only have made it the
+        // operating system's grey - which is not this library's surface colour, and the two
+        // sitting together in a form read as a mistake.
+        var classes = Render<ZenCheckbox>().Find("input").ClassList;
+
+        classes.ShouldContain("zen-check");
+        classes.ShouldNotContain("accent-primary", "the mark is drawn from --zen-* tokens now.");
+    }
+
+    [Fact]
+    public void Radio_IsDrawnByTheLibraryNotTheUserAgent()
+    {
+        var classes = RenderRadioGroup().FindAll("input")[0].ClassList;
+
+        classes.ShouldContain("zen-radio");
+        classes.ShouldNotContain("accent-primary");
+    }
+
     // ---- Radio group ------------------------------------------------------------------------
 
     private IRenderedComponent<ZenRadioGroup<string>> RenderRadioGroup(
@@ -310,6 +332,33 @@ public class ZenChoiceTests : BunitContext
             .Add(x => x.Shape, shape)
             .Add(x => x.Value, 50d))
         .Find("[role=progressbar]").ShouldNotBeNull();
+
+    [Fact]
+    public void Progress_Circular_SpinsTheSvgNotTheArc()
+    {
+        // Regression: animate-spin sat on the <circle>. Two things went wrong there. A CSS
+        // transform on the circle overrides its rotate(-90 18 18) presentation attribute, so the
+        // arc jumps to the 3 o'clock start; and an SVG child rotates about the SVG origin (0,0)
+        // rather than its own centre, so it orbited the top-left corner instead of turning.
+        var cut = Render<ZenProgress>(p => p
+            .Add(x => x.Shape, ZenProgressShape.Circular)
+            .Add(x => x.Value, null));
+
+        cut.Find("svg").ClassList.ShouldContain("motion-safe:animate-spin");
+
+        foreach (var circle in cut.FindAll("circle"))
+        {
+            circle.ClassList.ShouldNotContain("animate-spin");
+            circle.ClassList.ShouldNotContain("motion-safe:animate-spin");
+        }
+    }
+
+    [Fact]
+    public void Progress_Circular_DoesNotSpinWhenDeterminate() =>
+        Render<ZenProgress>(p => p
+            .Add(x => x.Shape, ZenProgressShape.Circular)
+            .Add(x => x.Value, 40d))
+        .Find("svg").ClassList.ShouldNotContain("motion-safe:animate-spin");
 
     [Fact]
     public void Progress_ClampsOutOfRangeValues()

@@ -1,0 +1,368 @@
+@namespace ZenithUI
+
+@typeparam TValue
+@inherits ZenInputBase<TValue>
+
+@*
+    A date field with a themed calendar panel, replacing the UA's own dropdown.
+
+    Why not the native picker. <input type="date"> is an excellent control, and ZenDateInput still
+    offers it - but its calendar is painted by the browser and cannot be themed at all. On a dark
+    page it is a white rectangle, and nothing in a stylesheet reaches it. Once a design system
+    commits to theming everything, that popup is the one hole left.
+
+    What is kept from native. The text field is still typed into directly, parsing the culture's
+    short date format, so a keyboard user never has to open the calendar. The panel is an
+    enhancement, not the only way in.
+
+    Positioning is an absolutely-positioned panel inside a relative wrapper rather than the top
+    layer. That is honest about its limit: inside a scrolling container with overflow hidden, the
+    panel clips. ZenPopover (M3) will supersede this with proper anchored positioning.
+*@
+
+<ZenField Label="@Label"
+          HelpText="@HelpText"
+          Errors="AllMessages"
+          Required="Required"
+          Disabled="Disabled"
+          For="@Id"
+          Size="Size"
+          Class="@FieldClass">
+    @*
+        focusout with a relatedTarget check, rather than a document click listener: it needs no
+        JavaScript, and it closes on Tab-away as well as on a click elsewhere - which a click
+        listener alone would miss.
+    *@
+    <div id="@ShellId" class="@ShellClass" @onfocusout="HandleFocusOutAsync" @onkeydown="HandleShellKeyDownAsync">
+        <div class="@WrapperClass">
+            <input id="@context.InputId"
+                   type="text"
+                   class="@RootClass(ZenStyles.InputInnerBase)"
+                   style="@Style"
+                   value="@TextValue"
+                   placeholder="@(Placeholder ?? DateFormatHint)"
+                   disabled="@Disabled"
+                   readonly="@ReadOnly"
+                   autocomplete="off"
+                   aria-describedby="@context.DescribedBy"
+                   aria-invalid="@context.AriaInvalid"
+                   aria-required="@context.AriaRequired"
+                   @attributes="AttributesWithoutClass"
+                   @onchange="HandleTextChanged" />
+
+            <button type="button"
+                    @ref="_trigger"
+                    class="@TriggerClass"
+                    aria-label="@(_open ? CloseCalendarLabel : OpenCalendarLabel)"
+                    aria-expanded="@(_open ? "true" : "false")"
+                    aria-haspopup="dialog"
+                    aria-controls="@PanelId"
+                    disabled="@(Disabled || ReadOnly)"
+                    @onclick="ToggleAsync">
+                <ZenIcon Path="@ZenIcons.Calendar" Size="ZenSize.Small" />
+            </button>
+        </div>
+
+        @if (_open)
+        {
+            @* role="dialog" so assistive technology announces entering a panel, and labelled by
+               the field so it is clear which date is being picked. *@
+            <div id="@PanelId"
+                 class="absolute z-50 mt-1 @(AlignEnd ? "end-0" : "start-0")"
+                 role="dialog"
+                 aria-modal="false"
+                 aria-label="@(Label is null ? "Choose a date" : $"Choose {Label}")">
+                <ZenCalendar @ref="_calendar"
+                             Value="@SelectedDate"
+                             ValueChanged="HandleDateSelectedAsync"
+                             Min="@MinDate"
+                             Max="@MaxDate"
+                             Culture="@Culture"
+                             IsDateDisabled="@IsDateDisabled"
+                             AllowClear="@AllowClear"
+                             OnClosed="CloseAndReturnFocusAsync" />
+            </div>
+        }
+    </div>
+</ZenField>
+
+@code {
+    private bool _open;
+    private bool _parseFailed;
+    private ZenCalendar? _calendar;
+    private ElementReference _trigger;
+
+    /// <summary>Earliest selectable date.</summary>
+    [Parameter]
+    public DateOnly? MinDate { get; set; }
+
+    /// <summary>Latest selectable date.</summary>
+    [Parameter]
+    public DateOnly? MaxDate { get; set; }
+
+    /// <summary>Culture used for parsing, formatting and the calendar's week layout.</summary>
+    [Parameter]
+    public CultureInfo? Culture { get; set; }
+
+    /// <summary>Predicate marking individual dates unselectable.</summary>
+    [Parameter]
+    public Func<DateOnly, bool>? IsDateDisabled { get; set; }
+
+    /// <summary>Offer a clear action in the calendar footer.</summary>
+    [Parameter]
+    public bool AllowClear { get; set; } = true;
+
+    /// <summary>Align the panel to the end of the field instead of the start.</summary>
+    [Parameter]
+    public bool AlignEnd { get; set; }
+
+    /// <summary>Accessible name for the trigger when the panel is closed.</summary>
+    [Parameter]
+    public string OpenCalendarLabel { get; set; } = "Open calendar";
+
+    /// <summary>Accessible name for the trigger when the panel is open.</summary>
+    [Parameter]
+    public string CloseCalendarLabel { get; set; } = "Close calendar";
+
+    private CultureInfo EffectiveCulture => Culture ?? CultureInfo.CurrentCulture;
+
+    private string PanelId => $"{Id}-calendar";
+
+    private string DateFormatHint => EffectiveCulture.DateTimeFormat.ShortDatePattern.ToLowerInvariant();
+
+    private IEnumerable<string> AllMessages =>
+        _parseFailed
+            ? ValidationMessages.Append($"Enter a date as {DateFormatHint}.")
+            : ValidationMessages;
+
+    // ---- Value plumbing ----------------------------------------------------------------------
+
+    /// <summary>
+    /// The bound value as a <see cref="DateOnly"/>, whatever the generic type actually is.
+    /// </summary>
+    /// <remarks>
+    /// The calendar speaks only <c>DateOnly</c> - a grid of days has no business knowing about
+    /// times or offsets. Conversion happens here, at the boundary.
+    /// </remarks>
+    private DateOnly? SelectedDate => CurrentValue switch
+    {
+        DateOnly d => d,
+        DateTime dt => DateOnly.FromDateTime(dt),
+        DateTimeOffset dto => DateOnly.FromDateTime(dto.DateTime),
+        _ => null,
+    };
+
+    private string? TextValue => SelectedDate?.ToString("d", EffectiveCulture);
+
+    private void HandleTextChanged(ChangeEventArgs args)
+    {
+        var text = args.Value?.ToString();
+
+        if (string.IsNullOrWhiteSpace(text))
+        {
+            _parseFailed = false;
+            SetDate(null);
+            return;
+        }
+
+        // The culture's short pattern first, then a general parse - so a user who types "1 Mar
+        // 2026" is not rejected for not matching the placeholder exactly.
+        if (DateOnly.TryParseExact(text, EffectiveCulture.DateTimeFormat.ShortDatePattern, EffectiveCulture, DateTimeStyles.None, out var exact)
+            || DateOnly.TryParse(text, EffectiveCulture, DateTimeStyles.None, out exact))
+        {
+            _parseFailed = false;
+            SetDate(exact);
+            return;
+        }
+
+        _parseFailed = true;
+    }
+
+    private async Task HandleDateSelectedAsync(DateOnly? date)
+    {
+        _parseFailed = false;
+        SetDate(date);
+        await CloseAndReturnFocusAsync();
+    }
+
+    private void SetDate(DateOnly? date)
+    {
+        var target = Nullable.GetUnderlyingType(typeof(TValue)) ?? typeof(TValue);
+
+        if (date is not { } value)
+        {
+            // A non-nullable target cannot represent "no date", so clearing is simply refused
+            // rather than silently storing DateTime.MinValue.
+            if (Nullable.GetUnderlyingType(typeof(TValue)) is not null)
+            {
+                CurrentValue = default;
+            }
+
+            return;
+        }
+
+        object converted =
+            target == typeof(DateOnly) ? value
+            : target == typeof(DateTime) ? value.ToDateTime(TimeOnly.MinValue)
+            : target == typeof(DateTimeOffset) ? new DateTimeOffset(value.ToDateTime(TimeOnly.MinValue))
+            : value;
+
+        CurrentValue = (TValue)converted;
+    }
+
+    // ---- Open and close ----------------------------------------------------------------------
+
+    private async Task ToggleAsync()
+    {
+        _open = !_open;
+
+        if (_open)
+        {
+            // Focus moves into the grid so arrow keys work immediately. Opening a calendar and
+            // leaving focus on the trigger means the first arrow press does nothing.
+            StateHasChanged();
+            _calendar?.FocusCursor();
+        }
+
+        await Task.CompletedTask;
+    }
+
+    private async Task CloseAndReturnFocusAsync()
+    {
+        if (!_open)
+        {
+            return;
+        }
+
+        _open = false;
+
+        // Focus returns to the trigger. Leaving it on a removed element drops the user at the top
+        // of the document, which is the single most disorienting thing a popup can do.
+        if (RendererInfo.IsInteractive)
+        {
+            try
+            {
+                await _trigger.FocusAsync();
+            }
+            catch (JSDisconnectedException)
+            {
+            }
+            catch (InvalidOperationException)
+            {
+            }
+        }
+    }
+
+    private async Task HandleShellKeyDownAsync(KeyboardEventArgs args)
+    {
+        if (args.Key == "Escape" && _open)
+        {
+            await CloseAndReturnFocusAsync();
+        }
+    }
+
+    /// <summary>
+    /// Closes when focus leaves the whole control.
+    /// </summary>
+    /// <remarks>
+    /// <c>RelatedTarget</c> is the element focus is moving to. When it is null the user clicked
+    /// something unfocusable or left the window; when it is inside this control - a calendar cell,
+    /// the month buttons - the panel must stay open. Blazor cannot tell us whether that element is
+    /// a descendant, so the check is deferred to the browser via <c>closest()</c> on the id.
+    /// </remarks>
+    private async Task HandleFocusOutAsync(FocusEventArgs args)
+    {
+        if (!_open)
+        {
+            return;
+        }
+
+        // focusout fires before the new element receives focus, so a synchronous close would
+        // cancel a click that is still in flight on a calendar cell. Yielding lets focus settle.
+        await Task.Yield();
+
+        if (!RendererInfo.IsInteractive)
+        {
+            return;
+        }
+
+        var stillInside = await IsFocusInsideAsync();
+
+        if (!stillInside)
+        {
+            _open = false;
+            StateHasChanged();
+        }
+    }
+
+    [Inject]
+    private IJSRuntime JS { get; set; } = default!;
+
+    private IJSObjectReference? _dom;
+
+    private async Task<bool> IsFocusInsideAsync()
+    {
+        try
+        {
+            _dom ??= await JS.InvokeAsync<IJSObjectReference>(
+                "import", "./_content/ZenithUI/js/zen-dom.js");
+
+            return await _dom.InvokeAsync<bool>("containsActiveElement", ShellId);
+        }
+        catch (JSDisconnectedException)
+        {
+            return true;
+        }
+        catch (OperationCanceledException)
+        {
+            return true;
+        }
+    }
+
+    private string ShellId => $"{Id}-shell";
+
+    protected override void DisposeCore()
+    {
+        base.DisposeCore();
+        _ = DisposeModuleAsync();
+    }
+
+    private async Task DisposeModuleAsync()
+    {
+        if (_dom is null)
+        {
+            return;
+        }
+
+        try
+        {
+            await _dom.DisposeAsync();
+        }
+        catch (JSDisconnectedException)
+        {
+        }
+        catch (OperationCanceledException)
+        {
+        }
+    }
+
+    // ---- Styling -----------------------------------------------------------------------------
+
+    private string ShellClass => CssBuilder
+        .Default("relative")
+        .AddClass(FullWidth ? "w-full" : "w-auto")
+        .Build()!;
+
+    private string WrapperClass => CssBuilder
+        .Default(ZenStyles.InputWrapperBase)
+        .AddClass(ZenStyles.InputSize(Size))
+        .AddClass(ZenStyles.InputRadius(Size))
+        .AddClass("gap-1 pe-1")
+        .Build()!;
+
+    private string TriggerClass => CssBuilder
+        .Default("zen-focus grid shrink-0 place-items-center rounded-zen-sm p-1")
+        .AddClass("text-content-subtle transition-colors hover:bg-surface-sunken hover:text-content")
+        .AddClass("disabled:cursor-not-allowed disabled:opacity-50")
+        .Build()!;
+}

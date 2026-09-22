@@ -49,9 +49,11 @@
                                       HelpText="Formats when you leave the field."
                                       @bind-Value="_model.Budget" />
 
-                    <ZenDateInput TValue="DateOnly?"
-                                  Label="Start date"
-                                  @bind-Value="_model.StartDate" />
+                    @* ZenDatePicker rather than ZenDateInput: the native dropdown is painted by
+                       the browser and cannot be themed, so on a dark page it is a white box. *@
+                    <ZenDatePicker TValue="DateOnly?"
+                                   Label="Start date"
+                                   @bind-Value="_model.StartDate" />
 
                     <ZenSelect TValue="string"
                                Label="Country"
@@ -158,6 +160,62 @@
     </div>
 </section>
 
+<!-- ----------------------------------------------------------- Date picker -->
+<section class="mt-12">
+    <h2 class="text-lg font-semibold">Dates</h2>
+    <p class="mt-1 max-w-3xl text-sm text-content-muted">
+        Two controls, and the difference is the dropdown. The native one is excellent apart from its
+        calendar, which the browser paints and no stylesheet can reach &mdash; on a dark page it is a
+        white rectangle. <code>ZenDatePicker</code> replaces just that part.
+    </p>
+
+    <div class="mt-4 grid gap-4 md:grid-cols-3">
+        <ZenCard Title="ZenDatePicker" TitleLevel="3" Subtitle="themed calendar">
+            <ZenDatePicker TValue="DateOnly?"
+                           Label="Pick a date"
+                           HelpText="Arrows move, PageUp/Down change month, Escape closes."
+                           @bind-Value="_picked" />
+            <p class="mt-3 text-sm text-content-muted">
+                Selected: <span class="font-medium text-content">@(_picked?.ToString("D") ?? "—")</span>
+            </p>
+        </ZenCard>
+
+        <ZenCard Title="With bounds" TitleLevel="3" Subtitle="min, max and weekends blocked">
+            <ZenDatePicker TValue="DateOnly?"
+                           Label="Delivery date"
+                           MinDate="@DateOnly.FromDateTime(DateTime.Today)"
+                           MaxDate="@DateOnly.FromDateTime(DateTime.Today.AddDays(45))"
+                           IsDateDisabled="@(d => d.DayOfWeek is DayOfWeek.Saturday or DayOfWeek.Sunday)"
+                           @bind-Value="_delivery" />
+            <p class="mt-3 text-sm text-content-muted">
+                Out-of-range and weekend days stay visible but unselectable, so arrow-key travel is
+                never interrupted.
+            </p>
+        </ZenCard>
+
+        <ZenCard Title="ZenDateInput" TitleLevel="3" Subtitle="native picker">
+            <ZenDateInput TValue="DateOnly?" Label="Native" @bind-Value="_native" />
+            <p class="mt-3 text-sm text-content-muted">
+                Still the better choice on mobile, where the OS picker beats any web calendar.
+            </p>
+        </ZenCard>
+    </div>
+
+    <div class="mt-4">
+        <ZenCard Title="Inline calendar" TitleLevel="3" Subtitle="ZenCalendar on its own">
+            <div class="flex flex-wrap items-start gap-6">
+                <ZenCalendar @bind-Value="_picked" />
+                <p class="max-w-md text-sm text-content-muted">
+                    The grid is a real <code>&lt;table role="grid"&gt;</code> with one tab stop and a
+                    roving cursor, so Tab leaves the calendar rather than walking all 42 cells. The
+                    month heading is an <code>aria-live</code> region &mdash; without it a screen
+                    reader user paging by month hears the new day but never learns the month moved.
+                </p>
+            </div>
+        </ZenCard>
+    </div>
+</section>
+
 <!-- --------------------------------------------------- Progress & indicator -->
 <section class="mt-12 grid gap-4 md:grid-cols-2">
     <ZenCard Title="ZenProgress" TitleLevel="2">
@@ -242,6 +300,9 @@
     private bool _notify = true;
     private bool _beta;
     private double _volume = 45;
+    private DateOnly? _picked = DateOnly.FromDateTime(DateTime.Today);
+    private DateOnly? _delivery;
+    private DateOnly? _native;
 
     private IEnumerable<(string Label, string Value)> ModelSnapshot =>
     [

@@ -6,6 +6,45 @@ All notable changes to ZenithUI are documented here. The format follows
 
 ## [Unreleased]
 
+### Added — `ZenCalendar` and `ZenDatePicker`
+
+A themed calendar, replacing the browser's own date dropdown.
+
+`<input type="date">` is a good control in every respect but one: its calendar is painted by the
+browser and cannot be styled at all, so on a dark page it is a white rectangle no stylesheet can
+reach. `ZenDateInput` remains for cases where the native experience wins — mobile especially, where
+the OS picker beats any web calendar — but `ZenDatePicker` is now the default in the demo.
+
+- `ZenCalendar` is the month grid on its own, usable inline. A real `<table role="grid">` with one
+  tab stop and a roving cursor, so Tab leaves the calendar instead of walking all 42 cells. Arrow
+  keys move by day, PageUp/PageDown by month, with Shift by year, Home/End to the week's ends.
+- The month heading is an `aria-live` region. Without it a screen reader user paging by month hears
+  the newly focused day but never learns the month moved.
+- Six rows are always rendered, so the panel does not change height between months and shift under
+  the pointer.
+- Out-of-range and predicate-disabled days stay visible but unselectable. Hiding them makes the grid
+  harder to scan, and skipping them breaks arrow-key travel.
+- `ZenDatePicker` returns focus to its trigger on close, and the text field still accepts typing, so
+  the calendar is an enhancement rather than the only way in.
+
+### Fixed — native controls ignored the dark palette
+
+- **`color-scheme` was never declared.** That property is what tells the browser to paint its *own*
+  chrome to match: scrollbars, number-input spinners, the select popup, the native date picker.
+  None of it is reachable from CSS, so its absence showed up as light widgets on a dark page with
+  nothing in the stylesheet to blame. Declared in every palette block — light too, or an explicit
+  light choice on a dark OS inherits dark chrome.
+- **Checkbox and radio are now drawn by the library.** They previously relied on the UA's rendering
+  plus `accent-color`, which left them white in dark. `color-scheme` alone would have made them the
+  operating system's grey, which is not this library's surface colour — and the two sitting side by
+  side in a form read as a mistake. Both are now `appearance: none` with the box, checkmark, dot and
+  indeterminate bar drawn from `--zen-*` tokens.
+- **The circular indeterminate progress ring did not animate correctly.** `animate-spin` sat on the
+  `<circle>`, where a CSS transform overrides its `rotate(-90 18 18)` presentation attribute, and an
+  SVG child rotates about the SVG origin rather than its own centre — so the arc jumped position and
+  orbited the top-left corner. The spin moved to the `<svg>`, which is a replaced element in normal
+  layout and transforms like anything else.
+
 ### Added — M2, form controls and feedback primitives
 
 **Text entry** — `ZenTextInput`, `ZenTextArea`, `ZenNumberInput<T>`, `ZenCurrencyInput`,

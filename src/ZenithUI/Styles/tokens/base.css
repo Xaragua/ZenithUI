@@ -34,6 +34,20 @@
  */
 
 :root {
+  /*
+   * Tells the browser which palette its own chrome should be painted in: scrollbars, number-input
+   * spinners, the select popup, the date picker, form-control defaults.
+   *
+   * Without this, those parts stay light no matter what the page around them does - they are drawn
+   * by the UA, not by CSS, so no amount of styling reaches them. It is also why a dark page with a
+   * white scrollbar looks broken in a way that is hard to trace: nothing in the stylesheet is
+   * wrong, the declaration is simply missing.
+   *
+   * It must be set in every palette block, not only the dark one, or an explicit light choice on a
+   * dark OS inherits dark chrome.
+   */
+  color-scheme: light;
+
   /* ---- Surfaces -------------------------------------------------------- */
   --zen-surface: oklch(0.985 0.002 258);
   --zen-surface-raised: oklch(1 0 0);

@@ -22,10 +22,22 @@
          aria-valuetext="@ValueText"
          aria-label="@Label"
          @attributes="AttributesWithoutClass">
-        <svg class="@CircleSizeClass" viewBox="0 0 36 36" aria-hidden="true">
+        @*
+            The spin is applied to the <svg>, not to the arc inside it.
+
+            Two reasons it cannot go on the circle. A CSS `transform` on the circle overrides its
+            `transform="rotate(-90 18 18)"` presentation attribute, so the arc jumps to the 3
+            o'clock start position. And an SVG child rotates about the SVG's origin (0,0) rather
+            than its own centre unless `transform-box`/`transform-origin` are set - which makes the
+            arc orbit the top-left corner instead of turning in place.
+
+            The <svg> is a replaced element in normal layout, so a CSS transform on it behaves the
+            way it does anywhere else.
+        *@
+        <svg class="@CircleClass" viewBox="0 0 36 36" aria-hidden="true">
             <circle class="text-border" cx="18" cy="18" r="@Radius"
                     fill="none" stroke="currentColor" stroke-width="@StrokeWidth" />
-            <circle class="@IndicatorColorClass @(IsIndeterminate ? "origin-center animate-spin" : null)"
+            <circle class="@IndicatorColorClass"
                     cx="18" cy="18" r="@Radius"
                     fill="none" stroke="currentColor" stroke-width="@StrokeWidth"
                     stroke-linecap="round"
@@ -184,12 +196,17 @@ else
 
     private string CircularWrapperClass => "relative inline-grid place-items-center";
 
-    private string CircleSizeClass => Size switch
-    {
-        ZenSize.Small => "size-8 -rotate-0",
-        ZenSize.Large => "size-16",
-        _ => "size-12",
-    };
+    private string CircleClass => CssBuilder
+        .Default(Size switch
+        {
+            ZenSize.Small => "size-8",
+            ZenSize.Large => "size-16",
+            _ => "size-12",
+        })
+        // motion-safe so a viewer who asked for reduced motion gets a static three-quarter arc
+        // rather than a permanently spinning one.
+        .AddClass("motion-safe:animate-spin", IsIndeterminate)
+        .Build()!;
 
     private string IndicatorColorClass => ZenStyles.Foreground(Intent);
 

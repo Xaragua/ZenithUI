@@ -1,0 +1,429 @@
+@namespace ZenithUI
+
+@inherits ZenComponentBase
+@implements IAsyncDisposable
+
+@*
+    The month grid. Presentation and keyboard handling only - it owns no popup, no input and no
+    binding, which is what lets ZenDatePicker use it in a panel and a page use it inline.
+
+    Markup follows the WAI-ARIA date-grid pattern: a real <table> with role="grid", column headers
+    naming the weekdays, and one tab stop for the whole grid. Arrow keys move a "focused date"
+    cursor between cells rather than tabbing through 42 buttons - which is the difference between
+    a calendar a keyboard user can use and one they have to escape from.
+
+    Only the cursor cell carries tabindex="0"; every other cell is -1. That is the roving tabindex
+    pattern, and it is why Tab leaves the calendar instead of walking it.
+*@
+
+<div class="@RootClass(CalendarClass)" style="@Style" @attributes="AttributesWithoutClass">
+    <div class="mb-2 flex items-center justify-between gap-1">
+        <ZenButton Size="ZenSize.Small"
+                   Variant="ZenVariant.Ghost"
+                   IconOnly="true"
+                   Icon="@ZenIcons.ChevronLeft"
+                   AriaLabel="@PreviousMonthLabel"
+                   Disabled="@(!CanGoToPreviousMonth)"
+                   OnClick="@(() => ShiftMonth(-1))" />
+
+        @*
+            aria-live so the month name is announced when it changes. Without it a screen reader
+            user pressing PageDown hears the newly focused day but never learns the month moved.
+        *@
+        <div class="flex-1 text-center text-sm font-semibold text-content" aria-live="polite">
+            @_view.ToString("MMMM yyyy", EffectiveCulture)
+        </div>
+
+        <ZenButton Size="ZenSize.Small"
+                   Variant="ZenVariant.Ghost"
+                   IconOnly="true"
+                   Icon="@ZenIcons.ChevronRight"
+                   AriaLabel="@NextMonthLabel"
+                   Disabled="@(!CanGoToNextMonth)"
+                   OnClick="@(() => ShiftMonth(1))" />
+    </div>
+
+    <table class="w-full border-collapse"
+           role="grid"
+           aria-label="@(_view.ToString("MMMM yyyy", EffectiveCulture))"
+           @onkeydown="HandleKeyDownAsync">
+        <thead>
+            <tr>
+                @foreach (var day in WeekdayHeadings)
+                {
+                    @* abbr carries the full weekday name; the visible text is the short form. *@
+                    <th scope="col" abbr="@day.Full" class="pb-1 text-center text-xs font-medium text-content-subtle">
+                        <span aria-hidden="true">@day.Short</span>
+                        <span class="zen-sr-only">@day.Full</span>
+                    </th>
+                }
+            </tr>
+        </thead>
+        <tbody>
+            @foreach (var week in Weeks)
+            {
+                <tr>
+                    @foreach (var date in week)
+                    {
+                        var state = StateOf(date);
+
+                        <td class="p-0.5 text-center">
+                            @*
+                                Focus is moved by id rather than an ElementReference: @ref only
+                                accepts a plain field, so capturing "whichever cell is the cursor"
+                                would mean duplicating this entire button in an if/else.
+                            *@
+                            <button type="button"
+                                    id="@DayId(date)"
+                                    class="@DayClass(state)"
+                                    tabindex="@(state.IsCursor ? 0 : -1)"
+                                    disabled="@state.IsDisabled"
+                                    aria-selected="@(state.IsSelected ? "true" : "false")"
+                                    aria-current="@(state.IsToday ? "date" : null)"
+                                    aria-label="@date.ToString("D", EffectiveCulture)"
+                                    @onclick="@(() => SelectAsync(date))">
+                                @date.Day
+                            </button>
+                        </td>
+                    }
+                </tr>
+            }
+        </tbody>
+    </table>
+
+    @if (ShowTodayButton)
+    {
+        <div class="mt-2 flex justify-between gap-2 border-t border-border pt-2">
+            <ZenButton Size="ZenSize.Small" Variant="ZenVariant.Ghost" OnClick="GoToTodayAsync">
+                @TodayLabel
+            </ZenButton>
+
+            @if (AllowClear)
+            {
+                <ZenButton Size="ZenSize.Small" Variant="ZenVariant.Ghost" OnClick="ClearAsync">
+                    @ClearLabel
+                </ZenButton>
+            }
+        </div>
+    }
+</div>
+
+@code {
+    private DateOnly _view;
+    private DateOnly _cursor;
+    private bool _focusCursorOnNextRender;
+    private IJSObjectReference? _dom;
+
+    [Inject]
+    private IJSRuntime JS { get; set; } = default!;
+
+    /// <summary>The selected date, if any.</summary>
+    [Parameter]
+    public DateOnly? Value { get; set; }
+
+    /// <summary>Raised when a date is chosen, or cleared.</summary>
+    [Parameter]
+    public EventCallback<DateOnly?> ValueChanged { get; set; }
+
+    /// <summary>Earliest selectable date.</summary>
+    [Parameter]
+    public DateOnly? Min { get; set; }
+
+    /// <summary>Latest selectable date.</summary>
+    [Parameter]
+    public DateOnly? Max { get; set; }
+
+    /// <summary>
+    /// Culture driving month names, weekday names and which day the week starts on.
+    /// </summary>
+    /// <remarks>
+    /// The first day of the week is not a styling detail - a calendar starting on Sunday for a
+    /// user whose week starts on Monday is subtly wrong every single time they read it.
+    /// </remarks>
+    [Parameter]
+    public CultureInfo? Culture { get; set; }
+
+    /// <summary>Predicate marking individual dates unselectable, on top of <see cref="Min"/>/<see cref="Max"/>.</summary>
+    [Parameter]
+    public Func<DateOnly, bool>? IsDateDisabled { get; set; }
+
+    /// <summary>Show the footer with "Today" and, optionally, "Clear".</summary>
+    [Parameter]
+    public bool ShowTodayButton { get; set; } = true;
+
+    /// <summary>Offer a clear action in the footer.</summary>
+    [Parameter]
+    public bool AllowClear { get; set; } = true;
+
+    /// <summary>Label for the today action.</summary>
+    [Parameter]
+    public string TodayLabel { get; set; } = "Today";
+
+    /// <summary>Label for the clear action.</summary>
+    [Parameter]
+    public string ClearLabel { get; set; } = "Clear";
+
+    /// <summary>Accessible name for the previous-month button.</summary>
+    [Parameter]
+    public string PreviousMonthLabel { get; set; } = "Previous month";
+
+    /// <summary>Accessible name for the next-month button.</summary>
+    [Parameter]
+    public string NextMonthLabel { get; set; } = "Next month";
+
+    /// <summary>Raised when the user asks to close - Escape, or a date being chosen.</summary>
+    [Parameter]
+    public EventCallback OnClosed { get; set; }
+
+    /// <summary>Move focus to the cursor cell after the next render.</summary>
+    public void FocusCursor() => _focusCursorOnNextRender = true;
+
+    private CultureInfo EffectiveCulture => Culture ?? CultureInfo.CurrentCulture;
+
+    private DateOnly Today => DateOnly.FromDateTime(DateTime.Now);
+
+    protected override void OnParametersSet()
+    {
+        // The cursor starts on the selection, or on today when there is none - never on the first
+        // of the month, which would make the keyboard cursor and the visible selection disagree.
+        var anchor = Value ?? Today;
+
+        if (_cursor == default)
+        {
+            _cursor = Clamp(anchor);
+            _view = new DateOnly(_cursor.Year, _cursor.Month, 1);
+        }
+        else if (Value is { } selected && selected != _cursor)
+        {
+            _cursor = Clamp(selected);
+            _view = new DateOnly(_cursor.Year, _cursor.Month, 1);
+        }
+    }
+
+    protected override async Task OnAfterRenderAsync(bool firstRender)
+    {
+        if (!_focusCursorOnNextRender || !RendererInfo.IsInteractive)
+        {
+            return;
+        }
+
+        _focusCursorOnNextRender = false;
+
+        try
+        {
+            _dom ??= await JS.InvokeAsync<IJSObjectReference>(
+                "import", "./_content/ZenithUI/js/zen-dom.js");
+
+            await _dom.InvokeVoidAsync("focusElement", DayId(_cursor));
+        }
+        catch (JSDisconnectedException)
+        {
+        }
+        catch (OperationCanceledException)
+        {
+        }
+    }
+
+    /// <summary>
+    /// Stable per-date element id. Scoped to this calendar instance so two on one page cannot
+    /// collide.
+    /// </summary>
+    private string DayId(DateOnly date) => $"{Id}-d{date:yyyyMMdd}";
+
+    /// <inheritdoc />
+    public async ValueTask DisposeAsync()
+    {
+        if (_dom is null)
+        {
+            return;
+        }
+
+        try
+        {
+            await _dom.DisposeAsync();
+        }
+        catch (JSDisconnectedException)
+        {
+        }
+        catch (OperationCanceledException)
+        {
+        }
+        finally
+        {
+            _dom = null;
+        }
+    }
+
+    // ---- Grid construction -------------------------------------------------------------------
+
+    private IReadOnlyList<(string Short, string Full)> WeekdayHeadings
+    {
+        get
+        {
+            var format = EffectiveCulture.DateTimeFormat;
+            var first = (int)format.FirstDayOfWeek;
+
+            return Enumerable.Range(0, 7)
+                .Select(i =>
+                {
+                    var day = (DayOfWeek)((first + i) % 7);
+                    return (format.GetShortestDayName(day), format.GetDayName(day));
+                })
+                .ToList();
+        }
+    }
+
+    /// <summary>
+    /// Six weeks, always. A fixed row count stops the panel changing height as the user pages
+    /// through months, which would make the control jump under the pointer.
+    /// </summary>
+    private IEnumerable<IEnumerable<DateOnly>> Weeks
+    {
+        get
+        {
+            var firstOfMonth = new DateOnly(_view.Year, _view.Month, 1);
+            var firstDayOfWeek = (int)EffectiveCulture.DateTimeFormat.FirstDayOfWeek;
+            var offset = ((int)firstOfMonth.DayOfWeek - firstDayOfWeek + 7) % 7;
+            var start = firstOfMonth.AddDays(-offset);
+
+            for (var week = 0; week < 6; week++)
+            {
+                yield return Enumerable.Range(0, 7).Select(d => start.AddDays((week * 7) + d));
+            }
+        }
+    }
+
+    private record struct DayState(bool IsSelected, bool IsToday, bool IsCursor, bool IsDisabled, bool IsOutsideMonth);
+
+    private DayState StateOf(DateOnly date) => new(
+        IsSelected: Value == date,
+        IsToday: date == Today,
+        IsCursor: date == _cursor,
+        IsDisabled: IsOutOfRange(date) || (IsDateDisabled?.Invoke(date) ?? false),
+        IsOutsideMonth: date.Month != _view.Month);
+
+    private bool IsOutOfRange(DateOnly date) =>
+        (Min is { } min && date < min) || (Max is { } max && date > max);
+
+    private DateOnly Clamp(DateOnly date)
+    {
+        if (Min is { } min && date < min)
+        {
+            return min;
+        }
+
+        return Max is { } max && date > max ? max : date;
+    }
+
+    private bool CanGoToPreviousMonth =>
+        Min is not { } min || new DateOnly(_view.Year, _view.Month, 1) > new DateOnly(min.Year, min.Month, 1);
+
+    private bool CanGoToNextMonth =>
+        Max is not { } max || new DateOnly(_view.Year, _view.Month, 1) < new DateOnly(max.Year, max.Month, 1);
+
+    // ---- Interaction -------------------------------------------------------------------------
+
+    private void ShiftMonth(int months)
+    {
+        _view = _view.AddMonths(months);
+
+        // Keep the cursor inside the visible month so arrow keys carry on from where the user is
+        // looking, not from a date that scrolled off.
+        var day = Math.Min(_cursor.Day, DateTime.DaysInMonth(_view.Year, _view.Month));
+        _cursor = new DateOnly(_view.Year, _view.Month, day);
+    }
+
+    private async Task SelectAsync(DateOnly date)
+    {
+        if (IsOutOfRange(date) || (IsDateDisabled?.Invoke(date) ?? false))
+        {
+            return;
+        }
+
+        _cursor = date;
+        Value = date;
+
+        await ValueChanged.InvokeAsync(date);
+        await OnClosed.InvokeAsync();
+    }
+
+    private async Task GoToTodayAsync()
+    {
+        _view = new DateOnly(Today.Year, Today.Month, 1);
+        _cursor = Clamp(Today);
+
+        FocusCursor();
+        await Task.CompletedTask;
+    }
+
+    private async Task ClearAsync()
+    {
+        Value = null;
+
+        await ValueChanged.InvokeAsync(null);
+        await OnClosed.InvokeAsync();
+    }
+
+    /// <summary>
+    /// Arrow-key navigation per the WAI-ARIA date-grid pattern.
+    /// </summary>
+    /// <remarks>
+    /// Moving the cursor across a month boundary follows it into the next month, rather than
+    /// stopping at the edge. A grid that refuses to advance past the 31st is the commonest way a
+    /// custom calendar becomes unusable by keyboard.
+    /// </remarks>
+    private async Task HandleKeyDownAsync(KeyboardEventArgs args)
+    {
+        var next = args.Key switch
+        {
+            "ArrowLeft" => _cursor.AddDays(-1),
+            "ArrowRight" => _cursor.AddDays(1),
+            "ArrowUp" => _cursor.AddDays(-7),
+            "ArrowDown" => _cursor.AddDays(7),
+            "Home" => _cursor.AddDays(-(int)((_cursor.DayOfWeek - EffectiveCulture.DateTimeFormat.FirstDayOfWeek + 7) % 7)),
+            "End" => _cursor.AddDays(6 - (int)((_cursor.DayOfWeek - EffectiveCulture.DateTimeFormat.FirstDayOfWeek + 7) % 7)),
+            // Shift turns month paging into year paging, which is the conventional binding.
+            "PageUp" => args.ShiftKey ? _cursor.AddYears(-1) : _cursor.AddMonths(-1),
+            "PageDown" => args.ShiftKey ? _cursor.AddYears(1) : _cursor.AddMonths(1),
+            _ => (DateOnly?)null,
+        };
+
+        if (next is { } target)
+        {
+            _cursor = Clamp(target);
+            _view = new DateOnly(_cursor.Year, _cursor.Month, 1);
+            FocusCursor();
+            return;
+        }
+
+        if (args.Key is "Enter" or " ")
+        {
+            await SelectAsync(_cursor);
+            return;
+        }
+
+        if (args.Key == "Escape")
+        {
+            await OnClosed.InvokeAsync();
+        }
+    }
+
+    // ---- Styling -----------------------------------------------------------------------------
+
+    private string CalendarClass =>
+        "w-[17.5rem] rounded-zen-lg border border-border bg-surface-overlay p-3 shadow-zen-lg";
+
+    private string DayClass(DayState state) => CssBuilder
+        .Default("zen-focus grid size-9 place-items-center rounded-zen-md text-sm transition-colors")
+        .AddClass("disabled:cursor-not-allowed disabled:opacity-35")
+        // Selected wins over today, which wins over plain. Today is marked with a ring rather than
+        // a fill so it cannot be confused with the selection.
+        .AddClass("bg-primary text-primary-content font-semibold", state.IsSelected)
+        .AddClass("ring-1 ring-primary text-primary-strong font-semibold", state.IsToday && !state.IsSelected)
+        .AddClass("hover:bg-surface-sunken", !state.IsSelected && !state.IsDisabled)
+        // Days spilling in from the neighbouring month stay visible but recede - hiding them makes
+        // the grid harder to scan, and disabling them breaks arrow-key travel.
+        .AddClass("text-content-subtle", state.IsOutsideMonth && !state.IsSelected && !state.IsToday)
+        .AddClass("text-content", !state.IsOutsideMonth && !state.IsSelected && !state.IsToday)
+        .Build()!;
+}

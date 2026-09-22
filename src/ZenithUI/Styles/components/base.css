@@ -197,6 +197,104 @@
 
 @layer components {
   /*
+   * Checkbox and radio.
+   *
+   * `appearance: none` and drawn from scratch. `color-scheme` alone would make the UA paint these
+   * in a dark palette, but "the operating system's dark grey" is not the same thing as "this
+   * library's surface colour", and the two sitting side by side in a form look like a mistake. A
+   * design system that themes everything except its checkboxes has a hole in it.
+   *
+   * The mark is a pseudo-element scaled from 0, so checking animates rather than snapping, and the
+   * box never changes size. Sized in percentages of the control so a single rule covers all three
+   * sizes.
+   */
+  .zen-check,
+  .zen-radio {
+    appearance: none;
+    -webkit-appearance: none;
+    flex: none;
+    display: inline-grid;
+    place-content: center;
+    background-color: var(--zen-surface);
+    border: 1px solid var(--zen-border-strong);
+    cursor: pointer;
+    transition:
+      background-color 120ms ease,
+      border-color 120ms ease;
+  }
+
+  .zen-check {
+    border-radius: var(--zen-radius-sm);
+  }
+
+  .zen-radio {
+    border-radius: 9999px;
+  }
+
+  .zen-check::before,
+  .zen-radio::before {
+    content: "";
+    background-color: var(--zen-primary-content);
+    transform: scale(0);
+    transition: transform 120ms ease;
+  }
+
+  /* A checkmark cut out of a square, rather than a background image - it inherits the mark colour
+     and needs no asset. */
+  .zen-check::before {
+    width: 68%;
+    height: 68%;
+    clip-path: polygon(14% 44%, 0 65%, 50% 100%, 100% 16%, 80% 0%, 43% 62%);
+  }
+
+  .zen-radio::before {
+    width: 50%;
+    height: 50%;
+    border-radius: 9999px;
+  }
+
+  .zen-check:checked,
+  .zen-radio:checked,
+  .zen-check:indeterminate {
+    background-color: var(--zen-primary);
+    border-color: var(--zen-primary);
+  }
+
+  .zen-check:checked::before,
+  .zen-radio:checked::before {
+    transform: scale(1);
+  }
+
+  /* Indeterminate replaces the tick with a bar: "some but not all", not "none". */
+  .zen-check:indeterminate::before {
+    width: 62%;
+    height: 2px;
+    border-radius: 1px;
+    clip-path: none;
+    transform: scale(1);
+  }
+
+  .zen-check:disabled,
+  .zen-radio:disabled {
+    cursor: not-allowed;
+    opacity: 0.5;
+  }
+
+  .zen-check[aria-invalid="true"],
+  .zen-radio[aria-invalid="true"] {
+    border-color: var(--zen-danger);
+  }
+
+  @media (prefers-reduced-motion: reduce) {
+    .zen-check,
+    .zen-radio,
+    .zen-check::before,
+    .zen-radio::before {
+      transition: none;
+    }
+  }
+
+  /*
    * ZenRangeSlider.
    *
    * A native <input type="range"> cannot be styled through utility classes alone: the track and

@@ -94,10 +94,10 @@
         .Build()!;
 
     private string RadioClass => CssBuilder
+        // zen-radio draws the whole control from --zen-* tokens (see components/base.css).
         // zen-focus, not zen-focus-border: a selected radio is filled, so a coloured border on it
         // would be invisible.
-        .Default("zen-focus cursor-pointer border-border-strong accent-primary")
-        .AddClass("disabled:cursor-not-allowed disabled:opacity-50")
+        .Default("zen-radio zen-focus")
         .AddClass(Group.GroupSize switch
         {
             ZenSize.Small => "size-4",
