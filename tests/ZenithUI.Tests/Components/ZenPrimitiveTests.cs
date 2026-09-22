@@ -143,16 +143,40 @@ public class ZenPrimitiveTests : BunitContext
         badge.ClassList.ShouldNotContain("text-warning", "plain -warning is a fill, not a foreground.");
     }
 
-    [Fact]
-    public void Badge_HasNoHoverState()
+    [Theory]
+    [InlineData(ZenVariant.Solid)]
+    [InlineData(ZenVariant.Soft)]
+    [InlineData(ZenVariant.Outline)]
+    [InlineData(ZenVariant.Ghost)]
+    public void Badge_HasNoHoverState_InAnyVariant(ZenVariant variant)
     {
-        // A badge is a label. A hover state would suggest it is clickable.
+        // A badge is a label. A hover state would tell the user it is clickable, which is a lie.
+        // Regression: the non-interactive flag originally suppressed the hover on Soft only, so a
+        // Solid or Outline badge still lit up under the pointer.
         var classes = Render<ZenBadge>(p => p
             .Add(x => x.Intent, ZenIntent.Primary)
+            .Add(x => x.Variant, variant)
             .AddChildContent("Label"))
             .Find("span").ClassList;
 
-        classes.ShouldNotContain("hover:bg-primary");
+        classes.ShouldNotContain(c => c.StartsWith("hover:", StringComparison.Ordinal));
+    }
+
+    [Theory]
+    [InlineData(ZenVariant.Solid)]
+    [InlineData(ZenVariant.Soft)]
+    [InlineData(ZenVariant.Outline)]
+    [InlineData(ZenVariant.Ghost)]
+    public void Button_HasAHoverState_InEveryVariant(ZenVariant variant)
+    {
+        // The mirror of the badge case: a control that does act must show that it does.
+        var classes = Render<ZenButton>(p => p
+            .Add(x => x.Intent, ZenIntent.Primary)
+            .Add(x => x.Variant, variant)
+            .AddChildContent("Go"))
+            .Find("button").ClassList;
+
+        classes.ShouldContain(c => c.StartsWith("hover:", StringComparison.Ordinal));
     }
 
     [Fact]

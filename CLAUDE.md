@@ -34,5 +34,11 @@ See [`docs/plan.md`](docs/plan.md) for the reasoning behind each of these.
 `dotnet build` regenerates the Tailwind stylesheets. `dotnet test` includes the contrast audit,
 which fails on any WCAG or sRGB-gamut regression in either palette.
 
-Run the demo before calling a component done — the M0 bugs listed in `docs/CHANGELOG.md` were all
-invisible to the test suite and obvious in the browser.
+Run the demo before calling a component done — the M0 and M1 bugs listed in `docs/CHANGELOG.md`
+were all invisible to the test suite and obvious in the browser.
+
+**Restart the demo after every rebuild.** `MapStaticAssets` bakes content-hashed asset URLs into a
+manifest at build time. A still-running process keeps serving the old fingerprints, and once the
+files behind them change it serves **empty responses** — the page loads with the library stylesheet
+applied but none of the app's own CSS, which looks exactly like a catastrophic styling bug and is
+not one. If the demo suddenly renders in Times New Roman with underlined links, this is why.

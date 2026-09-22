@@ -52,6 +52,10 @@ All notable changes to ZenithUI are documented here. The format follows
   `ZenithUI._Imports` classes and a `CS0111`. The directive moved into each component file.
 - **`ZenField` treated a whitespace-only validation message as real**, producing an alert region
   that was announced but contained nothing.
+- **A non-interactive `ZenBadge` still carried hover classes in three of four variants.** The
+  `interactive: false` flag only suppressed the hover on `Soft`, so a Solid or Outline badge lit up
+  under the pointer and told the user it was clickable. `ZenStyles` now keeps resting appearance and
+  hover state in separate methods and composes them, so the flag applies uniformly.
 
 ### Added — M0, the foundation
 

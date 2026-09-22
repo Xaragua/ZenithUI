@@ -14,6 +14,12 @@ namespace ZenithUI.Core;
 /// build includes <c>Core/**/*.cs</c> in its <c>@source</c> list for exactly this reason.
 /// </para>
 /// <para>
+/// Resting appearance and hover state are kept in separate methods. A badge and a button share a
+/// palette but not a behaviour: giving a status chip a hover state tells the user it is clickable,
+/// which is a lie. <see cref="Variant"/> composes the two, and only adds the hover half when the
+/// caller says the element is interactive.
+/// </para>
+/// <para>
 /// The token roles are honoured strictly: <c>-{intent}</c> only ever appears as a background,
 /// <c>-content</c> only as text on that background, and <c>-strong</c> only as a foreground on a
 /// surface or on <c>-soft</c>. See <c>Styles/tokens/base.css</c> for why that distinction exists.
@@ -21,28 +27,25 @@ namespace ZenithUI.Core;
 /// </remarks>
 public static class ZenStyles
 {
+    // ---- Resting appearance -----------------------------------------------------------------
+
     /// <summary>
     /// A solid fill: the intent colour as background, its <c>-content</c> colour as text.
     /// Highest emphasis.
     /// </summary>
-    /// <remarks>
-    /// The hover state moves the background to <c>-strong</c>. In the light palette that reads as
-    /// darker and in the dark palette as lighter, which is the correct direction in both: a hover
-    /// should increase contrast against the page, not move in a fixed direction.
-    /// </remarks>
     public static string Solid(ZenIntent intent) => intent switch
     {
-        ZenIntent.Primary => "bg-primary text-primary-content hover:bg-primary-strong",
-        ZenIntent.Secondary => "bg-secondary text-secondary-content hover:bg-secondary-strong",
-        ZenIntent.Accent => "bg-accent text-accent-content hover:bg-accent-strong",
-        ZenIntent.Success => "bg-success text-success-content hover:bg-success-strong",
-        ZenIntent.Warning => "bg-warning text-warning-content hover:bg-warning-strong",
-        ZenIntent.Danger => "bg-danger text-danger-content hover:bg-danger-strong",
-        ZenIntent.Info => "bg-info text-info-content hover:bg-info-strong",
+        ZenIntent.Primary => "bg-primary text-primary-content",
+        ZenIntent.Secondary => "bg-secondary text-secondary-content",
+        ZenIntent.Accent => "bg-accent text-accent-content",
+        ZenIntent.Success => "bg-success text-success-content",
+        ZenIntent.Warning => "bg-warning text-warning-content",
+        ZenIntent.Danger => "bg-danger text-danger-content",
+        ZenIntent.Info => "bg-info text-info-content",
 
         // Neutral has no intent colour of its own; it borrows the surface stack, which is what
         // makes it usable as a default button on any background.
-        _ => "bg-surface-raised text-content border border-border hover:bg-surface-sunken",
+        _ => "bg-surface-raised text-content border border-border",
     };
 
     /// <summary>
@@ -58,62 +61,115 @@ public static class ZenStyles
         ZenIntent.Warning => "bg-warning-soft text-warning-strong",
         ZenIntent.Danger => "bg-danger-soft text-danger-strong",
         ZenIntent.Info => "bg-info-soft text-info-strong",
-        _ => "bg-surface-sunken text-content-muted",
-    };
-
-    /// <summary>Soft, plus a hover state. For interactive elements rather than static chips.</summary>
-    public static string SoftInteractive(ZenIntent intent) => intent switch
-    {
-        ZenIntent.Primary => "bg-primary-soft text-primary-strong hover:bg-primary hover:text-primary-content",
-        ZenIntent.Secondary => "bg-secondary-soft text-secondary-strong hover:bg-secondary hover:text-secondary-content",
-        ZenIntent.Accent => "bg-accent-soft text-accent-strong hover:bg-accent hover:text-accent-content",
-        ZenIntent.Success => "bg-success-soft text-success-strong hover:bg-success hover:text-success-content",
-        ZenIntent.Warning => "bg-warning-soft text-warning-strong hover:bg-warning hover:text-warning-content",
-        ZenIntent.Danger => "bg-danger-soft text-danger-strong hover:bg-danger hover:text-danger-content",
-        ZenIntent.Info => "bg-info-soft text-info-strong hover:bg-info hover:text-info-content",
-        _ => "bg-surface-sunken text-content hover:bg-surface-overlay",
+        _ => "bg-surface-sunken text-content",
     };
 
     /// <summary>Transparent with an intent-coloured border and <c>-strong</c> text.</summary>
     public static string Outline(ZenIntent intent) => intent switch
     {
-        ZenIntent.Primary => "border border-primary text-primary-strong hover:bg-primary-soft",
-        ZenIntent.Secondary => "border border-secondary text-secondary-strong hover:bg-secondary-soft",
-        ZenIntent.Accent => "border border-accent text-accent-strong hover:bg-accent-soft",
-        ZenIntent.Success => "border border-success text-success-strong hover:bg-success-soft",
-        ZenIntent.Warning => "border border-warning text-warning-strong hover:bg-warning-soft",
-        ZenIntent.Danger => "border border-danger text-danger-strong hover:bg-danger-soft",
-        ZenIntent.Info => "border border-info text-info-strong hover:bg-info-soft",
-        _ => "border border-border text-content hover:bg-surface-sunken",
+        ZenIntent.Primary => "border border-primary text-primary-strong",
+        ZenIntent.Secondary => "border border-secondary text-secondary-strong",
+        ZenIntent.Accent => "border border-accent text-accent-strong",
+        ZenIntent.Success => "border border-success text-success-strong",
+        ZenIntent.Warning => "border border-warning text-warning-strong",
+        ZenIntent.Danger => "border border-danger text-danger-strong",
+        ZenIntent.Info => "border border-info text-info-strong",
+        _ => "border border-border text-content",
     };
 
-    /// <summary>Transparent until hovered. Lowest emphasis - toolbar and row actions.</summary>
+    /// <summary>Transparent. Lowest emphasis - toolbar and row actions.</summary>
     public static string Ghost(ZenIntent intent) => intent switch
     {
-        ZenIntent.Primary => "text-primary-strong hover:bg-primary-soft",
-        ZenIntent.Secondary => "text-secondary-strong hover:bg-secondary-soft",
-        ZenIntent.Accent => "text-accent-strong hover:bg-accent-soft",
-        ZenIntent.Success => "text-success-strong hover:bg-success-soft",
-        ZenIntent.Warning => "text-warning-strong hover:bg-warning-soft",
-        ZenIntent.Danger => "text-danger-strong hover:bg-danger-soft",
-        ZenIntent.Info => "text-info-strong hover:bg-info-soft",
-        _ => "text-content-muted hover:bg-surface-sunken hover:text-content",
+        ZenIntent.Primary => "text-primary-strong",
+        ZenIntent.Secondary => "text-secondary-strong",
+        ZenIntent.Accent => "text-accent-strong",
+        ZenIntent.Success => "text-success-strong",
+        ZenIntent.Warning => "text-warning-strong",
+        ZenIntent.Danger => "text-danger-strong",
+        ZenIntent.Info => "text-info-strong",
+        _ => "text-content-muted",
     };
 
-    /// <summary>Dispatches to the matching variant helper.</summary>
-    /// <param name="intent">The semantic colour role.</param>
-    /// <param name="variant">The visual weight.</param>
-    /// <param name="interactive">
-    /// When <see langword="true"/>, <see cref="ZenVariant.Soft"/> gains a hover state. Static chips
-    /// should pass <see langword="false"/> so they do not appear clickable.
-    /// </param>
-    public static string Variant(ZenIntent intent, ZenVariant variant, bool interactive = true) => variant switch
+    // ---- Hover states -----------------------------------------------------------------------
+
+    /// <summary>
+    /// Hover for <see cref="Solid"/>: the background moves to <c>-strong</c>.
+    /// </summary>
+    /// <remarks>
+    /// In the light palette that reads as darker and in the dark palette as lighter, which is the
+    /// correct direction in both: hovering should increase contrast against the page, not move in
+    /// a fixed direction.
+    /// </remarks>
+    public static string SolidHover(ZenIntent intent) => intent switch
+    {
+        ZenIntent.Primary => "hover:bg-primary-strong",
+        ZenIntent.Secondary => "hover:bg-secondary-strong",
+        ZenIntent.Accent => "hover:bg-accent-strong",
+        ZenIntent.Success => "hover:bg-success-strong",
+        ZenIntent.Warning => "hover:bg-warning-strong",
+        ZenIntent.Danger => "hover:bg-danger-strong",
+        ZenIntent.Info => "hover:bg-info-strong",
+        _ => "hover:bg-surface-sunken",
+    };
+
+    /// <summary>Hover for <see cref="Soft"/>: promotes the chip to a solid fill.</summary>
+    public static string SoftHover(ZenIntent intent) => intent switch
+    {
+        ZenIntent.Primary => "hover:bg-primary hover:text-primary-content",
+        ZenIntent.Secondary => "hover:bg-secondary hover:text-secondary-content",
+        ZenIntent.Accent => "hover:bg-accent hover:text-accent-content",
+        ZenIntent.Success => "hover:bg-success hover:text-success-content",
+        ZenIntent.Warning => "hover:bg-warning hover:text-warning-content",
+        ZenIntent.Danger => "hover:bg-danger hover:text-danger-content",
+        ZenIntent.Info => "hover:bg-info hover:text-info-content",
+        _ => "hover:bg-surface-overlay",
+    };
+
+    /// <summary>Hover for <see cref="Outline"/> and <see cref="Ghost"/>: a soft tint appears.</summary>
+    public static string TintHover(ZenIntent intent) => intent switch
+    {
+        ZenIntent.Primary => "hover:bg-primary-soft",
+        ZenIntent.Secondary => "hover:bg-secondary-soft",
+        ZenIntent.Accent => "hover:bg-accent-soft",
+        ZenIntent.Success => "hover:bg-success-soft",
+        ZenIntent.Warning => "hover:bg-warning-soft",
+        ZenIntent.Danger => "hover:bg-danger-soft",
+        ZenIntent.Info => "hover:bg-info-soft",
+        _ => "hover:bg-surface-sunken hover:text-content",
+    };
+
+    // ---- Composition ------------------------------------------------------------------------
+
+    /// <summary>Resting appearance for a variant, with no hover state.</summary>
+    public static string VariantBase(ZenIntent intent, ZenVariant variant) => variant switch
     {
         ZenVariant.Solid => Solid(intent),
-        ZenVariant.Soft => interactive ? SoftInteractive(intent) : Soft(intent),
+        ZenVariant.Soft => Soft(intent),
         ZenVariant.Outline => Outline(intent),
         _ => Ghost(intent),
     };
+
+    /// <summary>The hover half for a variant.</summary>
+    public static string VariantHover(ZenIntent intent, ZenVariant variant) => variant switch
+    {
+        ZenVariant.Solid => SolidHover(intent),
+        ZenVariant.Soft => SoftHover(intent),
+        _ => TintHover(intent),
+    };
+
+    /// <summary>Resting appearance plus, optionally, the hover state.</summary>
+    /// <param name="intent">The semantic colour role.</param>
+    /// <param name="variant">The visual weight.</param>
+    /// <param name="interactive">
+    /// <see langword="false"/> for a static element such as a badge, which must not appear
+    /// clickable. Applies to every variant, not just <see cref="ZenVariant.Soft"/>.
+    /// </param>
+    public static string Variant(ZenIntent intent, ZenVariant variant, bool interactive = true) =>
+        interactive
+            ? $"{VariantBase(intent, variant)} {VariantHover(intent, variant)}"
+            : VariantBase(intent, variant);
+
+    // ---- Standalone helpers -----------------------------------------------------------------
 
     /// <summary>
     /// The intent's foreground colour on a plain surface - for icons, links and coloured text.
@@ -143,6 +199,8 @@ public static class ZenStyles
         ZenIntent.Info => "bg-info-soft",
         _ => "bg-surface-sunken",
     };
+
+    // ---- Sizing -----------------------------------------------------------------------------
 
     /// <summary>Square icon dimensions matching a control size.</summary>
     public static string IconSize(ZenSize size) => size switch
