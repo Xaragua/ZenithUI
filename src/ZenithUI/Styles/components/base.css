@@ -204,17 +204,16 @@
    * library's surface colour", and the two sitting side by side in a form look like a mistake. A
    * design system that themes everything except its checkboxes has a hole in it.
    *
-   * The mark is a pseudo-element scaled from 0, so checking animates rather than snapping, and the
-   * box never changes size. Sized in percentages of the control so a single rule covers all three
-   * sizes.
+   * The mark is an overlaid sibling element scaled from 0, so checking animates rather than
+   * snapping, and the box never changes size. Its size comes from a utility class per control
+   * size; see the comment on `.zen-mark` below for why it is not a pseudo-element.
    */
   .zen-check,
   .zen-radio {
     appearance: none;
     -webkit-appearance: none;
+    margin: 0;
     flex: none;
-    display: inline-grid;
-    place-content: center;
     background-color: var(--zen-surface);
     border: 1px solid var(--zen-border-strong);
     cursor: pointer;
@@ -231,52 +230,65 @@
     border-radius: 9999px;
   }
 
-  .zen-check::before,
-  .zen-radio::before {
-    content: "";
-    background-color: var(--zen-primary-content);
-    transform: scale(0);
-    transition: transform 120ms ease;
-  }
-
-  /* A checkmark cut out of a square, rather than a background image - it inherits the mark colour
-     and needs no asset. */
-  .zen-check::before {
-    width: 68%;
-    height: 68%;
-    clip-path: polygon(14% 44%, 0 65%, 50% 100%, 100% 16%, 80% 0%, 43% 62%);
-  }
-
-  .zen-radio::before {
-    width: 50%;
-    height: 50%;
-    border-radius: 9999px;
-  }
-
   .zen-check:checked,
-  .zen-radio:checked,
-  .zen-check:indeterminate {
+  .zen-check:indeterminate,
+  .zen-radio:checked {
     background-color: var(--zen-primary);
     border-color: var(--zen-primary);
   }
 
-  .zen-check:checked::before,
-  .zen-radio:checked::before {
+  /*
+   * The tick and the dot are SIBLING elements overlaid on the input, not pseudo-elements on it.
+   *
+   * An <input> is a replaced element, and replaced elements are not required to render ::before or
+   * ::after - Chromium and Firefox disagree about whether they do even with `appearance: none`,
+   * which is how the first attempt at this produced a correctly coloured box with nothing drawn
+   * inside it.
+   *
+   * The alternative usually reached for is a background-image data URI, but a data URI cannot read
+   * a custom property, so the mark colour would have to be baked in. That breaks immediately here:
+   * --zen-primary-content is near-white in the light palette and near-black in the dark one, since
+   * --zen-primary itself flips from a mid blue to a light one. A sibling element inherits
+   * `currentColor` and needs no asset.
+   */
+  .zen-mark {
+    position: absolute;
+    inset: 0;
+    margin: auto;
+    pointer-events: none;
+    color: var(--zen-primary-content);
+    opacity: 0;
+    transform: scale(0.6);
+    transition:
+      opacity 120ms ease,
+      transform 120ms ease;
+  }
+
+  .zen-check:checked ~ .zen-mark-check,
+  .zen-check:indeterminate ~ .zen-mark-dash,
+  .zen-radio:checked ~ .zen-mark-dot {
+    opacity: 1;
     transform: scale(1);
   }
 
-  /* Indeterminate replaces the tick with a bar: "some but not all", not "none". */
-  .zen-check:indeterminate::before {
-    width: 62%;
-    height: 2px;
-    border-radius: 1px;
-    clip-path: none;
-    transform: scale(1);
+  /* Indeterminate shows the bar instead of the tick: "some but not all", not "all". */
+  .zen-check:indeterminate ~ .zen-mark-check {
+    opacity: 0;
   }
 
   .zen-check:disabled,
   .zen-radio:disabled {
     cursor: not-allowed;
+    opacity: 0.5;
+  }
+
+  /* The input's own `opacity` does not reach the mark, which is a sibling rather than a child, so
+     the disabled fade has to be restated for it. Only for the marks actually on show: a blanket
+     `:disabled ~ .zen-mark` would lift the hidden ones off zero as well, and a disabled unchecked
+     box would wear a ghost tick. */
+  .zen-check:disabled:checked ~ .zen-mark-check,
+  .zen-check:disabled:indeterminate ~ .zen-mark-dash,
+  .zen-radio:disabled:checked ~ .zen-mark-dot {
     opacity: 0.5;
   }
 
@@ -288,8 +300,7 @@
   @media (prefers-reduced-motion: reduce) {
     .zen-check,
     .zen-radio,
-    .zen-check::before,
-    .zen-radio::before {
+    .zen-mark {
       transition: none;
     }
   }

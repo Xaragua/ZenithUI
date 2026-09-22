@@ -17,16 +17,36 @@
 
 <div class="@RootClass(WrapperClass)" style="@Style">
     <div class="flex h-5 shrink-0 items-center">
-        <input id="@Id"
-               type="checkbox"
-               class="@BoxClass"
-               checked="@CurrentValue"
-               disabled="@Disabled"
-               aria-describedby="@DescribedBy"
-               aria-invalid="@(IsInvalid ? "true" : null)"
-               aria-required="@(Required ? "true" : null)"
-               @attributes="AttributesWithoutClass"
-               @onchange="HandleToggle" />
+        @*
+            The tick and the bar are siblings of the input, overlaid on it, rather than
+            pseudo-elements - see components/base.css for why an <input> cannot carry them.
+            They stay in DOM order after the input so the `~` sibling selectors reach them.
+        *@
+        <span class="relative inline-flex shrink-0">
+            <input id="@Id"
+                   type="checkbox"
+                   class="@BoxClass"
+                   checked="@CurrentValue"
+                   disabled="@Disabled"
+                   aria-describedby="@DescribedBy"
+                   aria-invalid="@(IsInvalid ? "true" : null)"
+                   aria-required="@(Required ? "true" : null)"
+                   @attributes="AttributesWithoutClass"
+                   @onchange="HandleToggle" />
+
+            <svg class="@($"zen-mark zen-mark-check {MarkSizeClass}")"
+                 viewBox="0 0 16 16"
+                 fill="none"
+                 stroke="currentColor"
+                 stroke-width="2.5"
+                 stroke-linecap="round"
+                 stroke-linejoin="round"
+                 aria-hidden="true">
+                <path d="m3.5 8.5 3 3 6-6.5" />
+            </svg>
+
+            <span class="@($"zen-mark zen-mark-dash {DashSizeClass}")" aria-hidden="true"></span>
+        </span>
     </div>
 
     @if (Label is not null || ChildContent is not null || HelpText is not null)
@@ -168,13 +188,29 @@
         // appearance is switched off. zen-focus, not zen-focus-border: a checked box is filled
         // with the primary colour, so a primary border on it would be invisible.
         .Default("zen-check zen-focus")
-        .AddClass(Size switch
-        {
-            ZenSize.Small => "size-4",
-            ZenSize.Large => "size-6",
-            _ => "size-5",
-        })
+        .AddClass(BoxSizeClass)
         .Build()!;
+
+    private string BoxSizeClass => Size switch
+    {
+        ZenSize.Small => "size-4",
+        ZenSize.Large => "size-6",
+        _ => "size-5",
+    };
+
+    private string MarkSizeClass => Size switch
+    {
+        ZenSize.Small => "size-2.5",
+        ZenSize.Large => "size-4",
+        _ => "size-3",
+    };
+
+    private string DashSizeClass => Size switch
+    {
+        ZenSize.Small => "h-0.5 w-2 rounded-full bg-current",
+        ZenSize.Large => "h-0.5 w-3 rounded-full bg-current",
+        _ => "h-0.5 w-2.5 rounded-full bg-current",
+    };
 
     private string LabelClass => CssBuilder
         .Default("inline-flex cursor-pointer items-center gap-1 text-content")

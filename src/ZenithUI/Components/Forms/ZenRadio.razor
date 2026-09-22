@@ -15,15 +15,21 @@
 
 <div class="@RootClass(WrapperClass)" style="@Style">
     <div class="flex h-5 shrink-0 items-center">
-        <input id="@Id"
-               type="radio"
-               name="@Group.GroupName"
-               value="@Value?.ToString()"
-               checked="@IsSelected"
-               disabled="@IsDisabled"
-               class="@RadioClass"
-               @attributes="AttributesWithoutClass"
-               @onchange="HandleChange" />
+        @* The dot is a sibling overlaid on the input, not a pseudo-element - see
+           components/base.css for why an <input> cannot carry one. *@
+        <span class="relative inline-flex shrink-0">
+            <input id="@Id"
+                   type="radio"
+                   name="@Group.GroupName"
+                   value="@Value?.ToString()"
+                   checked="@IsSelected"
+                   disabled="@IsDisabled"
+                   class="@RadioClass"
+                   @attributes="AttributesWithoutClass"
+                   @onchange="HandleChange" />
+
+            <span class="@($"zen-mark zen-mark-dot {DotSizeClass}")" aria-hidden="true"></span>
+        </span>
     </div>
 
     <div class="min-w-0">
@@ -105,6 +111,13 @@
             _ => "size-5",
         })
         .Build()!;
+
+    private string DotSizeClass => Group.GroupSize switch
+    {
+        ZenSize.Small => "size-1.5 rounded-full bg-current",
+        ZenSize.Large => "size-2.5 rounded-full bg-current",
+        _ => "size-2 rounded-full bg-current",
+    };
 
     private string LabelClass => CssBuilder
         .Default("cursor-pointer text-content")

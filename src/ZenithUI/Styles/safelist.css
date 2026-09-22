@@ -52,6 +52,10 @@
 @source inline("zen-check");
 @source inline("zen-radio");
 @source inline("zen-slider");
+@source inline("zen-mark");
+@source inline("zen-mark-check");
+@source inline("zen-mark-dash");
+@source inline("zen-mark-dot");
 @source inline("zen-indent");
 @source inline("zen-sr-only");
 @source inline("zen-root");

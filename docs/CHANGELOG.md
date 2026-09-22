@@ -26,6 +26,10 @@ the OS picker beats any web calendar — but `ZenDatePicker` is now the default 
   harder to scan, and skipping them breaks arrow-key travel.
 - `ZenDatePicker` returns focus to its trigger on close, and the text field still accepts typing, so
   the calendar is an enhancement rather than the only way in.
+- The panel sizes to its grid (`w-max`) rather than to a fixed width. It was `w-[17.5rem]` — 280px,
+  exactly seven 40px cells — but that measures the border box, so the 24px of padding came out of
+  the same budget and Saturday was clipped. Any hardcoded width has to be re-derived whenever the
+  cell size, the padding or the font changes; asking the grid how wide it is cannot drift.
 
 ### Fixed — native controls ignored the dark palette
 
@@ -39,6 +43,13 @@ the OS picker beats any web calendar — but `ZenDatePicker` is now the default 
   operating system's grey, which is not this library's surface colour — and the two sitting side by
   side in a form read as a mistake. Both are now `appearance: none` with the box, checkmark, dot and
   indeterminate bar drawn from `--zen-*` tokens.
+- **The tick and the dot are overlaid siblings, not pseudo-elements.** The first version of the
+  rule above hung the mark on `.zen-check::before`, which produced a correctly coloured box with
+  nothing drawn inside it: an `<input>` is a replaced element, and replaced elements are not
+  required to render `::before` or `::after`. The usual fallback — a `background-image` data URI —
+  cannot read a custom property, so the mark colour would have to be baked in, and
+  `--zen-primary-content` is near-white in one palette and near-black in the other. A sibling
+  element inherits `currentColor`, needs no asset, and is revealed through the `~` combinator.
 - **The circular indeterminate progress ring did not animate correctly.** `animate-spin` sat on the
   `<circle>`, where a CSS transform overrides its `rotate(-90 18 18)` presentation attribute, and an
   SVG child rotates about the SVG origin rather than its own centre — so the arc jumped position and

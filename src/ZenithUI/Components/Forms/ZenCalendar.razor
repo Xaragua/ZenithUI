@@ -43,7 +43,10 @@
                    OnClick="@(() => ShiftMonth(1))" />
     </div>
 
-    <table class="w-full border-collapse"
+    @* No w-full: the cells have a fixed size, so stretching the table to a container width would
+       force the columns to disagree with their contents. The table sizes to the cells and the
+       panel sizes to the table. *@
+    <table class="border-collapse"
            role="grid"
            aria-label="@(_view.ToString("MMMM yyyy", EffectiveCulture))"
            @onkeydown="HandleKeyDownAsync">
@@ -410,8 +413,18 @@
 
     // ---- Styling -----------------------------------------------------------------------------
 
+    /// <summary>
+    /// The panel sizes itself to the grid rather than to a fixed width.
+    /// </summary>
+    /// <remarks>
+    /// It used to be <c>w-[17.5rem]</c>, which is 280px - exactly the width of seven 40px cells,
+    /// but measured against the border box, so 24px of padding came out of the same budget and the
+    /// last column was clipped. Any hardcoded width is a standing invitation to that bug: it has to
+    /// be re-derived whenever the cell size, the padding or the font changes. <c>w-max</c> asks the
+    /// grid how wide it needs to be and cannot drift.
+    /// </remarks>
     private string CalendarClass =>
-        "w-[17.5rem] rounded-zen-lg border border-border bg-surface-overlay p-3 shadow-zen-lg";
+        "w-max rounded-zen-lg border border-border bg-surface-overlay p-3 shadow-zen-lg";
 
     private string DayClass(DayState state) => CssBuilder
         .Default("zen-focus grid size-9 place-items-center rounded-zen-md text-sm transition-colors")
