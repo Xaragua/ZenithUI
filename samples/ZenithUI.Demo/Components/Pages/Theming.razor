@@ -1,0 +1,133 @@
+@page "/theming"
+@rendermode InteractiveServer
+
+@*
+    Interactive Server. ZenThemeProvider is used here in the role it exists for: an interactive
+    subtree whose .NET code needs to know which palette is active.
+*@
+
+<PageTitle>Theming &middot; ZenithUI</PageTitle>
+
+<header class="max-w-3xl">
+    <h1 class="text-3xl font-bold tracking-tight">Theming</h1>
+    <p class="mt-3 text-content-muted">
+        Three states, not two. An explicit choice is stored and wins over the operating system;
+        following the system reacts live, including while the tab is in the background.
+    </p>
+</header>
+
+<ZenThemeProvider ThemeChanged="OnThemeChanged">
+    <section class="mt-10 grid gap-6 lg:grid-cols-[minmax(0,1fr)_20rem]">
+        <div class="space-y-6">
+            <article class="rounded-zen-lg border border-border bg-surface-raised p-6 shadow-zen-sm">
+                <h2 class="text-lg font-semibold">Segmented</h2>
+                <p class="mt-1 text-sm text-content-muted">
+                    Three explicit options. Use this wherever "follow the system" must be selectable
+                    &mdash; a settings page, an appearance panel.
+                </p>
+
+                <div class="mt-5 flex flex-wrap items-end gap-6">
+                    @foreach (var size in Sizes)
+                    {
+                        <div class="space-y-2">
+                            <p class="text-xs font-medium uppercase tracking-wide text-content-subtle">@size</p>
+                            <ZenThemeToggle Mode="ZenThemeToggleMode.Segmented" Size="size" />
+                        </div>
+                    }
+                </div>
+
+                <div class="mt-6 border-t border-border pt-5">
+                    <p class="text-xs font-medium uppercase tracking-wide text-content-subtle">With labels</p>
+                    <div class="mt-2">
+                        <ZenThemeToggle Mode="ZenThemeToggleMode.Segmented" ShowLabels="true" />
+                    </div>
+                </div>
+            </article>
+
+            <article class="rounded-zen-lg border border-border bg-surface-raised p-6 shadow-zen-sm">
+                <h2 class="text-lg font-semibold">Toggle</h2>
+                <p class="mt-1 text-sm text-content-muted">
+                    A single button for an app bar. Pressing it while following a dark system
+                    produces light &mdash; it inverts what you <em>see</em>, not the stored mode,
+                    which is what a one-button control has to do to feel right.
+                </p>
+
+                <div class="mt-5 flex flex-wrap items-end gap-6">
+                    @foreach (var size in Sizes)
+                    {
+                        <div class="space-y-2">
+                            <p class="text-xs font-medium uppercase tracking-wide text-content-subtle">@size</p>
+                            <ZenThemeToggle Size="size" />
+                        </div>
+                    }
+
+                    <div class="space-y-2">
+                        <p class="text-xs font-medium uppercase tracking-wide text-content-subtle">Labelled</p>
+                        <ZenThemeToggle ShowLabels="true" />
+                    </div>
+
+                    <div class="space-y-2">
+                        <p class="text-xs font-medium uppercase tracking-wide text-content-subtle">Disabled</p>
+                        <ZenThemeToggle Disabled="true" />
+                    </div>
+                </div>
+            </article>
+        </div>
+
+        <aside class="lg:sticky lg:top-24 lg:self-start">
+            <div class="rounded-zen-lg border border-border bg-surface-raised p-6 shadow-zen-sm">
+                <h2 class="text-sm font-semibold">Service state</h2>
+                <p class="mt-1 text-xs text-content-subtle">Read from IZenThemeService in C#.</p>
+
+                <dl class="mt-4 space-y-3 text-sm">
+                    <div class="flex items-center justify-between gap-4">
+                        <dt class="text-content-muted">Mode</dt>
+                        <dd class="font-medium">@ThemeService.Mode</dd>
+                    </div>
+                    <div class="flex items-center justify-between gap-4">
+                        <dt class="text-content-muted">Resolved palette</dt>
+                        <dd class="font-medium">@ThemeService.Theme</dd>
+                    </div>
+                    <div class="flex items-center justify-between gap-4">
+                        <dt class="text-content-muted">Initialized</dt>
+                        <dd>
+                            <span class="@StatusBadgeClass(ThemeService.IsInitialized)">
+                                @(ThemeService.IsInitialized ? "yes" : "prerender")
+                            </span>
+                        </dd>
+                    </div>
+                    <div class="flex items-center justify-between gap-4">
+                        <dt class="text-content-muted">Changes seen</dt>
+                        <dd class="font-medium tabular-nums">@_changeCount</dd>
+                    </div>
+                </dl>
+
+                <p class="mt-5 border-t border-border pt-4 text-xs text-content-subtle">
+                    "prerender" is the honest answer during the first pass: localStorage is not sent
+                    with the request, so the server cannot know the preference. The inline
+                    ZenThemeScript has already painted the correct palette by then.
+                </p>
+            </div>
+        </aside>
+    </section>
+</ZenThemeProvider>
+
+@code {
+    [Inject]
+    private IZenThemeService ThemeService { get; set; } = default!;
+
+    private static readonly ZenSize[] Sizes = [ZenSize.Small, ZenSize.Medium, ZenSize.Large];
+
+    private int _changeCount;
+
+    private void OnThemeChanged(ZenTheme theme)
+    {
+        _changeCount++;
+        StateHasChanged();
+    }
+
+    private static string StatusBadgeClass(bool ok) =>
+        CssBuilder.Default("inline-flex items-center rounded-full px-2 py-0.5 text-xs font-medium")
+            .AddClass("bg-success-soft text-success-strong", "bg-warning-soft text-warning-strong", ok)
+            .Build()!;
+}

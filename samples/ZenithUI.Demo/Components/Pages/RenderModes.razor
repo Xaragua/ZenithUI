@@ -1,0 +1,70 @@
+@page "/render-modes"
+@using ZenithUI.Demo.Client.Components
+
+@*
+    The page itself has no @rendermode, so it is static SSR. Each card below opts into its own
+    mode. The same component type renders three ways on one page - which is the whole claim the
+    library makes about render-mode agnosticism, made observable.
+*@
+
+<PageTitle>Render modes &middot; ZenithUI</PageTitle>
+
+<header class="max-w-3xl">
+    <h1 class="text-3xl font-bold tracking-tight">Render modes</h1>
+    <p class="mt-3 text-content-muted">
+        ZenithUI declares <code>@@rendermode</code> nowhere. The host application decides, per
+        component, and the library has to cope with every answer &mdash; including "none".
+    </p>
+</header>
+
+<section class="mt-10 grid gap-4 lg:grid-cols-3">
+    <RenderModeProbe Title="Static SSR"
+                     Description="No render mode. HTML only - the counter does nothing, and its toggle icon is stuck on the prerender default. Both are correct." />
+
+    <RenderModeProbe Title="Interactive Server"
+                     Description="Runs over a SignalR circuit. JS interop goes through the connection."
+                     @rendermode="InteractiveServer" />
+
+    <RenderModeProbe Title="Interactive WebAssembly"
+                     Description="Runs in the browser runtime, with its own DI container and IJSRuntime."
+                     @rendermode="InteractiveWebAssembly" />
+</section>
+
+<section class="mt-10 grid gap-4 md:grid-cols-2">
+    <article class="rounded-zen-lg border border-border bg-surface-raised p-6 shadow-zen-sm">
+        <h2 class="text-lg font-semibold">What the static card proves</h2>
+        <p class="mt-3 text-sm text-content-muted">
+            Its counter does not increment and its theme toggle does not respond &mdash; there is no
+            .NET running in the browser for that markup. What matters is that it still
+            <em>renders</em>: correct layout, correct palette, correct ARIA attributes, no
+            exception from a JS interop call that was never attempted.
+        </p>
+        <p class="mt-3 text-sm text-content-muted">
+            <code>ZenJsComponentBase</code> is what guarantees that. It checks
+            <code>RendererInfo.IsInteractive</code> before importing a module, so a prerender pass
+            never reaches for a JavaScript runtime that is not attached yet.
+        </p>
+        <p class="mt-3 text-sm text-content-muted">
+            Its toggle icon is the one honest wart: <code>localStorage</code> is not sent with the
+            request, so the server cannot know the stored preference and renders the default. The
+            other two cards correct themselves once their runtime attaches; this one has nothing to
+            correct itself with. The page around it is still the right colour, because the inline
+            <code>ZenThemeScript</code> settled that before first paint.
+        </p>
+    </article>
+
+    <article class="rounded-zen-lg border border-border bg-surface-raised p-6 shadow-zen-sm">
+        <h2 class="text-lg font-semibold">Why the theme still works everywhere</h2>
+        <p class="mt-3 text-sm text-content-muted">
+            Change the theme from the header and all three cards repaint together, including the
+            static one. Nothing re-rendered it: the palette lives in <code>--zen-*</code> custom
+            properties on <code>&lt;html&gt;</code>, so the browser restyles the whole document
+            without Blazor being involved at all.
+        </p>
+        <p class="mt-3 text-sm text-content-muted">
+            This is the practical argument for semantic tokens over <code>dark:</code> variants. A
+            <code>dark:</code>-based component would need a class change to switch palettes, and a
+            statically rendered component has no way to make one.
+        </p>
+    </article>
+</section>

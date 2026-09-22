@@ -1,0 +1,88 @@
+@inherits LayoutComponentBase
+
+@*
+    Interim demo shell. ZenAppShell replaces all of this in M5 - until then the demo hand-rolls a
+    header and sidebar so the token system has something real to be judged against.
+
+    The layout is static SSR; only the theme toggle is interactive. That is the point worth
+    noticing: a page can be entirely server-rendered HTML and still carry a working ZenithUI
+    control, because interactivity is opted into per component rather than per application.
+
+    ZenThemeProvider is deliberately NOT used here. It would have to wrap @Body, and a
+    RenderFragment cannot be passed as a parameter across a static-to-interactive boundary - so a
+    provider in a layout is always static, and a static provider never gets a JavaScript runtime
+    to initialize against. See Components/Pages/Theming.razor for the provider in the role it
+    exists for.
+*@
+
+<div class="min-h-screen bg-surface text-content">
+    <header class="sticky top-0 z-30 border-b border-border bg-surface-raised/85 backdrop-blur">
+        <div class="mx-auto flex h-appbar max-w-6xl items-center gap-4 px-4 sm:px-6">
+            <a href="/" class="zen-focus flex items-center gap-2 rounded-zen-sm font-semibold tracking-tight">
+                <span class="grid size-7 place-items-center rounded-zen-md bg-primary text-sm text-primary-content">Z</span>
+                <span>ZenithUI</span>
+            </a>
+
+            <nav class="ml-2 hidden items-center gap-1 md:flex" aria-label="Sections">
+                @foreach (var link in NavLinks)
+                {
+                    <NavLink href="@link.Href"
+                             Match="@(link.Href.Length == 0 ? NavLinkMatch.All : NavLinkMatch.Prefix)"
+                             class="zen-focus rounded-zen-sm px-3 py-1.5 text-sm text-content-muted transition-colors hover:bg-surface-sunken hover:text-content"
+                             ActiveClass="bg-surface-sunken text-content! font-medium">
+                        @link.Label
+                    </NavLink>
+                }
+            </nav>
+
+            <div class="ml-auto flex items-center gap-2">
+                <ZenThemeToggle Mode="ZenThemeToggleMode.Segmented"
+                                Size="ZenSize.Small"
+                                @rendermode="InteractiveServer" />
+            </div>
+        </div>
+
+        <nav class="flex items-center gap-1 overflow-x-auto border-t border-border px-4 pb-2 md:hidden"
+             aria-label="Sections">
+            @foreach (var link in NavLinks)
+            {
+                <NavLink href="@link.Href"
+                         Match="@(link.Href.Length == 0 ? NavLinkMatch.All : NavLinkMatch.Prefix)"
+                         class="zen-focus shrink-0 rounded-zen-sm px-3 py-1.5 text-sm text-content-muted"
+                         ActiveClass="bg-surface-sunken text-content! font-medium">
+                    @link.Label
+                </NavLink>
+            }
+        </nav>
+    </header>
+
+    <main class="mx-auto max-w-6xl px-4 py-8 sm:px-6 sm:py-10">
+        @Body
+    </main>
+
+    <footer class="border-t border-border">
+        <div class="mx-auto flex max-w-6xl flex-col gap-1 px-4 py-6 text-sm text-content-muted sm:px-6">
+            <p>ZenithUI &middot; milestone M0 &mdash; foundation, tokens and theming.</p>
+            <p class="text-content-subtle">
+                Every colour on this page resolves through a <code>--zen-*</code> custom property.
+                Switching the theme repaints without re-rendering a single component.
+            </p>
+        </div>
+    </footer>
+</div>
+
+<div id="blazor-error-ui" data-nosnippet>
+    An unhandled error has occurred.
+    <a href="." class="reload">Reload</a>
+    <span class="dismiss">&#128937;</span>
+</div>
+
+@code {
+    private static readonly (string Href, string Label)[] NavLinks =
+    [
+        ("", "Overview"),
+        ("tokens", "Tokens"),
+        ("theming", "Theming"),
+        ("render-modes", "Render modes"),
+    ];
+}

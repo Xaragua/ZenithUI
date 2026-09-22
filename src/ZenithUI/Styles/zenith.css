@@ -1,0 +1,26 @@
+/*
+ * ZenithUI stylesheet - full build (includes Tailwind's preflight reset).
+ *
+ * Reference it from an app that does NOT already run Tailwind:
+ *   <link rel="stylesheet" href="_content/ZenithUI/zenith.css" />
+ *
+ * If your app already emits Tailwind's preflight, use zenith.nopreflight.css instead to avoid
+ * shipping the reset twice.
+ *
+ * `source(none)` disables Tailwind's automatic file discovery: without it Tailwind would walk
+ * up from this file and also scan wwwroot/, re-reading its own compiled output on every
+ * rebuild. The @source lines below declare exactly what to scan instead.
+ */
+
+@import "tailwindcss" source(none);
+
+@source "../Components/**/*.razor";
+@source "../Core/**/*.cs";
+@source "../Services/**/*.cs";
+
+@import "./safelist.css";
+
+@import "./tokens/base.css";
+@import "./tokens/dark.css";
+@import "./tokens/theme.css";
+@import "./components/base.css";

@@ -1,0 +1,83 @@
+@inherits ZenComponentBase
+@implements IDisposable
+@inject IZenThemeService ThemeService
+
+@*
+    Initializes the theme service on the first interactive render and cascades the active palette
+    so that descendants can react in C# (choosing a chart palette, swapping an icon).
+
+    Most components need nothing from this: colours come from --zen-* tokens and repaint through
+    CSS alone. Cascade a value only when a decision genuinely has to be made in .NET.
+
+    Wrap your layout body with it once:
+
+        <ZenThemeProvider>
+            <ZenAppShell>@Body</ZenAppShell>
+        </ZenThemeProvider>
+*@
+
+<CascadingValue Value="ThemeService" IsFixed="true">
+    <CascadingValue Value="_theme">
+        @ChildContent
+    </CascadingValue>
+</CascadingValue>
+
+@code {
+    private ZenTheme _theme = ZenTheme.Light;
+
+    /// <summary>Content rendered inside the theme cascade.</summary>
+    [Parameter]
+    public RenderFragment? ChildContent { get; set; }
+
+    /// <summary>
+    /// Raised after the active palette changes, including the initial resolution that happens
+    /// once the browser's stored preference has been read.
+    /// </summary>
+    [Parameter]
+    public EventCallback<ZenTheme> ThemeChanged { get; set; }
+
+    protected override void OnInitialized()
+    {
+        _theme = ThemeService.Theme;
+        ThemeService.ThemeChanged += HandleThemeChanged;
+    }
+
+    protected override async Task OnAfterRenderAsync(bool firstRender)
+    {
+        if (!firstRender || !RendererInfo.IsInteractive)
+        {
+            // Static SSR and the prerender pass have no JavaScript runtime. The inline
+            // ZenThemeScript has already applied the correct attribute, so the page looks right;
+            // there is simply no .NET-side state to resolve yet.
+            return;
+        }
+
+        await ThemeService.InitializeAsync();
+
+        // If the browser's stored preference matched what the prerender assumed, no ThemeChanged
+        // fires and nothing below this provider would ever re-render - leaving any UI bound to
+        // IsInitialized stuck reporting the prerender state forever.
+        StateHasChanged();
+    }
+
+    private void HandleThemeChanged(object? sender, ZenThemeChangedEventArgs args)
+    {
+        _theme = args.Theme;
+
+        // The event arrives from a JS interop callback or another component's call, neither of
+        // which runs on the renderer's synchronization context. InvokeAsync marshals back onto it
+        // before touching component state.
+        //
+        // The task is deliberately not awaited (the handler signature is synchronous) but it is
+        // not fire-and-forget either: failures are routed through the renderer's normal
+        // unhandled-exception path rather than being swallowed on a thread-pool thread, which is
+        // what an `async void` handler would do.
+        _ = InvokeAsync(async () =>
+        {
+            StateHasChanged();
+            await ThemeChanged.InvokeAsync(args.Theme);
+        });
+    }
+
+    public void Dispose() => ThemeService.ThemeChanged -= HandleThemeChanged;
+}

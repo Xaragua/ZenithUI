@@ -1,0 +1,46 @@
+@*
+    Inline FOUC-prevention script. Place it inside <head> in App.razor, BEFORE the ZenithUI
+    stylesheet link:
+
+        <head>
+            ...
+            <ZenThemeScript />
+            <link rel="stylesheet" href="_content/ZenithUI/zenith.css" />
+        </head>
+
+    Why this has to be inline and synchronous
+    -----------------------------------------
+    The server cannot know the viewer's stored preference: localStorage is not sent with the
+    request. So the first HTML the browser receives is always the light palette. Without this
+    script, a dark-mode user sees a white flash on every navigation until the Blazor circuit
+    connects and JavaScript gets a chance to run - which can be hundreds of milliseconds.
+
+    A synchronous inline script in <head> runs before the browser paints anything, so the
+    attribute is already in place for the very first frame. A module, a deferred script, or
+    anything loaded over the network would run too late to help.
+
+    The logic below must stay in lockstep with wwwroot/js/zen-theme.js (same storage key, same
+    attribute, same 'system means no attribute' rule). It is intentionally duplicated rather
+    than imported, because importing would reintroduce the network round-trip this exists to
+    avoid.
+*@
+
+<script>
+    (function () {
+        try {
+            var mode = localStorage.getItem('zen-theme');
+
+            // 'system' (or anything unrecognised) leaves the attribute off, which hands control
+            // to the prefers-color-scheme media query in the stylesheet. Setting the resolved
+            // value here instead would freeze the page against later OS changes.
+            if (mode === 'light' || mode === 'dark') {
+                document.documentElement.setAttribute('data-zen-theme', mode);
+            } else {
+                document.documentElement.removeAttribute('data-zen-theme');
+            }
+        } catch (e) {
+            // Storage unavailable (private browsing, partitioned iframe). Fall through to the
+            // media query; a wrong-but-reasonable palette beats a broken page.
+        }
+    })();
+</script>

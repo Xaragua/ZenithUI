@@ -1,0 +1,74 @@
+<Project Sdk="Microsoft.NET.Sdk.Razor">
+
+  <PropertyGroup>
+    <RootNamespace>ZenithUI</RootNamespace>
+    <AssemblyName>ZenithUI</AssemblyName>
+    <AddRazorSupportForMvc>true</AddRazorSupportForMvc>
+
+    <IsPackable>true</IsPackable>
+    <PackageId>ZenithUI</PackageId>
+    <Title>ZenithUI — Blazor components for TailwindCSS</Title>
+    <Description>
+      A render-mode-agnostic Blazor component library styled with TailwindCSS. Inputs, selects,
+      combobox, hierarchical tables, trees, cards, navigation chrome and a responsive app shell,
+      themed through CSS custom properties with first-class light and dark palettes.
+    </Description>
+
+    <!-- Razor-generated classes expose public members without XML docs; documenting them is
+         not possible from .razor markup, so CS1591 is suppressed project-wide. -->
+    <NoWarn>$(NoWarn);CS1591</NoWarn>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <SupportedPlatform Include="browser" />
+    <PackageReference Include="Microsoft.AspNetCore.Components.Web" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <None Include="..\..\README.md" Pack="true" PackagePath="\" Visible="false" />
+  </ItemGroup>
+
+  <!-- Stylesheet sources. Listed explicitly so the Tailwind target has accurate inputs for
+       incremental builds, and excluded from the compile/content pipelines (only the compiled
+       output in wwwroot/ ships). -->
+  <ItemGroup>
+    <ZenithStyle Include="Styles\**\*.css" />
+    <None Include="@(ZenithStyle)" Pack="false" />
+    <Content Remove="Styles\**" />
+  </ItemGroup>
+
+  <!--
+    Build tooling, not library content. The Razor SDK globs *.json into Content, which packs it -
+    a consumer restoring ZenithUI would otherwise find this project's package.json dropped into
+    their own project as a content file. Removing them from Content and re-adding as non-packing
+    None keeps them visible in the IDE without shipping them.
+  -->
+  <ItemGroup>
+    <Content Remove="package.json;package-lock.json" />
+    <None Include="package.json;package-lock.json" Pack="false" />
+    <None Remove="node_modules\**" />
+    <Content Remove="node_modules\**" />
+  </ItemGroup>
+
+  <!--
+    Tailwind runs over this project's own .razor sources and emits a self-contained stylesheet
+    into wwwroot/, which consumers reference at _content/ZenithUI/zenith.css. This is required
+    because a consumer's Tailwind `content` globs cannot scan .razor files that ship compiled
+    inside the NuGet package.
+  -->
+  <Target Name="ZenithRestoreNpm" Condition="!Exists('$(MSBuildProjectDirectory)\node_modules')">
+    <Exec Command="npm ci --no-audit --no-fund" WorkingDirectory="$(MSBuildProjectDirectory)"
+          Condition="Exists('$(MSBuildProjectDirectory)\package-lock.json')" />
+    <Exec Command="npm install --no-audit --no-fund" WorkingDirectory="$(MSBuildProjectDirectory)"
+          Condition="!Exists('$(MSBuildProjectDirectory)\package-lock.json')" />
+  </Target>
+
+  <Target Name="BuildTailwind"
+          DependsOnTargets="ZenithRestoreNpm"
+          BeforeTargets="ResolveStaticWebAssetsInputs;Build"
+          Inputs="@(ZenithStyle);@(Content);@(_ContentIncludedByDefault);@(RazorComponent)"
+          Outputs="wwwroot\zenith.css;wwwroot\zenith.nopreflight.css">
+    <Exec Command="npm run css:build" WorkingDirectory="$(MSBuildProjectDirectory)" />
+  </Target>
+
+</Project>

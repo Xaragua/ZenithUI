@@ -1,0 +1,49 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <IsPackable>false</IsPackable>
+    <IsTestProject>true</IsTestProject>
+    <GenerateDocumentationFile>false</GenerateDocumentationFile>
+
+    <!--
+      BL0005 forbids setting a [Parameter] from outside its component. These tests deliberately
+      exercise ZenComponentBase directly, without a renderer, because the property it guards
+      (a stable Id assigned in the constructor) must be correct before any render happens.
+    -->
+    <NoWarn>$(NoWarn);CA1707;xUnit1051;BL0005</NoWarn>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="..\..\src\ZenithUI\ZenithUI.csproj" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <PackageReference Include="bunit" />
+    <PackageReference Include="Microsoft.NET.Test.Sdk" />
+    <PackageReference Include="Shouldly" />
+    <PackageReference Include="xunit" />
+    <PackageReference Include="xunit.runner.visualstudio" />
+    <PackageReference Include="coverlet.collector" />
+  </ItemGroup>
+
+  <!--
+    The contrast audit asserts against the real token stylesheets. Copying them into the output
+    rather than walking up to the repository root keeps the suite runnable from a published test
+    bundle, where no source tree exists.
+  -->
+  <ItemGroup>
+    <Content Include="..\..\src\ZenithUI\Styles\tokens\*.css"
+             Link="Tokens\%(Filename)%(Extension)"
+             CopyToOutputDirectory="PreserveNewest" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <Using Include="Xunit" />
+    <Using Include="Bunit" />
+    <Using Include="Shouldly" />
+    <Using Include="Microsoft.AspNetCore.Components" />
+    <Using Include="ZenithUI.Core" />
+    <Using Include="ZenithUI.Services" />
+  </ItemGroup>
+
+</Project>

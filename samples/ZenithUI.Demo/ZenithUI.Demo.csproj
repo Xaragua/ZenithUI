@@ -1,0 +1,58 @@
+<Project Sdk="Microsoft.NET.Sdk.Web">
+
+  <PropertyGroup>
+    <BlazorDisableThrowNavigationException>true</BlazorDisableThrowNavigationException>
+
+    <!-- The demo is a showcase, not a shipped API; XML docs on every page would be noise. -->
+    <GenerateDocumentationFile>false</GenerateDocumentationFile>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="..\ZenithUI.Demo.Client\ZenithUI.Demo.Client.csproj" />
+    <ProjectReference Include="..\..\src\ZenithUI\ZenithUI.csproj" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <PackageReference Include="Microsoft.AspNetCore.Components.WebAssembly.Server" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <DemoStyle Include="Styles\**\*.css" />
+    <None Include="@(DemoStyle)" />
+    <Content Remove="Styles\**" />
+    <Content Remove="package.json;package-lock.json" />
+    <None Include="package.json;package-lock.json" />
+  </ItemGroup>
+
+  <!--
+    The demo compiles its own Tailwind utilities. ZenithUI's stylesheet cannot contain them:
+    Tailwind only emits a class it finds in a file it scanned, and the library's build never sees
+    this project's .razor files. Any consuming app that writes Tailwind classes of its own does
+    exactly this - see Styles/app.css.
+
+    The token stylesheets are listed as inputs so that editing a palette value rebuilds the demo's
+    CSS too, not just the library's.
+  -->
+  <Target Name="DemoRestoreNpm" Condition="!Exists('$(MSBuildProjectDirectory)\node_modules')">
+    <Exec Command="npm ci --no-audit --no-fund" WorkingDirectory="$(MSBuildProjectDirectory)"
+          Condition="Exists('$(MSBuildProjectDirectory)\package-lock.json')" />
+    <Exec Command="npm install --no-audit --no-fund" WorkingDirectory="$(MSBuildProjectDirectory)"
+          Condition="!Exists('$(MSBuildProjectDirectory)\package-lock.json')" />
+  </Target>
+
+  <ItemGroup>
+    <DemoTailwindInput Include="@(DemoStyle)" />
+    <DemoTailwindInput Include="Components\**\*.razor" />
+    <DemoTailwindInput Include="..\ZenithUI.Demo.Client\**\*.razor" />
+    <DemoTailwindInput Include="..\..\src\ZenithUI\Styles\tokens\*.css" />
+  </ItemGroup>
+
+  <Target Name="BuildDemoTailwind"
+          DependsOnTargets="DemoRestoreNpm"
+          BeforeTargets="ResolveStaticWebAssetsInputs;Build"
+          Inputs="@(DemoTailwindInput)"
+          Outputs="wwwroot\app.css">
+    <Exec Command="npm run css:build" WorkingDirectory="$(MSBuildProjectDirectory)" />
+  </Target>
+
+</Project>

@@ -1,0 +1,33 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <base href="/" />
+    <ResourcePreloader />
+
+    @*
+        ZenThemeScript must come before the stylesheet and must not be deferred: it stamps
+        data-zen-theme on <html> synchronously, before the browser's first paint, so a dark-mode
+        visitor never sees a white flash. See the component for the full reasoning.
+    *@
+    <ZenThemeScript />
+
+    @* The demo runs its own Tailwind (see Styles/app.css), so it takes the preflight-free build
+       and supplies the reset itself. An app with no Tailwind of its own would link zenith.css. *@
+    <link rel="stylesheet" href="_content/ZenithUI/zenith.nopreflight.css" />
+    <link rel="stylesheet" href="@Assets["app.css"]" />
+    <link rel="stylesheet" href="@Assets["ZenithUI.Demo.styles.css"]" />
+
+    <ImportMap />
+    <HeadOutlet />
+</head>
+
+<body class="zen-root">
+    <Routes />
+    <ReconnectModal />
+    <script src="@Assets["_framework/blazor.web.js"]"></script>
+</body>
+
+</html>

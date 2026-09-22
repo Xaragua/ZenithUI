@@ -1,0 +1,22 @@
+@* Shared using directives for every ZenithUI component. _Imports.razor files are additive down
+   the directory tree, so each component folder inherits these and only has to declare its
+   @namespace.
+
+   This file lives in Components/ rather than at the project root deliberately. A root
+   _Imports.razor would generate its class as `ZenithUI._Imports`, colliding with the folder-level
+   files that flatten their components into the `ZenithUI` namespace. Keeping it one level down
+   gives it the distinct `ZenithUI.Components` namespace and sidesteps the clash. *@
+
+@using System.Globalization
+@using System.Linq.Expressions
+@using Microsoft.AspNetCore.Components
+@using Microsoft.AspNetCore.Components.Forms
+@using Microsoft.AspNetCore.Components.Routing
+@using Microsoft.AspNetCore.Components.Web
+@using Microsoft.JSInterop
+@using ZenithUI
+@using ZenithUI.Core
+@using ZenithUI.Services
+
+@* Deliberately absent: @rendermode. A component library must never pick a render mode for the
+   host application - the consumer decides whether a page is static, Server or WebAssembly. *@

@@ -1,0 +1,30 @@
+# Build results
+[Bb]in/
+[Oo]bj/
+[Oo]ut/
+artifacts/
+*.user
+*.suo
+.vs/
+.idea/
+.vscode/
+
+# NuGet
+*.nupkg
+*.snupkg
+packages/
+
+# Node / Tailwind
+node_modules/
+npm-debug.log*
+
+# Generated stylesheets (built by the BuildTailwind MSBuild target)
+samples/ZenithUI.Demo/wwwroot/app.css
+src/ZenithUI/wwwroot/zenith.css
+src/ZenithUI/wwwroot/zenith.nopreflight.css
+src/ZenithUI/wwwroot/*.css.map
+
+# Test results
+TestResults/
+coverage/
+*.trx

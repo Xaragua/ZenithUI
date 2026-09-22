@@ -1,0 +1,37 @@
+<Project>
+
+  <PropertyGroup>
+    <ManagePackageVersionsCentrally>true</ManagePackageVersionsCentrally>
+    <CentralPackageTransitivePinningEnabled>true</CentralPackageTransitivePinningEnabled>
+    <AspNetCoreVersion>10.0.12</AspNetCoreVersion>
+  </PropertyGroup>
+
+  <!-- Library -->
+  <ItemGroup>
+    <PackageVersion Include="Microsoft.AspNetCore.Components.Web" Version="$(AspNetCoreVersion)" />
+  </ItemGroup>
+
+  <!-- Demo -->
+  <ItemGroup>
+    <PackageVersion Include="Microsoft.AspNetCore.Components.WebAssembly" Version="$(AspNetCoreVersion)" />
+    <PackageVersion Include="Microsoft.AspNetCore.Components.WebAssembly.Server" Version="$(AspNetCoreVersion)" />
+  </ItemGroup>
+
+  <!-- Tests -->
+  <ItemGroup>
+    <PackageVersion Include="bunit" Version="2.11.3" />
+    <PackageVersion Include="coverlet.collector" Version="6.0.4" />
+
+    <!--
+      Transitive pin. bUnit brings in AngleSharp for DOM assertions, and the version it resolves
+      by default carries GHSA-pgww-w46g-26qg. CentralPackageTransitivePinningEnabled lets this
+      entry lift the whole graph onto a patched release without waiting for bUnit to bump it.
+    -->
+    <PackageVersion Include="AngleSharp" Version="1.8.2" />
+    <PackageVersion Include="Microsoft.NET.Test.Sdk" Version="17.14.1" />
+    <PackageVersion Include="Shouldly" Version="4.3.0" />
+    <PackageVersion Include="xunit" Version="2.9.3" />
+    <PackageVersion Include="xunit.runner.visualstudio" Version="3.1.4" />
+  </ItemGroup>
+
+</Project>

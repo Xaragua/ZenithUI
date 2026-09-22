@@ -1,0 +1,85 @@
+/*
+ * Shared rules that Tailwind utilities cannot express, plus the handful of custom utilities
+ * ZenithUI components compose from. Everything lands in @layer components / @layer utilities
+ * so a consuming application's own utilities win on specificity ties.
+ */
+
+@layer components {
+  /*
+   * Opt-in page-level styling. ZenithUI never styles `body` itself - a component library that
+   * reaches for the document root fights whatever the host app already does. Apply this class
+   * to your layout root (ZenAppShell does it for you) to adopt the surface and content tokens.
+   */
+  .zen-root {
+    background-color: var(--zen-surface);
+    color: var(--zen-content);
+    -webkit-font-smoothing: antialiased;
+    -moz-osx-font-smoothing: grayscale;
+  }
+
+  /*
+   * Theme transition. Applied by ZenThemeProvider only while a theme change is in flight, so
+   * that switching palettes cross-fades instead of snapping, without making every unrelated
+   * hover state sluggish. `prefers-reduced-motion` disables it entirely.
+   */
+  .zen-theme-transition,
+  .zen-theme-transition * {
+    transition:
+      background-color 180ms ease,
+      border-color 180ms ease,
+      color 180ms ease,
+      fill 180ms ease,
+      stroke 180ms ease;
+  }
+}
+
+/*
+ * Custom utilities. `@utility` must sit at the top level - Tailwind places these in the
+ * utilities layer itself, so wrapping them in `@layer utilities` is both unnecessary and a
+ * compile error.
+ */
+
+/* Visible-on-keyboard focus ring, built from the ring tokens. */
+@utility zen-focus {
+  outline: none;
+
+  &:focus-visible {
+    outline: var(--zen-ring-width) solid var(--zen-ring);
+    outline-offset: var(--zen-ring-offset-width);
+  }
+}
+
+/* Same ring, but always shown - for roving-tabindex items that own focus programmatically. */
+@utility zen-focus-always {
+  outline: var(--zen-ring-width) solid var(--zen-ring);
+  outline-offset: var(--zen-ring-offset-width);
+}
+
+/*
+ * Indentation for nested rows (ZenTable hierarchy) and tree items. Depth is passed as the
+ * `--zen-depth` custom property on the element, which keeps the class list static regardless
+ * of how deep the data nests.
+ */
+@utility zen-indent {
+  padding-inline-start: calc(var(--zen-indent) * var(--zen-depth, 0));
+}
+
+/* Accessible visually-hidden text (skip links, screen-reader-only labels). */
+@utility zen-sr-only {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  padding: 0;
+  margin: -1px;
+  overflow: hidden;
+  clip-path: inset(50%);
+  white-space: nowrap;
+  border-width: 0;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .zen-theme-transition,
+  .zen-theme-transition * {
+    transition: none !important;
+  }
+}

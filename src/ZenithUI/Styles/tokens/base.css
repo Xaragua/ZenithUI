@@ -1,0 +1,115 @@
+/*
+ * ZenithUI design tokens - light palette (the default).
+ *
+ * Every token is defined here on bare `:root`. Dark mode only ever *overrides* these values
+ * (see tokens/dark.css); no token may have its only definition inside a media query or an
+ * attribute selector, otherwise a viewer in the non-matching state gets an undefined variable.
+ *
+ * Colors are expressed in OKLCH so that lightness is perceptually uniform: adjusting the `L`
+ * component moves contrast predictably, which is what makes the automated contrast audit in
+ * CI meaningful.
+ *
+ * Each intent is a quartet, and the roles are not interchangeable:
+ *
+ *   --zen-{intent}          a FILL. Solid button backgrounds, badges, progress bars.
+ *   --zen-{intent}-content  the text that goes ON that fill.
+ *   --zen-{intent}-soft     a tinted BACKGROUND for low-emphasis chips and callouts.
+ *   --zen-{intent}-strong   a FOREGROUND. Text, icons and borders on surfaces or on -soft.
+ *
+ * Why -strong has to exist: a fill colour and a text colour have opposite requirements, and for
+ * some hues no single value can serve both. Warning is the clear case - a useful amber fill sits
+ * around L 0.76, which is far too light to read as text on white (about 2:1). Darkening the fill
+ * until the text works would turn every warning button brown. Two tokens, two jobs.
+ *
+ * So: `text-warning-strong` on a light surface, `bg-warning` with `text-warning-content` for a
+ * solid chip. Never `text-warning` on a surface.
+ *
+ * Contrast guarantees (WCAG 2.2 AA, verified by the contrast audit in tests/ZenithUI.Tests):
+ *   --zen-content          on any --zen-surface-*   >= 7:1
+ *   --zen-content-muted    on any --zen-surface-*   >= 4.5:1
+ *   --zen-content-subtle   on any --zen-surface-*   >= 4.5:1
+ *   --zen-{intent}-content on --zen-{intent}        >= 4.5:1
+ *   --zen-{intent}-strong  on --zen-{intent}-soft   >= 4.5:1
+ *   --zen-{intent}-strong  on any --zen-surface-*   >= 4.5:1
+ */
+
+:root {
+  /* ---- Surfaces -------------------------------------------------------- */
+  --zen-surface: oklch(0.985 0.002 258);
+  --zen-surface-raised: oklch(1 0 0);
+  --zen-surface-sunken: oklch(0.955 0.004 258);
+  --zen-surface-overlay: oklch(1 0 0);
+
+  /* ---- Content --------------------------------------------------------- */
+  --zen-content: oklch(0.21 0.015 258);
+  --zen-content-muted: oklch(0.44 0.015 258);
+  --zen-content-subtle: oklch(0.525 0.013 258);
+  --zen-content-inverted: oklch(0.99 0 0);
+
+  /* ---- Borders --------------------------------------------------------- */
+  --zen-border: oklch(0.905 0.006 258);
+  --zen-border-strong: oklch(0.8 0.01 258);
+
+  /* ---- Intents --------------------------------------------------------- */
+  --zen-primary: oklch(0.54 0.19 264);
+  --zen-primary-content: oklch(0.99 0 0);
+  --zen-primary-soft: oklch(0.955 0.02 264);
+  --zen-primary-strong: oklch(0.48 0.19 264);
+
+  --zen-secondary: oklch(0.52 0.05 258);
+  --zen-secondary-content: oklch(0.99 0 0);
+  --zen-secondary-soft: oklch(0.955 0.01 258);
+  --zen-secondary-strong: oklch(0.46 0.05 258);
+
+  --zen-accent: oklch(0.54 0.19 322);
+  --zen-accent-content: oklch(0.99 0 0);
+  --zen-accent-soft: oklch(0.955 0.03 322);
+  --zen-accent-strong: oklch(0.48 0.19 322);
+
+  --zen-success: oklch(0.52 0.12 155);
+  --zen-success-content: oklch(0.99 0 0);
+  --zen-success-soft: oklch(0.955 0.035 155);
+  --zen-success-strong: oklch(0.46 0.11 155);
+
+  --zen-warning: oklch(0.76 0.15 78);
+  --zen-warning-content: oklch(0.24 0.05 78);
+  --zen-warning-soft: oklch(0.965 0.028 78);
+  --zen-warning-strong: oklch(0.48 0.1 78);
+
+  --zen-danger: oklch(0.54 0.21 27);
+  --zen-danger-content: oklch(0.99 0 0);
+  --zen-danger-soft: oklch(0.955 0.02 27);
+  --zen-danger-strong: oklch(0.48 0.19 27);
+
+  --zen-info: oklch(0.55 0.112 236);
+  --zen-info-content: oklch(0.99 0 0);
+  --zen-info-soft: oklch(0.955 0.022 236);
+  --zen-info-strong: oklch(0.48 0.1 236);
+
+  /* ---- Focus ----------------------------------------------------------- */
+  --zen-ring: var(--zen-primary);
+  --zen-ring-offset: var(--zen-surface);
+  --zen-ring-width: 2px;
+  --zen-ring-offset-width: 2px;
+
+  /* ---- Shape ----------------------------------------------------------- */
+  --zen-radius-sm: 0.25rem;
+  --zen-radius-md: 0.5rem;
+  --zen-radius-lg: 0.75rem;
+  --zen-radius-xl: 1rem;
+
+  --zen-shadow-sm: 0 1px 2px 0 oklch(0.21 0.015 258 / 0.06);
+  --zen-shadow-md:
+    0 2px 4px -1px oklch(0.21 0.015 258 / 0.08),
+    0 4px 12px -2px oklch(0.21 0.015 258 / 0.06);
+  --zen-shadow-lg:
+    0 8px 24px -4px oklch(0.21 0.015 258 / 0.12),
+    0 2px 6px -2px oklch(0.21 0.015 258 / 0.08);
+
+  /* ---- Layout ---------------------------------------------------------- */
+  /* Per-level indent for ZenTable hierarchy and ZenTree nesting. */
+  --zen-indent: 1.25rem;
+  --zen-sidenav-width: 16rem;
+  --zen-sidenav-width-collapsed: 4rem;
+  --zen-appbar-height: 3.5rem;
+}

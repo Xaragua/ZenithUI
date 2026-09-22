@@ -1,0 +1,104 @@
+/*
+ * Maps the --zen-* design tokens into Tailwind's theme so that semantic utilities exist:
+ * `bg-surface`, `text-content-muted`, `border-border`, `ring-ring`, `rounded-zen-md`, ...
+ *
+ * The indirection is deliberate. Tailwind emits `--color-surface: var(--zen-surface)`, so a
+ * consumer rebrands the whole library by redefining `--zen-*` in their own stylesheet - no
+ * Tailwind install, no config file, no rebuild of this package.
+ *
+ * Because the generated utilities reference a var(), Tailwind's opacity modifiers still work
+ * (`bg-primary/10` compiles to a color-mix against the variable).
+ *
+ * `@theme inline` is used so the utilities resolve `var(--zen-*)` at use time rather than
+ * snapshotting the value; that is what lets a `data-zen-theme` switch repaint without any
+ * class changes.
+ */
+
+@theme inline {
+  /* ---- Surfaces ---- */
+  --color-surface: var(--zen-surface);
+  --color-surface-raised: var(--zen-surface-raised);
+  --color-surface-sunken: var(--zen-surface-sunken);
+  --color-surface-overlay: var(--zen-surface-overlay);
+
+  /* ---- Content ---- */
+  --color-content: var(--zen-content);
+  --color-content-muted: var(--zen-content-muted);
+  --color-content-subtle: var(--zen-content-subtle);
+  --color-content-inverted: var(--zen-content-inverted);
+
+  /* ---- Borders ---- */
+  --color-border: var(--zen-border);
+  --color-border-strong: var(--zen-border-strong);
+
+  /* ---- Intents ---- */
+  --color-primary: var(--zen-primary);
+  --color-primary-content: var(--zen-primary-content);
+  --color-primary-soft: var(--zen-primary-soft);
+  --color-primary-strong: var(--zen-primary-strong);
+
+  --color-secondary: var(--zen-secondary);
+  --color-secondary-content: var(--zen-secondary-content);
+  --color-secondary-soft: var(--zen-secondary-soft);
+  --color-secondary-strong: var(--zen-secondary-strong);
+
+  --color-accent: var(--zen-accent);
+  --color-accent-content: var(--zen-accent-content);
+  --color-accent-soft: var(--zen-accent-soft);
+  --color-accent-strong: var(--zen-accent-strong);
+
+  --color-success: var(--zen-success);
+  --color-success-content: var(--zen-success-content);
+  --color-success-soft: var(--zen-success-soft);
+  --color-success-strong: var(--zen-success-strong);
+
+  --color-warning: var(--zen-warning);
+  --color-warning-content: var(--zen-warning-content);
+  --color-warning-soft: var(--zen-warning-soft);
+  --color-warning-strong: var(--zen-warning-strong);
+
+  --color-danger: var(--zen-danger);
+  --color-danger-content: var(--zen-danger-content);
+  --color-danger-soft: var(--zen-danger-soft);
+  --color-danger-strong: var(--zen-danger-strong);
+
+  --color-info: var(--zen-info);
+  --color-info-content: var(--zen-info-content);
+  --color-info-soft: var(--zen-info-soft);
+  --color-info-strong: var(--zen-info-strong);
+
+  /* ---- Focus ---- */
+  --color-ring: var(--zen-ring);
+
+  /* ---- Shape ---- */
+  --radius-zen-sm: var(--zen-radius-sm);
+  --radius-zen-md: var(--zen-radius-md);
+  --radius-zen-lg: var(--zen-radius-lg);
+  --radius-zen-xl: var(--zen-radius-xl);
+
+  --shadow-zen-sm: var(--zen-shadow-sm);
+  --shadow-zen-md: var(--zen-shadow-md);
+  --shadow-zen-lg: var(--zen-shadow-lg);
+
+  /* ---- Layout ---- */
+  --spacing-sidenav: var(--zen-sidenav-width);
+  --spacing-sidenav-collapsed: var(--zen-sidenav-width-collapsed);
+  --spacing-appbar: var(--zen-appbar-height);
+}
+
+/*
+ * A `zen-dark:` variant for the rare rule that cannot be expressed by swapping a token
+ * (for example inverting an inline SVG). Matches the same three states as tokens/dark.css.
+ * Prefer tokens; reach for this only when a token genuinely cannot carry the difference.
+ */
+@custom-variant zen-dark {
+  @media (prefers-color-scheme: dark) {
+    &:where(:root:not([data-zen-theme="light"]) *, :root:not([data-zen-theme="light"])) {
+      @slot;
+    }
+  }
+
+  &:where(:root[data-zen-theme="dark"] *, :root[data-zen-theme="dark"]) {
+    @slot;
+  }
+}

@@ -1,0 +1,136 @@
+/*
+ * ZenithUI design tokens - dark palette.
+ *
+ * Three viewer states must be handled, because only two of them stamp an attribute:
+ *
+ *   1. `data-zen-theme` absent  + OS prefers dark  -> the media query block applies.
+ *   2. `data-zen-theme="dark"`                     -> the attribute block applies, and must win
+ *                                                     even when the OS prefers light.
+ *   3. `data-zen-theme="light"` + OS prefers dark  -> neither applies and the light palette
+ *                                                     stands. That is what the
+ *                                                     `:not([data-zen-theme="light"])` guard buys.
+ *
+ * The two override blocks below are intentionally byte-identical in their declarations.
+ * `ThemeTokenTests.DarkPalette_MediaQueryAndAttributeBlocks_AreIdentical` parses this file and
+ * fails the build if they drift, so edit both or neither.
+ */
+
+/* ---- 1. System preference (no explicit choice stamped) -------------------- */
+@media (prefers-color-scheme: dark) {
+  :root:not([data-zen-theme="light"]) {
+    --zen-surface: oklch(0.19 0.012 258);
+    --zen-surface-raised: oklch(0.23 0.013 258);
+    --zen-surface-sunken: oklch(0.15 0.012 258);
+    --zen-surface-overlay: oklch(0.25 0.013 258);
+
+    --zen-content: oklch(0.96 0.004 258);
+    --zen-content-muted: oklch(0.76 0.012 258);
+    --zen-content-subtle: oklch(0.645 0.014 258);
+    --zen-content-inverted: oklch(0.18 0.01 258);
+
+    --zen-border: oklch(0.32 0.014 258);
+    --zen-border-strong: oklch(0.44 0.016 258);
+
+    --zen-primary: oklch(0.72 0.14 264);
+    --zen-primary-content: oklch(0.17 0.04 264);
+    --zen-primary-soft: oklch(0.3 0.055 264);
+  --zen-primary-strong: oklch(0.82 0.085 264);
+
+    --zen-secondary: oklch(0.72 0.045 258);
+    --zen-secondary-content: oklch(0.17 0.015 258);
+    --zen-secondary-soft: oklch(0.3 0.018 258);
+  --zen-secondary-strong: oklch(0.82 0.03 258);
+
+    --zen-accent: oklch(0.74 0.17 322);
+    --zen-accent-content: oklch(0.18 0.05 322);
+    --zen-accent-soft: oklch(0.31 0.06 322);
+  --zen-accent-strong: oklch(0.84 0.11 322);
+
+    --zen-success: oklch(0.74 0.14 155);
+    --zen-success-content: oklch(0.18 0.04 155);
+    --zen-success-soft: oklch(0.3 0.055 155);
+  --zen-success-strong: oklch(0.84 0.12 155);
+
+    --zen-warning: oklch(0.81 0.14 78);
+    --zen-warning-content: oklch(0.21 0.05 78);
+    --zen-warning-soft: oklch(0.33 0.06 78);
+  --zen-warning-strong: oklch(0.87 0.11 78);
+
+    --zen-danger: oklch(0.71 0.17 25);
+    --zen-danger-content: oklch(0.17 0.05 25);
+    --zen-danger-soft: oklch(0.31 0.065 25);
+  --zen-danger-strong: oklch(0.8 0.11 25);
+
+    --zen-info: oklch(0.74 0.12 236);
+    --zen-info-content: oklch(0.17 0.04 236);
+    --zen-info-soft: oklch(0.3 0.05 236);
+  --zen-info-strong: oklch(0.84 0.09 236);
+
+    --zen-shadow-sm: 0 1px 2px 0 oklch(0 0 0 / 0.4);
+    --zen-shadow-md:
+      0 2px 4px -1px oklch(0 0 0 / 0.45),
+      0 4px 12px -2px oklch(0 0 0 / 0.35);
+    --zen-shadow-lg:
+      0 8px 24px -4px oklch(0 0 0 / 0.55),
+      0 2px 6px -2px oklch(0 0 0 / 0.4);
+  }
+}
+
+/* ---- 2. Explicit choice (wins over the system preference) ---------------- */
+:root[data-zen-theme="dark"] {
+  --zen-surface: oklch(0.19 0.012 258);
+  --zen-surface-raised: oklch(0.23 0.013 258);
+  --zen-surface-sunken: oklch(0.15 0.012 258);
+  --zen-surface-overlay: oklch(0.25 0.013 258);
+
+  --zen-content: oklch(0.96 0.004 258);
+  --zen-content-muted: oklch(0.76 0.012 258);
+  --zen-content-subtle: oklch(0.645 0.014 258);
+  --zen-content-inverted: oklch(0.18 0.01 258);
+
+  --zen-border: oklch(0.32 0.014 258);
+  --zen-border-strong: oklch(0.44 0.016 258);
+
+  --zen-primary: oklch(0.72 0.14 264);
+  --zen-primary-content: oklch(0.17 0.04 264);
+  --zen-primary-soft: oklch(0.3 0.055 264);
+  --zen-primary-strong: oklch(0.82 0.085 264);
+
+  --zen-secondary: oklch(0.72 0.045 258);
+  --zen-secondary-content: oklch(0.17 0.015 258);
+  --zen-secondary-soft: oklch(0.3 0.018 258);
+  --zen-secondary-strong: oklch(0.82 0.03 258);
+
+  --zen-accent: oklch(0.74 0.17 322);
+  --zen-accent-content: oklch(0.18 0.05 322);
+  --zen-accent-soft: oklch(0.31 0.06 322);
+  --zen-accent-strong: oklch(0.84 0.11 322);
+
+  --zen-success: oklch(0.74 0.14 155);
+  --zen-success-content: oklch(0.18 0.04 155);
+  --zen-success-soft: oklch(0.3 0.055 155);
+  --zen-success-strong: oklch(0.84 0.12 155);
+
+  --zen-warning: oklch(0.81 0.14 78);
+  --zen-warning-content: oklch(0.21 0.05 78);
+  --zen-warning-soft: oklch(0.33 0.06 78);
+  --zen-warning-strong: oklch(0.87 0.11 78);
+
+  --zen-danger: oklch(0.71 0.17 25);
+  --zen-danger-content: oklch(0.17 0.05 25);
+  --zen-danger-soft: oklch(0.31 0.065 25);
+  --zen-danger-strong: oklch(0.8 0.11 25);
+
+  --zen-info: oklch(0.74 0.12 236);
+  --zen-info-content: oklch(0.17 0.04 236);
+  --zen-info-soft: oklch(0.3 0.05 236);
+  --zen-info-strong: oklch(0.84 0.09 236);
+
+  --zen-shadow-sm: 0 1px 2px 0 oklch(0 0 0 / 0.4);
+  --zen-shadow-md:
+    0 2px 4px -1px oklch(0 0 0 / 0.45),
+    0 4px 12px -2px oklch(0 0 0 / 0.35);
+  --zen-shadow-lg:
+    0 8px 24px -4px oklch(0 0 0 / 0.55),
+    0 2px 6px -2px oklch(0 0 0 / 0.4);
+}

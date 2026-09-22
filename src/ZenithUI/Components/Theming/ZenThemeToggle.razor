@@ -1,0 +1,212 @@
+@inherits ZenComponentBase
+@implements IDisposable
+@inject IZenThemeService ThemeService
+
+@*
+    Theme switcher. Two shapes, chosen with `Mode`:
+
+      Toggle   - a single button that flips light <-> dark.
+      Segmented - three buttons (System / Light / Dark) in a radiogroup, for a settings page
+                  where "follow the system" needs to be explicitly selectable.
+
+    Renders as a working <button> under static SSR too; it simply does nothing until an
+    interactive renderer is attached, which is the honest behaviour for a control whose entire
+    job is a client-side preference.
+*@
+
+@if (Mode == ZenThemeToggleMode.Segmented)
+{
+    <div class="@RootClass(SegmentedRootClass)"
+         style="@Style"
+         role="radiogroup"
+         aria-label="@Label"
+         id="@Id"
+         @attributes="AttributesWithoutClass">
+        @foreach (var option in Options)
+        {
+            var isSelected = ThemeService.Mode == option.Value;
+
+            <button type="button"
+                    role="radio"
+                    aria-checked="@(isSelected ? "true" : "false")"
+                    title="@option.Label"
+                    class="@SegmentClass(isSelected)"
+                    disabled="@Disabled"
+                    @onclick="() => SetModeAsync(option.Value)">
+                @IconFor(option.Value)
+                <span class="@(ShowLabels ? "text-sm" : "zen-sr-only")">@option.Label</span>
+            </button>
+        }
+    </div>
+}
+else
+{
+    <button type="button"
+            id="@Id"
+            class="@RootClass(ToggleClass)"
+            style="@Style"
+            title="@ToggleTitle"
+            aria-label="@ToggleTitle"
+            disabled="@Disabled"
+            @onclick="ToggleAsync"
+            @attributes="AttributesWithoutClass">
+        @IconFor(ThemeService.Theme == ZenTheme.Dark ? ZenThemeMode.Dark : ZenThemeMode.Light)
+        @if (ShowLabels)
+        {
+            <span class="text-sm">@(ThemeService.Theme == ZenTheme.Dark ? DarkLabel : LightLabel)</span>
+        }
+    </button>
+}
+
+@code {
+    /// <summary>Which shape to render.</summary>
+    [Parameter]
+    public ZenThemeToggleMode Mode { get; set; } = ZenThemeToggleMode.Toggle;
+
+    /// <summary>Control size.</summary>
+    [Parameter]
+    public ZenSize Size { get; set; } = ZenSize.Medium;
+
+    /// <summary>Show text labels next to the icons. Off by default to suit an app bar.</summary>
+    [Parameter]
+    public bool ShowLabels { get; set; }
+
+    /// <summary>Disables the control.</summary>
+    [Parameter]
+    public bool Disabled { get; set; }
+
+    /// <summary>Accessible name for the segmented group.</summary>
+    [Parameter]
+    public string Label { get; set; } = "Colour theme";
+
+    /// <summary>Label for the light option.</summary>
+    [Parameter]
+    public string LightLabel { get; set; } = "Light";
+
+    /// <summary>Label for the dark option.</summary>
+    [Parameter]
+    public string DarkLabel { get; set; } = "Dark";
+
+    /// <summary>Label for the follow-the-system option.</summary>
+    [Parameter]
+    public string SystemLabel { get; set; } = "System";
+
+    private (ZenThemeMode Value, string Label)[] Options =>
+    [
+        (ZenThemeMode.System, SystemLabel),
+        (ZenThemeMode.Light, LightLabel),
+        (ZenThemeMode.Dark, DarkLabel),
+    ];
+
+    private string ToggleTitle =>
+        ThemeService.Theme == ZenTheme.Dark
+            ? $"Switch to {LightLabel.ToLowerInvariant()} theme"
+            : $"Switch to {DarkLabel.ToLowerInvariant()} theme";
+
+    protected override void OnInitialized() => ThemeService.ThemeChanged += HandleThemeChanged;
+
+    protected override async Task OnAfterRenderAsync(bool firstRender)
+    {
+        if (!firstRender || !RendererInfo.IsInteractive)
+        {
+            return;
+        }
+
+        // The toggle initializes the service itself rather than assuming a ZenThemeProvider is
+        // mounted above it. A toggle in an app bar is the common case, and an app bar is usually
+        // in a static layout where a provider cannot be placed at all (a RenderFragment cannot
+        // cross a static-to-interactive boundary). Without this the control would render, respond
+        // to clicks, update its own highlight - and never touch the DOM.
+        //
+        // InitializeAsync is idempotent and internally gated, so several toggles on one page
+        // collapse into a single module import.
+        await ThemeService.InitializeAsync();
+
+        // The service may have resolved a different mode than the prerender assumed (the stored
+        // preference is only readable here). If it did, ThemeChanged has already queued a render;
+        // if it did not, this is what corrects the markup anyway.
+        StateHasChanged();
+    }
+
+    private Task ToggleAsync() => ThemeService.ToggleAsync();
+
+    private Task SetModeAsync(ZenThemeMode mode) => ThemeService.SetModeAsync(mode);
+
+    private void HandleThemeChanged(object? sender, ZenThemeChangedEventArgs args) =>
+        _ = InvokeAsync(StateHasChanged);
+
+    public void Dispose() => ThemeService.ThemeChanged -= HandleThemeChanged;
+
+    // ---- Styling ---------------------------------------------------------------------------
+
+    private string ToggleClass => CssBuilder
+        .Default("zen-focus inline-flex items-center justify-center gap-2 rounded-zen-md border border-border")
+        .AddClass("bg-surface-raised text-content-muted")
+        .AddClass("transition-colors hover:bg-surface-sunken hover:text-content")
+        .AddClass("disabled:cursor-not-allowed disabled:opacity-50")
+        .AddClass(Size switch
+        {
+            ZenSize.Small => ShowLabels ? "h-8 px-2.5 text-sm" : "size-8",
+            ZenSize.Large => ShowLabels ? "h-11 px-4 text-base" : "size-11",
+            _ => ShowLabels ? "h-9 px-3 text-sm" : "size-9",
+        })
+        .Build()!;
+
+    private string SegmentedRootClass => CssBuilder
+        .Default("inline-flex items-center gap-0.5 rounded-zen-md border border-border bg-surface-sunken p-0.5")
+        .Build()!;
+
+    private string SegmentClass(bool isSelected) => CssBuilder
+        .Default("zen-focus inline-flex items-center justify-center gap-1.5 rounded-zen-sm transition-colors")
+        .AddClass("disabled:cursor-not-allowed disabled:opacity-50")
+        // The selected segment lifts onto the raised surface; the rest stay flat on the sunken
+        // track. Using surface tokens rather than a brand colour keeps the control readable
+        // against any app bar without assuming what the brand colour is.
+        .AddClass(
+            "bg-surface-raised text-content shadow-zen-sm",
+            "text-content-muted hover:text-content",
+            isSelected)
+        .AddClass(Size switch
+        {
+            ZenSize.Small => ShowLabels ? "h-7 px-2 text-xs" : "size-7",
+            ZenSize.Large => ShowLabels ? "h-10 px-3.5 text-base" : "size-10",
+            _ => ShowLabels ? "h-8 px-2.5 text-sm" : "size-8",
+        })
+        .Build()!;
+
+    private string IconSizeClass => Size switch
+    {
+        ZenSize.Small => "size-4",
+        ZenSize.Large => "size-5",
+        _ => "size-4",
+    };
+
+    // Icons are inlined rather than pulled from an icon font so the package has no external
+    // asset dependency and renders identically under static SSR.
+    private RenderFragment IconFor(ZenThemeMode mode) => builder =>
+    {
+        builder.OpenElement(0, "svg");
+        builder.AddAttribute(1, "class", IconSizeClass);
+        builder.AddAttribute(2, "viewBox", "0 0 24 24");
+        builder.AddAttribute(3, "fill", "none");
+        builder.AddAttribute(4, "stroke", "currentColor");
+        builder.AddAttribute(5, "stroke-width", "1.75");
+        builder.AddAttribute(6, "stroke-linecap", "round");
+        builder.AddAttribute(7, "stroke-linejoin", "round");
+        builder.AddAttribute(8, "aria-hidden", "true");
+        builder.AddMarkupContent(9, IconPath(mode));
+        builder.CloseElement();
+    };
+
+    private static string IconPath(ZenThemeMode mode) => mode switch
+    {
+        // Moon
+        ZenThemeMode.Dark => """<path d="M21 12.79A9 9 0 1 1 11.21 3a7 7 0 0 0 9.79 9.79Z" />""",
+
+        // Sun
+        ZenThemeMode.Light => """<circle cx="12" cy="12" r="4" /><path d="M12 2v2m0 16v2M4.93 4.93l1.41 1.41m11.32 11.32 1.41 1.41M2 12h2m16 0h2M4.93 19.07l1.41-1.41m11.32-11.32 1.41-1.41" />""",
+
+        // Monitor
+        _ => """<rect x="2" y="3" width="20" height="14" rx="2" /><path d="M8 21h8m-4-4v4" />""",
+    };
+}

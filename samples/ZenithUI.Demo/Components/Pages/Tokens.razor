@@ -1,0 +1,133 @@
+@page "/tokens"
+
+@*
+    The token gallery. Static SSR on purpose - if the palette needs JavaScript to look right,
+    the theming approach is wrong.
+
+    Switch themes with the header control and watch this page: no element changes its class list.
+    Every swatch is `bg-<token>`, which compiles to `background-color: var(--zen-<token>)`, and
+    the value behind that variable is all that changes.
+*@
+
+<PageTitle>Tokens &middot; ZenithUI</PageTitle>
+
+<header class="max-w-3xl">
+    <h1 class="text-3xl font-bold tracking-tight">Design tokens</h1>
+    <p class="mt-3 text-content-muted">
+        Every colour in ZenithUI comes from one of these custom properties. Override any of them
+        in your own stylesheet to rebrand the library &mdash; no Tailwind install and no rebuild
+        of the package required.
+    </p>
+</header>
+
+<section class="mt-10">
+    <h2 class="text-lg font-semibold">Surfaces and content</h2>
+    <p class="mt-1 text-sm text-content-muted">
+        Surfaces stack from sunken to overlay. Content tokens are guaranteed readable on all of them.
+    </p>
+
+    <div class="mt-4 grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
+        @foreach (var surface in Surfaces)
+        {
+            <div class="overflow-hidden rounded-zen-lg border border-border">
+                <div class="@($"{surface.Class} p-5")">
+                    <p class="text-sm font-medium text-content">Content</p>
+                    <p class="mt-1 text-sm text-content-muted">Muted content</p>
+                    <p class="mt-1 text-sm text-content-subtle">Subtle content</p>
+                </div>
+                <div class="border-t border-border bg-surface-raised px-3 py-2">
+                    <code class="text-xs text-content-muted">@surface.Token</code>
+                </div>
+            </div>
+        }
+    </div>
+</section>
+
+<section class="mt-12">
+    <h2 class="text-lg font-semibold">Intents</h2>
+    <p class="mt-1 text-sm text-content-muted">
+        Each intent is a quartet with four non-interchangeable roles: <code>-{intent}</code> fills,
+        <code>-content</code> is the text on that fill, <code>-soft</code> is a tinted background,
+        and <code>-strong</code> is the foreground for text and icons.
+    </p>
+    <p class="mt-2 max-w-3xl text-sm text-content-muted">
+        <code>-strong</code> earns its place on <span class="text-warning-strong">warning</span>: a
+        usable amber fill sits near L&nbsp;0.76, which reads at roughly 2:1 as text on white.
+        Darkening the fill until the text passed would make every warning button brown, so the two
+        jobs get two tokens.
+    </p>
+
+    <div class="mt-4 grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
+        @foreach (var intent in Intents)
+        {
+            <div class="overflow-hidden rounded-zen-lg border border-border bg-surface-raised">
+                <div class="@($"bg-{intent} p-4 text-{intent}-content")">
+                    <p class="text-sm font-semibold">@intent</p>
+                    <p class="text-xs opacity-90">--zen-@intent</p>
+                </div>
+                <div class="@($"bg-{intent}-soft px-4 py-3 text-{intent}-strong")">
+                    <p class="text-xs font-medium">-strong on -soft</p>
+                </div>
+                <div class="flex items-center justify-between gap-2 border-t border-border px-4 py-2.5">
+                    <span class="@($"inline-flex items-center rounded-full bg-{intent}-soft px-2 py-0.5 text-xs font-medium text-{intent}-strong")">
+                        badge
+                    </span>
+                    <span class="@($"text-xs font-medium text-{intent}-strong")">on surface</span>
+                </div>
+            </div>
+        }
+    </div>
+</section>
+
+<section class="mt-12">
+    <h2 class="text-lg font-semibold">Shape and elevation</h2>
+
+    <div class="mt-4 grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
+        @foreach (var radius in Radii)
+        {
+            <div class="rounded-zen-lg border border-border bg-surface-raised p-5">
+                <div class="@($"{radius.Class} h-16 w-full bg-primary-soft border border-primary/25")"></div>
+                <code class="mt-3 block text-xs text-content-muted">@radius.Token</code>
+            </div>
+        }
+    </div>
+
+    <div class="mt-4 grid gap-4 sm:grid-cols-3">
+        @foreach (var shadow in Shadows)
+        {
+            <div class="@($"{shadow.Class} rounded-zen-lg border border-border bg-surface-raised p-5")">
+                <code class="text-xs text-content-muted">@shadow.Token</code>
+            </div>
+        }
+    </div>
+</section>
+
+@code {
+    private static readonly (string Class, string Token)[] Surfaces =
+    [
+        ("bg-surface-sunken", "--zen-surface-sunken"),
+        ("bg-surface", "--zen-surface"),
+        ("bg-surface-raised", "--zen-surface-raised"),
+        ("bg-surface-overlay", "--zen-surface-overlay"),
+    ];
+
+    private static readonly string[] Intents =
+    [
+        "primary", "secondary", "accent", "success", "warning", "danger", "info",
+    ];
+
+    private static readonly (string Class, string Token)[] Radii =
+    [
+        ("rounded-zen-sm", "--zen-radius-sm"),
+        ("rounded-zen-md", "--zen-radius-md"),
+        ("rounded-zen-lg", "--zen-radius-lg"),
+        ("rounded-zen-xl", "--zen-radius-xl"),
+    ];
+
+    private static readonly (string Class, string Token)[] Shadows =
+    [
+        ("shadow-zen-sm", "--zen-shadow-sm"),
+        ("shadow-zen-md", "--zen-shadow-md"),
+        ("shadow-zen-lg", "--zen-shadow-lg"),
+    ];
+}

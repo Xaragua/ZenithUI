@@ -1,0 +1,12 @@
+<Solution>
+  <Folder Name="/samples/">
+    <Project Path="samples/ZenithUI.Demo.Client/ZenithUI.Demo.Client.csproj" />
+    <Project Path="samples/ZenithUI.Demo/ZenithUI.Demo.csproj" />
+  </Folder>
+  <Folder Name="/src/">
+    <Project Path="src/ZenithUI/ZenithUI.csproj" />
+  </Folder>
+  <Folder Name="/tests/">
+    <Project Path="tests/ZenithUI.Tests/ZenithUI.Tests.csproj" />
+  </Folder>
+</Solution>

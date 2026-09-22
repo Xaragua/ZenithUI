@@ -1,0 +1,77 @@
+@page "/"
+
+@* No @rendermode: this page is static SSR. It renders correctly with JavaScript disabled. *@
+
+<PageTitle>ZenithUI</PageTitle>
+
+<section class="max-w-3xl">
+    <p class="text-sm font-semibold uppercase tracking-widest text-content-subtle">Milestone M0</p>
+    <h1 class="mt-2 text-3xl font-bold tracking-tight sm:text-4xl">
+        A TailwindCSS component library for Blazor
+    </h1>
+    <p class="mt-4 text-lg text-content-muted">
+        Render-mode agnostic components themed entirely through CSS custom properties.
+        This page is static server-rendered HTML &mdash; the theme switcher in the header is the
+        only interactive component on it.
+    </p>
+</section>
+
+<section class="mt-10 grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
+    @foreach (var card in Foundations)
+    {
+        <article class="rounded-zen-lg border border-border bg-surface-raised p-5 shadow-zen-sm">
+            <h2 class="text-sm font-semibold">@card.Title</h2>
+            <p class="mt-2 text-sm text-content-muted">@card.Body</p>
+        </article>
+    }
+</section>
+
+<section class="mt-10 rounded-zen-lg border border-border bg-surface-raised p-6 shadow-zen-sm">
+    <h2 class="text-lg font-semibold">What ships in M0</h2>
+
+    <ul class="mt-4 grid gap-2 text-sm text-content-muted sm:grid-cols-2">
+        @foreach (var item in Shipped)
+        {
+            <li class="flex items-start gap-2">
+                <span class="mt-1.5 size-1.5 shrink-0 rounded-full bg-success" aria-hidden="true"></span>
+                <span>@item</span>
+            </li>
+        }
+    </ul>
+
+    <p class="mt-6 text-sm text-content-subtle">
+        Primitives, form controls, the hierarchical table, the tree and the app shell arrive in
+        M1&ndash;M5. The foundation is deliberately finished first: every one of those components
+        composes from these tokens and base classes.
+    </p>
+</section>
+
+@code {
+    private static readonly (string Title, string Body)[] Foundations =
+    [
+        ("Semantic tokens",
+            "Components never write a literal colour. bg-surface resolves to var(--zen-surface), so a rebrand is a custom-property override rather than a find-and-replace."),
+        ("Three-state theming",
+            "Light, dark, and follow-the-system are all handled. An explicit choice wins over the OS preference; following the OS reacts live, even in a background tab."),
+        ("No render-mode assumptions",
+            "The library declares no @rendermode anywhere. The same component works under static SSR, Interactive Server and WebAssembly."),
+        ("Precompiled stylesheet",
+            "A consumer's Tailwind cannot scan .razor files compiled into a NuGet package, so ZenithUI ships its own CSS. Using Tailwind in your app is optional."),
+        ("Minimal JavaScript",
+            "Three small ES modules, no third-party JS dependencies. Everything expressible in C# or CSS is done there instead."),
+        ("Accessible by default",
+            "WAI-ARIA patterns, keyboard operation, and a contrast audit that runs in CI against both palettes."),
+    ];
+
+    private static readonly string[] Shipped =
+    [
+        "OKLCH design tokens with light and dark palettes",
+        "Tailwind v4 build pipeline wired into MSBuild",
+        "ZenComponentBase: class merging, attribute splatting, stable ARIA ids",
+        "ZenJsComponentBase: prerender-safe module loading and disposal",
+        "CssBuilder for conditional class composition",
+        "IZenThemeService with localStorage persistence",
+        "ZenThemeProvider, ZenThemeToggle, ZenThemeScript",
+        "bUnit test project and a CI workflow",
+    ];
+}

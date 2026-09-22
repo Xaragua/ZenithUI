@@ -1,0 +1,67 @@
+/*
+ * The demo's own Tailwind build.
+ *
+ * This file exists to model the real consumer path, and the reason it is needed is worth stating
+ * plainly: ZenithUI ships a PRECOMPILED stylesheet, so `_content/ZenithUI/zenith.nopreflight.css`
+ * contains only the utilities ZenithUI's own components use, plus the semantic surface listed in
+ * the library's safelist.css. It does not - and cannot - contain `grid`, `gap-4` or `max-w-6xl`
+ * for markup that lives in THIS project. Tailwind cannot scan .razor files it has never seen.
+ *
+ * So an application that writes Tailwind classes of its own runs its own Tailwind, exactly as it
+ * would without ZenithUI. An application that does not can skip all of this and link
+ * `_content/ZenithUI/zenith.css` alone - the safelist guarantees the semantic utilities are there.
+ *
+ * The token and @theme imports below are what make `bg-surface` and `rounded-zen-lg` resolve in
+ * THIS project's markup: `@theme` has to be present in the build that compiles a utility, not
+ * merely in some other stylesheet on the page.
+ */
+
+@import "tailwindcss" source(none);
+
+@source "../Components/**/*.razor";
+@source "../../ZenithUI.Demo.Client/**/*.razor";
+
+@import "../../../src/ZenithUI/Styles/tokens/base.css";
+@import "../../../src/ZenithUI/Styles/tokens/dark.css";
+@import "../../../src/ZenithUI/Styles/tokens/theme.css";
+
+/* ---- Demo-only rules ------------------------------------------------------
+ * Note what is absent: no colours, no spacing scale, no component styling. If the demo needed
+ * those, the library would be incomplete.
+ */
+
+html {
+  /* Anchored scroll targets should not slide under the sticky app bar. */
+  scroll-padding-top: calc(var(--zen-appbar-height) + 1rem);
+}
+
+body {
+  margin: 0;
+  font-family:
+    system-ui,
+    -apple-system,
+    "Segoe UI",
+    Roboto,
+    "Helvetica Neue",
+    Arial,
+    sans-serif;
+}
+
+#blazor-error-ui {
+  position: fixed;
+  inset-inline: 0;
+  bottom: 0;
+  z-index: 1000;
+  display: none;
+  padding: 0.75rem 1.25rem;
+  background: var(--zen-danger-soft);
+  color: var(--zen-danger-strong);
+  box-shadow: var(--zen-shadow-lg);
+}
+
+#blazor-error-ui .dismiss {
+  position: absolute;
+  inset-inline-end: 0.75rem;
+  top: 0.5rem;
+  cursor: pointer;
+}

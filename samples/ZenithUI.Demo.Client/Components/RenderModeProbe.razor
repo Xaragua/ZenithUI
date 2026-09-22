@@ -1,0 +1,62 @@
+@*
+    Reports which renderer it is running under, and exercises a ZenithUI component in the same
+    breath. Lives in the CLIENT assembly so the very same component type can be rendered three
+    ways - static SSR, Interactive Server, Interactive WebAssembly - from one page.
+
+    This is the render-mode agnosticism claim made testable rather than asserted.
+*@
+
+<article class="rounded-zen-lg border border-border bg-surface-raised p-5 shadow-zen-sm">
+    <header class="flex items-start justify-between gap-3">
+        <div>
+            <h3 class="text-sm font-semibold">@Title</h3>
+            <p class="mt-0.5 text-xs text-content-subtle">@Description</p>
+        </div>
+
+        <span class="@BadgeClass">@(RendererInfo.IsInteractive ? "interactive" : "static")</span>
+    </header>
+
+    <dl class="mt-4 space-y-2 text-sm">
+        <div class="flex items-center justify-between gap-4">
+            <dt class="text-content-muted">RendererInfo.Name</dt>
+            <dd><code class="text-xs">@RendererInfo.Name</code></dd>
+        </div>
+        <div class="flex items-center justify-between gap-4">
+            <dt class="text-content-muted">AssignedRenderMode</dt>
+            <dd><code class="text-xs">@(AssignedRenderMode?.GetType().Name ?? "none")</code></dd>
+        </div>
+        <div class="flex items-center justify-between gap-4">
+            <dt class="text-content-muted">Counter</dt>
+            <dd class="flex items-center gap-2">
+                <span class="tabular-nums font-medium">@_count</span>
+                <button type="button"
+                        class="zen-focus rounded-zen-sm border border-border px-2 py-0.5 text-xs text-content-muted transition-colors hover:bg-surface-sunken hover:text-content"
+                        @onclick="() => _count++">
+                    increment
+                </button>
+            </dd>
+        </div>
+    </dl>
+
+    <div class="mt-4 flex items-center justify-between gap-4 border-t border-border pt-4">
+        <span class="text-sm text-content-muted">ZenThemeToggle</span>
+        <ZenThemeToggle Size="ZenSize.Small" />
+    </div>
+</article>
+
+@code {
+    /// <summary>Heading shown on the card.</summary>
+    [Parameter]
+    public string Title { get; set; } = "Probe";
+
+    /// <summary>One-line explanation of what this instance demonstrates.</summary>
+    [Parameter]
+    public string Description { get; set; } = string.Empty;
+
+    private int _count;
+
+    private string BadgeClass => CssBuilder
+        .Default("inline-flex shrink-0 items-center rounded-full px-2 py-0.5 text-xs font-medium")
+        .AddClass("bg-success-soft text-success", "bg-secondary-soft text-secondary", RendererInfo.IsInteractive)
+        .Build()!;
+}

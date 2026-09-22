@@ -1,0 +1,46 @@
+/*
+ * Semantic utility surface, emitted unconditionally.
+ *
+ * Why this file exists
+ * --------------------
+ * Tailwind only generates a utility it can find as a literal string in a scanned file. Two
+ * consequences for a component library that ships precompiled CSS:
+ *
+ *   1. A consuming application cannot extend the stylesheet. If `bg-primary` happens not to
+ *      appear in any ZenithUI component, it is absent from zenith.css, and an app that does not
+ *      run Tailwind itself has no way to add it. The semantic utilities are part of this
+ *      package's public API, so they ship whether or not the library's own components use them.
+ *
+ *   2. Class names built at runtime - `$"bg-{intent}"` - are invisible to the scanner. Library
+ *      components avoid that pattern (switch expressions return literal strings, which the
+ *      scanner does see), but consumers write it constantly.
+ *
+ * Cost: roughly 6 KB before compression. That buys a stylesheet consumers can actually build on.
+ * Opacity modifiers (`bg-primary/10`) are NOT listed - the combinatorial expansion is large, and
+ * an app needing them is already running Tailwind.
+ */
+
+/* Backgrounds, text, borders and rings across the full intent and surface palette. */
+@source inline("{bg,text,border,ring,divide,outline,decoration}-{primary,secondary,accent,success,warning,danger,info}");
+@source inline("{bg,text,border,ring}-{primary,secondary,accent,success,warning,danger,info}-{content,soft,strong}");
+@source inline("{bg,text,border,ring}-{surface,surface-raised,surface-sunken,surface-overlay}");
+@source inline("{bg,text,border,ring}-{content,content-muted,content-subtle,content-inverted}");
+@source inline("{bg,text,border,ring,divide}-{border,border-strong}");
+@source inline("ring-ring");
+
+/* Shape and elevation. */
+@source inline("rounded-zen-{sm,md,lg,xl}");
+@source inline("rounded-{t,b,s,e,tl,tr,bl,br}-zen-{sm,md,lg,xl}");
+@source inline("shadow-zen-{sm,md,lg}");
+
+/* Layout tokens used by the shell components. */
+@source inline("{w,min-w,max-w}-sidenav");
+@source inline("{w,min-w,max-w}-sidenav-collapsed");
+@source inline("{h,min-h,top,pt}-appbar");
+
+/* ZenithUI's own custom utilities. */
+@source inline("zen-focus");
+@source inline("zen-focus-always");
+@source inline("zen-indent");
+@source inline("zen-sr-only");
+@source inline("zen-root");

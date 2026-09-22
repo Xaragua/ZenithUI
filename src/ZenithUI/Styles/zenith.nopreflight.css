@@ -1,0 +1,29 @@
+/*
+ * ZenithUI stylesheet - preflight-free build.
+ *
+ * Reference it from an app that ALREADY runs Tailwind (or otherwise emits its own reset):
+ *   <link rel="stylesheet" href="_content/ZenithUI/zenith.nopreflight.css" />
+ *
+ * Identical to zenith.css except that `tailwindcss/preflight.css` is not imported, so the host
+ * application's reset is the only one on the page.
+ *
+ * The explicit `@layer` statement fixes layer order up front. Without it, layer precedence
+ * would depend on which stylesheet the browser parses first, making the cascade dependent on
+ * <link> ordering.
+ */
+
+@layer theme, base, components, utilities;
+
+@import "tailwindcss/theme.css" layer(theme) source(none);
+@import "tailwindcss/utilities.css" layer(utilities) source(none);
+
+@source "../Components/**/*.razor";
+@source "../Core/**/*.cs";
+@source "../Services/**/*.cs";
+
+@import "./safelist.css";
+
+@import "./tokens/base.css";
+@import "./tokens/dark.css";
+@import "./tokens/theme.css";
+@import "./components/base.css";
