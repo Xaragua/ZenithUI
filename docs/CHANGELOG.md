@@ -89,10 +89,12 @@ dense form that makes adjacent fields look like they are colliding.
 
 Two details worth knowing:
 
-- The focused border is reinforced with an outline pulled inside the element, bringing it to `--zen-ring-width`
-  total. A 1px colour change is the bare minimum WCAG 2.4.7 accepts and falls short of the 2px
-  perimeter WCAG 2.4.13 asks for. Inset rather than outset means the control's outer dimensions
-  never change, so a focused field does not nudge its neighbours.
+- The focused border is reinforced with an outline pulled *inside* the element by a negative
+  offset, bringing the band to `--zen-ring-width` total. A 1px colour change is the bare minimum
+  WCAG 2.4.7 accepts and falls short of the 2px perimeter WCAG 2.4.13 asks for. Drawing inward
+  rather than outward means the control's outer dimensions never change, so a focused field does
+  not nudge its neighbours — and it leaves `box-shadow` free, so the same treatment composes with
+  `ZenCard`'s elevation.
 - An invalid field **keeps its danger border while focused**. An error outranks a focus hint;
   turning a failing field primary-coloured the moment it is focused hides the state the user is
   trying to fix.
