@@ -77,8 +77,17 @@
  *     on any elevated surface - and that lands as a bug the first time someone hovers a raised
  *     card.
  *
- * `outline-offset: -1px` makes the outline start exactly where the 1px border ends, so the two
- * read as a single band of --zen-ring-width.
+ * Getting the offset right. A CSS outline is painted OUTWARD from the "outline edge", which sits
+ * at `outline-offset` from the border-box edge. With a negative offset the outline edge moves
+ * inward, and the outline is then painted back out towards the border-box edge.
+ *
+ * So for a band spanning [0, W] inward from the edge, where the 1px border already covers [0, 1]:
+ *
+ *     outline-offset = -W          puts the outline edge W inside
+ *     outline-width  = W - 1px     paints back out, covering [1, W]
+ *
+ * The obvious-looking `outline-offset: -1px` is wrong: it lays a 1px outline directly ON TOP of
+ * the 1px border, and the band stays 1px wide no matter what --zen-ring-width says.
  */
 
 /*
@@ -97,7 +106,7 @@
   &:focus-visible {
     border-color: var(--zen-ring);
     outline: calc(var(--zen-ring-width) - 1px) solid var(--zen-ring);
-    outline-offset: -1px;
+    outline-offset: calc(-1 * var(--zen-ring-width));
   }
 
   &:focus-visible[aria-invalid="true"] {
@@ -122,7 +131,7 @@
   &:focus-within {
     border-color: var(--zen-ring);
     outline: calc(var(--zen-ring-width) - 1px) solid var(--zen-ring);
-    outline-offset: -1px;
+    outline-offset: calc(-1 * var(--zen-ring-width));
   }
 
   &:focus-within:has(:is(input, textarea, select)[aria-invalid="true"]) {
@@ -146,7 +155,7 @@
   &:focus-visible {
     border-color: var(--zen-ring);
     outline: calc(var(--zen-ring-width) - 1px) solid var(--zen-ring);
-    outline-offset: -1px;
+    outline-offset: calc(-1 * var(--zen-ring-width));
   }
 }
 

@@ -35,6 +35,9 @@
     <Content Include="..\..\src\ZenithUI\Styles\tokens\*.css"
              Link="Tokens\%(Filename)%(Extension)"
              CopyToOutputDirectory="PreserveNewest" />
+    <Content Include="..\..\src\ZenithUI\Styles\components\*.css"
+             Link="Styles\%(Filename)%(Extension)"
+             CopyToOutputDirectory="PreserveNewest" />
   </ItemGroup>
 
   <ItemGroup>

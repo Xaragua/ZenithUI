@@ -56,6 +56,21 @@ debounce.
   `surface-raised`. A neutral badge therefore rendered white on a white page. A marker's entire job
   is to be noticed.
 
+### Fixed — focus and hover border was 1px, not 2px
+
+The border-emphasis utilities offset their outline by `-1px`, which laid the 1px outline directly
+on top of the 1px border instead of beside it. The band stayed 1px wide regardless of
+`--zen-ring-width`.
+
+A CSS outline paints *outward* from the outline edge, which sits at `outline-offset` from the
+border-box edge. For a band spanning `[0, W]` inward, where the border already covers `[0, 1]`, the
+offset must be `-W` and the width `W - 1px`. `-1px` is the plausible-looking value that silently
+halves the indicator.
+
+`BorderEmphasisTests` now parses `components/base.css` and asserts the arithmetic. bUnit has no
+layout engine, so no rendering test can measure how thick a focus ring actually appears — asserting
+on the CSS text is the only guard available, and it was verified to fail on the old value.
+
 ### Changed — focus treatment for input controls
 
 Text-entry controls now signal focus by recolouring **their own border** to the ring colour, with no
@@ -74,7 +89,7 @@ dense form that makes adjacent fields look like they are colliding.
 
 Two details worth knowing:
 
-- The focused border is reinforced with an **inset** shadow, bringing it to `--zen-ring-width`
+- The focused border is reinforced with an outline pulled inside the element, bringing it to `--zen-ring-width`
   total. A 1px colour change is the bare minimum WCAG 2.4.7 accepts and falls short of the 2px
   perimeter WCAG 2.4.13 asks for. Inset rather than outset means the control's outer dimensions
   never change, so a focused field does not nudge its neighbours.
