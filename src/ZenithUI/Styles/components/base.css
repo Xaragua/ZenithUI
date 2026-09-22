@@ -248,7 +248,7 @@
    * The alternative usually reached for is a background-image data URI, but a data URI cannot read
    * a custom property, so the mark colour would have to be baked in. That breaks immediately here:
    * --zen-primary-content is near-white in the light palette and near-black in the dark one, since
-   * --zen-primary itself flips from a mid blue to a light one. A sibling element inherits
+   * --zen-primary itself flips from a mid tone to a light one. A sibling element inherits
    * `currentColor` and needs no asset.
    */
   .zen-mark {

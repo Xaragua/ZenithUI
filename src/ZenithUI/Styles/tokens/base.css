@@ -65,10 +65,10 @@
   --zen-border-strong: oklch(0.8 0.01 258);
 
   /* ---- Intents --------------------------------------------------------- */
-  --zen-primary: oklch(0.54 0.19 264);
+  --zen-primary: oklch(0.54 0.112 163);
   --zen-primary-content: oklch(0.99 0 0);
-  --zen-primary-soft: oklch(0.955 0.02 264);
-  --zen-primary-strong: oklch(0.48 0.19 264);
+  --zen-primary-soft: oklch(0.955 0.03 163);
+  --zen-primary-strong: oklch(0.48 0.1 163);
 
   --zen-secondary: oklch(0.52 0.05 258);
   --zen-secondary-content: oklch(0.99 0 0);

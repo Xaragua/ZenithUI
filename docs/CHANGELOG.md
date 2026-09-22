@@ -6,6 +6,21 @@ All notable changes to ZenithUI are documented here. The format follows
 
 ## [Unreleased]
 
+### Changed — the primary intent is emerald
+
+The default palette's primary quartet moved from blue (hue 264) to emerald (hue 163) in both light
+and dark. `--zen-ring` follows `--zen-primary`, so focus rings move with it; nothing else was
+touched.
+
+The chroma could not come across unchanged. sRGB holds far less green than blue at these
+lightnesses: the audit put the ceiling at 0.117 for `--zen-primary` (L 0.54) and 0.105 for
+`--zen-primary-strong` (L 0.48), against the 0.19 the blue carried. They are set to 0.112 and 0.1 —
+just inside, with room for a hue nudge. Lightness is unchanged, which is what keeps the contrast
+ratios intact: in OKLCH the `L` component predicts contrast, and hue barely moves it.
+
+Primary now sits 8° from `--zen-success` (hue 155). They are distinguishable side by side but no
+longer carry different meaning on their own, so a green button is not self-evidently a "confirm".
+
 ### Added — `ZenCalendar` and `ZenDatePicker`
 
 A themed calendar, replacing the browser's own date dropdown.

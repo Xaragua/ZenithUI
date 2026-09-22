@@ -160,8 +160,8 @@ Failures report **every** violation at once, with the maximum in-gamut chroma fo
 a palette fix is one edit rather than a guess-and-rerun loop:
 
 ```
-[dark] tokens outside the sRGB gamut:
-  --zen-primary = oklch(0.72 0.16 264) (max in-gamut chroma at this L/H is about 0.145)
+[light] tokens outside the sRGB gamut:
+  --zen-primary = oklch(0.54 0.13 163) (max in-gamut chroma at this L/H is about 0.117)
 ```
 
 ## Roadmap
