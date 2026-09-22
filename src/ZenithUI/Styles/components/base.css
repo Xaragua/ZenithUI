@@ -56,36 +56,53 @@
 }
 
 /*
- * Focus treatment for text-entry controls: the control's OWN border turns the ring colour, with
- * no outline drawn outside it.
+ * BORDER EMPHASIS
  *
- * Why inputs differ from buttons. A button is a solid shape, so a ring around it reads clearly and
- * costs nothing. A text field already has a visible border as part of its resting appearance, and
- * an outline sitting outside that border produces two concentric lines - which looks like a defect,
- * and in a dense form makes adjacent fields appear to collide. Recolouring the border the field
- * already has is the cleaner signal.
+ * An element that already has a border states "focused" or "hovered" by turning that border the
+ * ring colour and thickening it to --zen-ring-width - rather than drawing a ring outside itself.
  *
- * Keeping the indicator thick enough. A 1px colour change is a weak focus indicator: it is the
- * minimum WCAG 2.4.7 accepts, but WCAG 2.4.13 asks for a perimeter at least 2px thick. So the
- * border is reinforced with an INSET shadow rather than left at a hairline. Inset matters - it
- * thickens the border inward, so the control's outer dimensions never change and a focused field
- * does not nudge its neighbours. Total thickness comes to --zen-ring-width.
+ * Why bordered elements differ from buttons. A button is a solid shape with no resting border, so
+ * a ring around it reads clearly and costs nothing. A text field or a card already has a border,
+ * and an outline sitting outside it produces two concentric lines - which looks like a defect, and
+ * in a dense form makes adjacent fields appear to collide. Recolouring the border that is already
+ * there is the cleaner signal.
  *
- * Invalid fields keep their danger border when focused. An error outranks a focus hint: turning a
- * failing field primary-coloured the moment it is focused hides the very state the user needs to
- * see while fixing it.
+ * How the extra thickness is drawn. A 1px colour change is a weak indicator: it is the minimum
+ * WCAG 2.4.7 accepts, and short of the 2px perimeter 2.4.13 asks for. The shortfall is made up
+ * with an outline pulled INSIDE the element by a negative offset, so:
+ *
+ *   - outer dimensions never change, and a focused field does not nudge its neighbours;
+ *   - box-shadow stays free, so this composes with ZenCard's elevation. An inset box-shadow
+ *     would have worked equally well on inputs, but it would have silently replaced the shadow
+ *     on any elevated surface - and that lands as a bug the first time someone hovers a raised
+ *     card.
+ *
+ * `outline-offset: -1px` makes the outline start exactly where the 1px border ends, so the two
+ * read as a single band of --zen-ring-width.
+ */
+
+/*
+ * The three declarations are repeated in each utility below rather than factored out. `@utility`
+ * bodies cannot reference one another, and a shared class would have to be applied alongside every
+ * use - which is how you end up with an element that has the emphasis colours but not the trigger.
+ *
+ * Focus treatment for a text-entry control that carries its own border.
+ *
+ * An invalid field keeps its danger colour while focused. An error outranks a focus hint: turning
+ * a failing field primary the moment it is focused hides the very state the user is fixing.
  */
 @utility zen-focus-border {
   outline: none;
 
   &:focus-visible {
     border-color: var(--zen-ring);
-    box-shadow: inset 0 0 0 calc(var(--zen-ring-width) - 1px) var(--zen-ring);
+    outline: calc(var(--zen-ring-width) - 1px) solid var(--zen-ring);
+    outline-offset: -1px;
   }
 
   &:focus-visible[aria-invalid="true"] {
     border-color: var(--zen-danger);
-    box-shadow: inset 0 0 0 calc(var(--zen-ring-width) - 1px) var(--zen-danger);
+    outline-color: var(--zen-danger);
   }
 }
 
@@ -104,12 +121,32 @@
 
   &:focus-within {
     border-color: var(--zen-ring);
-    box-shadow: inset 0 0 0 calc(var(--zen-ring-width) - 1px) var(--zen-ring);
+    outline: calc(var(--zen-ring-width) - 1px) solid var(--zen-ring);
+    outline-offset: -1px;
   }
 
   &:focus-within:has(:is(input, textarea, select)[aria-invalid="true"]) {
     border-color: var(--zen-danger);
-    box-shadow: inset 0 0 0 calc(var(--zen-ring-width) - 1px) var(--zen-danger);
+    outline-color: var(--zen-danger);
+  }
+}
+
+/*
+ * The same treatment on hover as well as keyboard focus, for a bordered surface that is itself
+ * actionable - a linked ZenCard being the case this exists for.
+ *
+ * Hover and focus deliberately look identical. A pointer user and a keyboard user are being told
+ * the same thing - "this is the thing you are about to activate" - and giving them two different
+ * signals only means one of them was designed and the other was an afterthought.
+ */
+@utility zen-interactive-border {
+  outline: none;
+
+  &:hover,
+  &:focus-visible {
+    border-color: var(--zen-ring);
+    outline: calc(var(--zen-ring-width) - 1px) solid var(--zen-ring);
+    outline-offset: -1px;
   }
 }
 

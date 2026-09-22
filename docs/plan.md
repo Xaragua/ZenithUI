@@ -246,12 +246,14 @@ first paint.
 The requested set, plus the primitives the rest depend on.
 
 **Primitives** — `ZenIcon` (slot-based, so no icon font is forced on consumers), `ZenButton`,
-`ZenBadge`, `ZenSpinner`, `ZenSkeleton`, `ZenPopover`, `ZenField`.
+`ZenBadge`, `ZenSpinner`, `ZenSkeleton`, `ZenPopover`, `ZenField`, `ZenIndicator`, `ZenProgress`.
 
 **Inputs** — `ZenTextInput`, `ZenTextArea`, `ZenDateInput` (+ optional `ZenDatePicker`),
 `ZenNumberInput<TValue>`, `ZenCurrencyInput` (culture-aware, **formats on blur in C#** — no JS
 masking, which sidesteps caret-position bugs), `ZenSearchInput`, `ZenCheckbox`,
-`ZenCheckboxGroup<T>`, `ZenRadioGroup<T>` + `ZenRadio<T>`.
+`ZenCheckboxGroup<T>`, `ZenRadioGroup<T>` + `ZenRadio<T>`, `ZenToggle`, `ZenRangeSlider`.
+
+**Overlays and feedback** — `ZenModal` + `IZenModalService`, `ZenToast` + `IZenToastService`.
 
 **Selection** — `ZenSelect<TValue>` (native `<select>`, works in SSR with zero JS),
 `ZenCombobox<TItem>` (typeahead, async `ItemsProvider`, single/multi, full WAI-ARIA combobox
@@ -277,6 +279,62 @@ pattern).
   when hierarchical.
 - **Responsive default:** below `md`, collapse to a stacked card list driven by `data-label`
   attributes from column titles — pure CSS, no JS, no media-query service.
+
+### `ZenModal` and `IZenModalService`
+
+The service exists because the alternative is worse. Without it every page that needs a dialog
+declares a `ZenModal` in its own markup and owns a `bool _isOpen` — so a confirmation prompt cannot
+be raised from a service, a nested component, or an event handler without threading state back up
+the tree. The service lets any code say `await Modals.ConfirmAsync(...)` and get an answer.
+
+- `IZenModalService.ShowAsync<TComponent>(parameters)` returns a `ZenModalResult` the caller awaits,
+  so a dialog reads as a function call rather than a state machine.
+- `ConfirmAsync(title, message, options)` for the common case, so a yes/no prompt needs no component.
+- A single `ZenModalHost` placed once in the layout renders whatever the service has open. Modals
+  stack; the host tracks a list, not a single slot.
+- Native `<dialog>` with `showModal()`, which gets the top layer, inert background, and Escape
+  handling from the platform rather than from re-implemented JavaScript.
+- Focus moves to the dialog on open and **returns to the element that opened it** on close —
+  the part most hand-rolled modals miss, and the one that strands keyboard users at the top of the
+  page.
+- `zen-focus.js` supplies the focus trap for the fallback path and the scroll lock.
+
+### `ZenToast` and `IZenToastService`
+
+- `IZenToastService.Show(message, intent, options)`, plus `Success` / `Warning` / `Danger` / `Info`
+  shorthands.
+- One `ZenToastHost` in the layout, positioned by the consumer (corner, duration, max visible).
+- `role="status"` for informational toasts and `role="alert"` for errors: the first must not
+  interrupt what a screen reader is reading, the second must.
+- Auto-dismiss pauses on hover and on focus. A toast that vanishes while being read, or while the
+  user is reaching for its action, is a toast that failed at its one job.
+- `prefers-reduced-motion` drops the slide animation but not the toast.
+
+### `ZenProgress`
+
+Determinate and indeterminate. `role="progressbar"` with `aria-valuenow` / `aria-valuemin` /
+`aria-valuemax`, omitting `aria-valuenow` when indeterminate — which is exactly how a screen reader
+is told "in progress, amount unknown". Linear and circular shapes.
+
+### `ZenIndicator`
+
+A small dot or count anchored to the corner of another element — unread badges, status dots on
+avatars. Wraps its child rather than requiring the caller to manage positioning. The count is real
+text, not a background image, so it is announced; a bare dot is `aria-hidden` and the meaning has to
+live in the child's accessible name.
+
+### `ZenToggle`
+
+A switch. Rendered as `<button role="switch" aria-checked>` rather than a styled checkbox: a switch
+takes effect immediately, a checkbox is a value to be submitted, and screen readers announce the two
+differently. `ZenCheckbox` remains the right control inside a form.
+
+### `ZenRangeSlider`
+
+Native `<input type="range">` underneath, restyled — the platform already gives correct keyboard
+handling, touch targets and `aria-valuetext`, and every hand-rolled slider gets at least one of
+those wrong. Single value first; a dual-thumb range variant only if a real need appears, since it
+requires abandoning the native element.
 
 ### `ZenTree<TItem>`
 WAI-ARIA tree pattern: `role="tree"` / `treeitem` / `group`, roving `tabindex`, arrow-key navigation
@@ -310,8 +368,8 @@ component's bUnit test asserts its required ARIA attributes.
 | --- | --- | --- | --- |
 | **M0** | Repo scaffold, Tailwind v4 pipeline, tokens, theme service/provider/toggle, `ZenComponentBase`, `ZenJsComponentBase`, `CssBuilder`, demo, tests, CI | Demo runs; light/dark/system repaints via CSS variables alone; CI green | ✅ |
 | **M1** | `ZenIcon`, `ZenButton`, `ZenBadge`, `ZenSpinner`, `ZenSkeleton`, `ZenCard`, `ZenStatCard`, `ZenField`, `ZenInputBase<T>` | A demo page per primitive, verified in both palettes | ✅ |
-| **M2** | Text, textarea, number, currency, date, search, checkbox (+group), radio group, native select, `ZenForm` | A demo form binds an `EditForm` + `DataAnnotationsValidator` and shows per-field errors; the same inputs also work **without** an `EditForm` | |
-| **M3** | `ZenPopover`, `ZenCombobox<TItem>`, `ZenList<TItem>` | Combobox passes keyboard + ARIA tests; prerenders as a closed labelled field with JS disabled | |
+| **M2** | Text, textarea, number, currency, date, search, checkbox (+group), radio group, native select, `ZenToggle`, `ZenRangeSlider`, `ZenForm`, plus the feedback primitives `ZenProgress` and `ZenIndicator` | A demo form binds an `EditForm` + `DataAnnotationsValidator` and shows per-field errors; the same inputs also work **without** an `EditForm` | |
+| **M3** | `ZenModal` + `IZenModalService`, `ZenToast` + `IZenToastService`, `ZenPopover`, `ZenCombobox<TItem>`, `ZenList<TItem>` | A dialog can be raised and awaited from a service with no markup on the page; focus returns to the opener on close; combobox passes keyboard + ARIA tests and prerenders as a closed labelled field with JS disabled | |
 | **M4** | `ZenTable<TItem>` (sort/page/select/hierarchy/responsive collapse), `ZenTree<TItem>`, `ZenTimeline` | Demo renders a 3-level hierarchical table and a lazy-loading tree | |
 | **M5** | `ZenAppBar`, `ZenNavMenu`, `ZenSideNav`, `ZenFooter`, `ZenAppShell` | Shell demo usable at 360 / 768 / 1440 px; drawer traps focus and restores it on close | |
 | **M6** | Docs, a11y audit, `dotnet pack`, NuGet metadata, v1.0.0, **close the consumer-`@theme` gap** | `.nupkg` consumed successfully by a scratch Blazor Server app **and** a Blazor WASM app | |

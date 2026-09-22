@@ -23,6 +23,22 @@ public class ZenStylesTests
         ZenStyles.InputWrapperBase.ShouldContain("zen-focus-border-within");
 
     [Fact]
+    public void LinkedCards_UseTheSameBorderEmphasis()
+    {
+        // A linked card and a focused field say the same thing - "this is what you are about to
+        // act on" - so they say it the same way. Asserted on the rendered component rather than a
+        // constant, because the class is applied conditionally on Href.
+        using var ctx = new BunitContext();
+        ctx.Renderer.SetRendererInfo(new RendererInfo("Server", isInteractive: true));
+
+        var linked = ctx.Render<ZenCard>(p => p.Add(x => x.Href, "/detail"));
+        var plain = ctx.Render<ZenCard>();
+
+        linked.Find("a").ClassList.ShouldContain("zen-interactive-border");
+        plain.Find("article").ClassList.ShouldNotContain("zen-interactive-border");
+    }
+
+    [Fact]
     public void Buttons_KeepTheRing() =>
         // Buttons have no resting border to recolour, so the ring stays the right signal there.
         ZenStyles.InteractiveBase.Split(' ').ShouldContain("zen-focus");

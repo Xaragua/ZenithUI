@@ -118,7 +118,11 @@ else
             ZenElevation.High => "shadow-zen-lg",
             _ => "shadow-zen-sm",
         })
-        .AddClass("zen-focus transition-colors hover:bg-surface-sunken", IsLink)
+        // A linked card states "you are about to activate this" by turning its own border the ring
+        // colour at --zen-ring-width, on hover and on keyboard focus alike - the same treatment a
+        // focused input gets. The outline is drawn inside the element, so the card never changes
+        // size and its elevation shadow survives untouched.
+        .AddClass("zen-interactive-border transition-colors", IsLink)
         .Build()!;
 
     private RenderFragment Root => builder =>

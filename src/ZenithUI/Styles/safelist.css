@@ -48,6 +48,7 @@
 @source inline("zen-focus-always");
 @source inline("zen-focus-border");
 @source inline("zen-focus-border-within");
+@source inline("zen-interactive-border");
 @source inline("zen-indent");
 @source inline("zen-sr-only");
 @source inline("zen-root");
