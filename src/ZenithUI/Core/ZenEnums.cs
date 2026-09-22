@@ -213,3 +213,27 @@ public enum ZenPlacement
     /// <summary>On the side text ends at, bottom edges aligned.</summary>
     EndBottom,
 }
+
+/// <summary>How wide a modal dialog is allowed to grow.</summary>
+/// <remarks>
+/// A maximum rather than a fixed width: every size still shrinks to fit a narrow viewport, so a
+/// dialog never overflows a phone screen. The scale is separate from <see cref="ZenSize"/>, which
+/// describes control height and text size - a dialog has neither.
+/// </remarks>
+public enum ZenModalSize
+{
+    /// <summary>Narrow. Confirmations and single-field prompts.</summary>
+    Small,
+
+    /// <summary>The default. A short form.</summary>
+    Medium,
+
+    /// <summary>A longer form, or content with a table in it.</summary>
+    Large,
+
+    /// <summary>Close to the viewport width, for editors and detail views.</summary>
+    ExtraLarge,
+
+    /// <summary>The whole viewport. For an immersive editing surface on small screens.</summary>
+    Full,
+}

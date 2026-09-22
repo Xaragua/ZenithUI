@@ -34,6 +34,7 @@ public static class ZenithUIServiceCollectionExtensions
         ArgumentNullException.ThrowIfNull(services);
 
         services.TryAddScoped<IZenThemeService, ZenThemeService>();
+        services.TryAddScoped<IZenModalService, ZenModalService>();
 
         return services;
     }

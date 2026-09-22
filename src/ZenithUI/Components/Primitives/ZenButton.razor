@@ -18,11 +18,17 @@
     3. While loading, the label stays in the DOM at zero opacity rather than being replaced by the
        spinner. Swapping the content would make the button resize mid-click, moving the target out
        from under the pointer.
+
+    4. The id is rendered, not just held. ZenComponentBase gives every component an Id parameter
+       with a generated fallback, but a component that never emits it turns that parameter into a
+       silent no-op - and a button is referenced by id more often than most things are: aria-controls
+       from a popover trigger, and a dialog naming which of its buttons to focus first.
 *@
 
 @if (IsLink)
 {
-    <a class="@RootClass(ButtonClass)"
+    <a id="@Id"
+       class="@RootClass(ButtonClass)"
        style="@Style"
        href="@(Inert ? null : Href)"
        target="@Target"
@@ -38,7 +44,8 @@
 }
 else
 {
-    <button class="@RootClass(ButtonClass)"
+    <button id="@Id"
+            class="@RootClass(ButtonClass)"
             style="@Style"
             type="@ButtonType"
             aria-label="@AriaLabel"

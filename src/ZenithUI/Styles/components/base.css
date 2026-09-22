@@ -451,3 +451,68 @@
     opacity: 1;
   }
 }
+
+@layer components {
+  /*
+   * ZenModal's dialog element.
+   *
+   * The UA gives `dialog` a border, padding and `width: fit-content`; all three are cleared by
+   * utilities on the element itself. What cannot be reached from a utility is ::backdrop, which is
+   * a pseudo-element on the top layer.
+   *
+   * The backdrop colour is derived from the content token rather than a literal black, so it
+   * follows the palette: a dark page dimmed with black turns muddy, because the surface underneath
+   * is already dark and the backdrop has nothing to subtract.
+   */
+  .zen-modal::backdrop {
+    background-color: oklch(from var(--zen-content) l c h / 0.45);
+    backdrop-filter: blur(2px);
+  }
+
+  /*
+   * Entry animation, as a keyframe animation rather than a transition. A dialog goes from
+   * `display: none` to `display: block` when it opens, and a transition cannot animate across
+   * that - it would need `transition-behavior: allow-discrete` and a separate `@starting-style`
+   * block, in exchange for nothing an animation does not already do. An animation simply runs when
+   * the element starts being displayed.
+   *
+   * There is no exit animation for the same reason there is no exit state: the element is removed
+   * from the render tree by Blazor, not faded out by CSS, so an exit keyframe would never play.
+   */
+  .zen-modal[open] {
+    animation: zen-modal-in 140ms ease-out;
+  }
+
+  .zen-modal[open]::backdrop {
+    animation: zen-backdrop-in 140ms ease-out;
+  }
+
+  @media (prefers-reduced-motion: reduce) {
+    .zen-modal[open],
+    .zen-modal[open]::backdrop {
+      animation: none;
+    }
+  }
+}
+
+@keyframes zen-modal-in {
+  from {
+    opacity: 0;
+    transform: translateY(0.5rem) scale(0.98);
+  }
+
+  to {
+    opacity: 1;
+    transform: none;
+  }
+}
+
+@keyframes zen-backdrop-in {
+  from {
+    opacity: 0;
+  }
+
+  to {
+    opacity: 1;
+  }
+}

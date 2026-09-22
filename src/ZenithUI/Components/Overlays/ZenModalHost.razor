@@ -1,0 +1,98 @@
+@namespace ZenithUI
+@implements IDisposable
+@inject IZenModalService Modals
+
+@*
+    Renders whatever IZenModalService has open. Place one in the layout, once:
+
+        <ZenModalHost />
+
+    Without it the service accepts calls and nothing appears - which is the failure mode to expect
+    when a dialog "does not open". Two of them is worse than none: each would render every open
+    dialog, so every dialog would appear twice.
+
+    Dialogs stack. A confirmation raised from inside an editor appears above it rather than
+    replacing it - <dialog> puts each one in the top layer in the order it was shown, so the stack
+    needs no z-index management here.
+*@
+
+@foreach (var modal in Modals.Modals)
+{
+    @*
+        Keyed by instance. Without a key, Blazor diffs two dialogs of the same component type
+        positionally and reuses the first one's state for the second - so closing the top dialog of
+        a stack would leave the one underneath showing the closed dialog's contents.
+    *@
+    <ZenModal @key="modal"
+              Id="@modal.Id"
+              Open="true"
+              OpenChanged="@(open => HandleOpenChanged(modal, open))"
+              Title="@modal.Options.Title"
+              Size="modal.Options.Size"
+              ShowCloseButton="modal.Options.ShowCloseButton"
+              CloseOnEscape="modal.Options.CloseOnEscape"
+              CloseOnBackdropClick="modal.Options.CloseOnBackdropClick"
+              LockScroll="modal.Options.LockScroll"
+              InitialFocusId="@modal.Options.InitialFocusId"
+              Class="@modal.Options.Class">
+        @*
+            Cascaded so the dialog's content can close itself with a result, without knowing
+            anything about this host or the service. IsFixed: the instance reference never changes
+            for the life of the dialog, and saying so skips a subtree diff on every host render.
+        *@
+        <CascadingValue Value="modal" IsFixed="true">
+            <DynamicComponent Type="modal.ComponentType" Parameters="ParametersFor(modal)" />
+        </CascadingValue>
+    </ZenModal>
+}
+
+@code {
+    /// <inheritdoc />
+    protected override void OnInitialized() => Modals.Changed += OnModalsChanged;
+
+    private void OnModalsChanged() => InvokeAsync(StateHasChanged);
+
+    /// <summary>
+    /// A dialog reporting that it wants to close.
+    /// </summary>
+    /// <remarks>
+    /// The host does not decide the outcome - it cancels. Every route that reaches here is a
+    /// dismissal (Escape, the close button, the backdrop); a dialog that completed successfully
+    /// closes itself through the instance with a result, and never gets this far.
+    /// </remarks>
+    private void HandleOpenChanged(ZenModalInstance modal, bool open)
+    {
+        if (!open)
+        {
+            modal.Close(ZenModalResult.Cancel());
+        }
+    }
+
+    /// <summary>
+    /// The instance's parameters, as the dictionary <see cref="DynamicComponent"/> wants.
+    /// </summary>
+    /// <remarks>
+    /// <see cref="DynamicComponent.Parameters"/> is typed as <c>IDictionary&lt;string, object&gt;</c>
+    /// - non-null values, mutable dictionary - while the service exposes a read-only map of
+    /// nullable values, because a caller passing a null parameter is ordinary. The copy reconciles
+    /// the two; nulls are dropped rather than crashing, since an omitted parameter and one
+    /// explicitly set to null are the same thing to a component.
+    /// </remarks>
+    private static Dictionary<string, object> ParametersFor(ZenModalInstance modal)
+    {
+        var parameters = new Dictionary<string, object>(modal.Parameters.Count, StringComparer.Ordinal);
+
+        foreach (var pair in modal.Parameters)
+        {
+            if (pair.Value is not null)
+            {
+                parameters[pair.Key] = pair.Value;
+            }
+        }
+
+        return parameters;
+    }
+
+    /// <inheritdoc />
+    public void Dispose() => Modals.Changed -= OnModalsChanged;
+}

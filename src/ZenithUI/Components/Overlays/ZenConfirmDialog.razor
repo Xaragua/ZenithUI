@@ -1,0 +1,67 @@
+@namespace ZenithUI
+
+@*
+    The body of IZenModalService.ConfirmAsync. Rendered inside the host's ZenModal like any other
+    dialog component, which is the point: the common case needs no component of its own, but it is
+    not a special case in the host either.
+
+    It closes itself through the cascaded instance rather than through the service, so it has no
+    more privilege than a dialog a consumer writes.
+*@
+
+<p class="text-sm text-content-muted">@Message</p>
+
+@*
+    The action row is rendered here rather than projected into ZenModal's Footer slot. A
+    service-raised dialog owns its whole body, and adding a projection mechanism so a child could
+    reach its host's footer would buy one visual detail at the cost of a cascade every dialog
+    component has to know about. Declarative <ZenModal> callers still have the Footer slot.
+*@
+<div class="mt-5 flex flex-wrap items-center justify-end gap-2">
+    <ZenButton Variant="ZenVariant.Ghost"
+               Id="@CancelId"
+               OnClick="Cancel">
+        @Options.CancelText
+    </ZenButton>
+
+    <ZenButton Intent="Options.ConfirmIntent"
+               Id="@ConfirmId"
+               OnClick="Confirm">
+        @Options.ConfirmText
+    </ZenButton>
+</div>
+
+@code {
+    /// <summary>The question put to the user.</summary>
+    [Parameter]
+    public string Message { get; set; } = string.Empty;
+
+    /// <summary>Button labels, intent and focus behaviour.</summary>
+    [Parameter]
+    public ZenConfirmOptions Options { get; set; } = new();
+
+    /// <summary>The dialog this content is rendered in, supplied by <see cref="ZenModalHost"/>.</summary>
+    [CascadingParameter]
+    public ZenModalInstance? Instance { get; set; }
+
+    private string ConfirmId => $"{Instance?.Id}-confirm";
+
+    private string CancelId => $"{Instance?.Id}-cancel";
+
+    /// <inheritdoc />
+    protected override void OnInitialized()
+    {
+        // Focus is asked for here rather than in the host, because only this component knows which
+        // of its two buttons is the safe one. Cancel by default: a user who hits Enter out of
+        // habit, or who was mid-keystroke when the dialog appeared, should not thereby delete
+        // something.
+        if (Instance is not null)
+        {
+            Instance.Options.InitialFocusId = Options.FocusCancel ? CancelId : ConfirmId;
+        }
+    }
+
+    private void Confirm() => Instance?.Confirm();
+
+    private void Cancel() => Instance?.Cancel();
+}

@@ -1,0 +1,326 @@
+@namespace ZenithUI
+@inherits ZenJsComponentBase
+
+@*
+    A modal dialog, built on the platform's <dialog> element.
+
+    Why <dialog> and not a div with role="dialog". showModal() brings three things that are
+    genuinely hard to reproduce, and that hand-rolled modals get wrong in that order of frequency:
+
+      - the top layer, so no ancestor's overflow or z-index can clip or bury the dialog;
+      - `inert` on everything behind it, which removes the background from the tab order AND from
+        the accessibility tree. A keydown-based focus trap does the first and not the second, so a
+        screen reader user can still browse the page behind a "trapped" dialog;
+      - ::backdrop, which needs no extra element.
+
+    What is deliberately taken back from the platform. Escape. The browser's own handling closes
+    the dialog with no chance to intervene, so the `cancel` event is prevented and the key is
+    routed through C# - which is what lets a dialog refuse to close while its form is dirty, and
+    what makes CloseOnEscape="false" mean something.
+
+    Focus restore is the part most implementations miss. <dialog> moves focus in on open but puts
+    it back on close only when the dialog is still in the DOM at that moment - and a service-raised
+    dialog is removed in the same render. So the opener is recorded before opening and restored
+    explicitly afterwards.
+*@
+
+<dialog id="@DialogId"
+        class="@DialogClass"
+        style="@Style"
+        aria-labelledby="@(TitleText is null ? null : TitleId)"
+        aria-label="@(TitleText is null ? Label : null)"
+        aria-describedby="@DescribedBy"
+        @onclose="HandleNativeCloseAsync"
+        @oncancel:preventDefault="true"
+        @oncancel="HandleNativeCancelAsync"
+        @onkeydown="HandleKeyDownAsync"
+        @onclick="HandleClickAsync"
+        @attributes="AttributesWithoutClass">
+
+    @* An inner element so padding and scrolling are not on the element whose rectangle the
+       backdrop-click test measures. A click on <dialog>'s own padding is a click on the dialog,
+       and measuring a padded box would make the padding behave like backdrop. *@
+    <div class="flex max-h-[inherit] flex-col overflow-hidden">
+        @if (TitleText is not null || ShowCloseButton)
+        {
+            <div class="flex shrink-0 items-start gap-3 border-b border-border px-4 py-3">
+                @if (TitleText is not null)
+                {
+                    <h2 id="@TitleId" class="min-w-0 flex-1 text-base font-semibold text-content">
+                        @TitleText
+                    </h2>
+                }
+                else
+                {
+                    <div class="flex-1"></div>
+                }
+
+                @if (ShowCloseButton)
+                {
+                    <button type="button"
+                            class="zen-focus -m-1 grid shrink-0 place-items-center rounded-zen-sm p-1 text-content-subtle transition-colors hover:bg-surface-sunken hover:text-content"
+                            aria-label="@CloseLabel"
+                            @onclick="RequestCloseAsync">
+                        <ZenIcon Path="@ZenIcons.Close" Size="ZenSize.Small" />
+                    </button>
+                }
+            </div>
+        }
+
+        <div class="min-h-0 flex-1 overflow-y-auto px-4 py-4 text-content">
+            @ChildContent
+        </div>
+
+        @if (Footer is not null)
+        {
+            <div class="flex shrink-0 flex-wrap items-center justify-end gap-2 border-t border-border px-4 py-3">
+                @Footer
+            </div>
+        }
+    </div>
+</dialog>
+
+@code {
+    private string? _focusToken;
+    private bool _shown;
+    private bool _openLastRender;
+
+    /// <inheritdoc />
+    protected override string? ModulePath => "./_content/ZenithUI/js/zen-focus.js";
+
+    /// <summary>Whether the dialog is showing.</summary>
+    [Parameter]
+    public bool Open { get; set; }
+
+    /// <summary>Raised when the dialog opens or asks to close.</summary>
+    [Parameter]
+    public EventCallback<bool> OpenChanged { get; set; }
+
+    /// <summary>Heading shown in the title bar, and the dialog's accessible name.</summary>
+    [Parameter]
+    public string? Title { get; set; }
+
+    /// <summary>Accessible name when there is no visible title.</summary>
+    [Parameter]
+    public string? Label { get; set; }
+
+    /// <summary>Id of an element describing the dialog, for <c>aria-describedby</c>.</summary>
+    [Parameter]
+    public string? DescribedBy { get; set; }
+
+    /// <summary>The dialog's body.</summary>
+    [Parameter]
+    public RenderFragment? ChildContent { get; set; }
+
+    /// <summary>Actions, rendered in a footer bar below the body.</summary>
+    [Parameter]
+    public RenderFragment? Footer { get; set; }
+
+    /// <summary>How wide the dialog may grow.</summary>
+    [Parameter]
+    public ZenModalSize Size { get; set; } = ZenModalSize.Medium;
+
+    /// <summary>Show the close button in the title bar.</summary>
+    [Parameter]
+    public bool ShowCloseButton { get; set; } = true;
+
+    /// <summary>Accessible name for the close button.</summary>
+    [Parameter]
+    public string CloseLabel { get; set; } = "Close";
+
+    /// <summary>Whether Escape dismisses the dialog.</summary>
+    [Parameter]
+    public bool CloseOnEscape { get; set; } = true;
+
+    /// <summary>Whether a click on the backdrop dismisses the dialog.</summary>
+    [Parameter]
+    public bool CloseOnBackdropClick { get; set; }
+
+    /// <summary>Lock scrolling of the page behind the dialog.</summary>
+    [Parameter]
+    public bool LockScroll { get; set; } = true;
+
+    /// <summary>Id of the element to focus on open, instead of the first focusable one.</summary>
+    [Parameter]
+    public string? InitialFocusId { get; set; }
+
+    private string DialogId => SubId("dialog");
+
+    private string TitleId => SubId("title");
+
+    private string? TitleText => Title;
+
+    // ---- Open and close ----------------------------------------------------------------------
+
+    /// <inheritdoc />
+    protected override Task OnModuleReadyAsync() => SyncAsync();
+
+    /// <inheritdoc />
+    protected override async Task OnAfterRenderAsync(bool firstRender)
+    {
+        await base.OnAfterRenderAsync(firstRender);
+
+        if (!firstRender && IsJsReady && _openLastRender != Open)
+        {
+            await SyncAsync();
+        }
+    }
+
+    private async Task SyncAsync()
+    {
+        _openLastRender = Open;
+
+        if (Open && !_shown)
+        {
+            // Recorded BEFORE showModal moves focus into the dialog, or the token would point at
+            // whatever the dialog itself focused.
+            _focusToken = await InvokeModuleAsync<string?>("saveFocus");
+
+            await InvokeModuleVoidAsync("showModal", DialogId);
+
+            if (LockScroll)
+            {
+                await InvokeModuleVoidAsync("lockScroll");
+            }
+
+            // showModal already focuses the first focusable element, or the dialog itself. This
+            // call only matters when the caller named a different target - typically the safe
+            // button in a destructive confirmation.
+            if (InitialFocusId is not null)
+            {
+                await InvokeModuleVoidAsync("focusFirst", DialogId, InitialFocusId);
+            }
+
+            _shown = true;
+        }
+        else if (!Open && _shown)
+        {
+            await CloseNativeAsync();
+        }
+    }
+
+    private async Task CloseNativeAsync()
+    {
+        _shown = false;
+
+        await InvokeModuleVoidAsync("closeModal", DialogId);
+
+        if (LockScroll)
+        {
+            await InvokeModuleVoidAsync("unlockScroll");
+        }
+
+        // Restored explicitly rather than left to <dialog>. The element's own restore only fires
+        // while it is still in the document, and a service-raised dialog is removed in the same
+        // render that closes it - so the platform's restore never runs and focus is left on
+        // <body>, which drops a keyboard user at the top of the page.
+        await InvokeModuleVoidAsync("restoreFocus", _focusToken, false);
+        _focusToken = null;
+    }
+
+    /// <summary>Asks the owner to close. The owner decides; this component never closes itself.</summary>
+    private Task RequestCloseAsync() => OpenChanged.InvokeAsync(false);
+
+    private async Task HandleKeyDownAsync(KeyboardEventArgs args)
+    {
+        // Escape arrives here as well as through the `cancel` event, because a key pressed while
+        // focus is inside the dialog bubbles first. Both routes are handled: `cancel` covers the
+        // case where the dialog itself holds focus.
+        if (args.Key == "Escape" && Open)
+        {
+            if (CloseOnEscape)
+            {
+                await RequestCloseAsync();
+            }
+        }
+    }
+
+    /// <summary>
+    /// The platform's own Escape handling, suppressed and re-routed.
+    /// </summary>
+    /// <remarks>
+    /// <c>@oncancel:preventDefault</c> stops the browser closing the dialog behind the component's
+    /// back. Without it, <c>CloseOnEscape="false"</c> would be a lie and the C# state would drift
+    /// out of sync with the DOM.
+    /// </remarks>
+    private async Task HandleNativeCancelAsync()
+    {
+        if (CloseOnEscape && Open)
+        {
+            await RequestCloseAsync();
+        }
+    }
+
+    /// <summary>
+    /// Fires when the dialog closes by any route the component did not initiate.
+    /// </summary>
+    /// <remarks>
+    /// The safety net for a form method="dialog" submit inside the body, which closes the element
+    /// directly. Without this the DOM would be closed while C# still believed it open, and the
+    /// next open would be a no-op because <c>showModal</c> short-circuits on an already-open
+    /// dialog.
+    /// </remarks>
+    private async Task HandleNativeCloseAsync()
+    {
+        if (_shown && Open)
+        {
+            _shown = false;
+            await RequestCloseAsync();
+        }
+    }
+
+    /// <summary>
+    /// Closes on a click outside the dialog's box.
+    /// </summary>
+    /// <remarks>
+    /// The backdrop is a pseudo-element and cannot carry a listener, and a click on it targets the
+    /// <c>&lt;dialog&gt;</c> itself - so a plain handler cannot tell backdrop from dialog. The
+    /// pointer is compared against the element's rectangle in JavaScript instead, where the
+    /// rectangle is actually knowable.
+    /// </remarks>
+    private async Task HandleClickAsync(MouseEventArgs args)
+    {
+        if (!CloseOnBackdropClick || !Open || !IsJsReady)
+        {
+            return;
+        }
+
+        var outside = await InvokeModuleAsync<bool>(
+            "isOutsideDialog", DialogId, args.ClientX, args.ClientY);
+
+        if (outside)
+        {
+            await RequestCloseAsync();
+        }
+    }
+
+    /// <inheritdoc />
+    protected override async ValueTask DisposeAsyncCore()
+    {
+        // A dialog disposed while open - navigation, or its host removing it - still has to
+        // release the scroll lock and put focus back. Done before the base class drops the module
+        // reference, while interop is still usable.
+        if (_shown)
+        {
+            await CloseNativeAsync();
+        }
+
+        await base.DisposeAsyncCore();
+    }
+
+    // ---- Styling -----------------------------------------------------------------------------
+
+    private string DialogClass => CssBuilder
+        .Default("zen-modal m-auto w-full rounded-zen-lg border border-border bg-surface-overlay p-0 text-content shadow-zen-lg")
+        .AddClass("max-h-[calc(100vh-2rem)]")
+        .AddClass(Size switch
+        {
+            ZenModalSize.Small => "max-w-sm",
+            ZenModalSize.Large => "max-w-2xl",
+            ZenModalSize.ExtraLarge => "max-w-5xl",
+            ZenModalSize.Full => "h-full max-h-none w-full max-w-none rounded-none",
+            _ => "max-w-lg",
+        })
+        .AddClass(Class)
+        .Build()!;
+}

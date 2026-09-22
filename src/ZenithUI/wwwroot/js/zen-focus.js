@@ -326,3 +326,93 @@ export function scrollItemIntoView(containerId, itemId) {
 
     item.scrollIntoView({ block: 'nearest', inline: 'nearest' });
 }
+
+/**
+ * Opens a `<dialog>` as a modal.
+ *
+ * `showModal()` rather than `show()` or a div with `role="dialog"`, because it brings three things
+ * from the platform that are painful to reproduce and easy to get subtly wrong: the top layer, so
+ * no ancestor's `overflow` or `z-index` can clip or bury the dialog; `inert` on everything behind
+ * it, which removes the background from the tab order *and* from the accessibility tree, something
+ * a keydown-based focus trap cannot do; and the `::backdrop` pseudo-element.
+ *
+ * Escape is deliberately NOT left to the platform - the component cancels the browser's default
+ * and routes it through C#, so a dialog can refuse to close while a form in it is dirty. Without
+ * that, `showModal` closes on Escape with no way to intervene.
+ *
+ * @param {string} id The dialog element's id.
+ * @returns {boolean} Whether the dialog was opened.
+ */
+export function showModal(id) {
+    const dialog = document.getElementById(id);
+
+    if (!dialog || typeof dialog.showModal !== 'function') {
+        return false;
+    }
+
+    if (dialog.open) {
+        return true;
+    }
+
+    try {
+        dialog.showModal();
+        return true;
+    } catch {
+        // Already open in another tree, or disconnected between the check and the call.
+        return false;
+    }
+}
+
+/**
+ * Closes a `<dialog>` opened by {@link showModal}.
+ *
+ * @param {string} id The dialog element's id.
+ */
+export function closeModal(id) {
+    const dialog = document.getElementById(id);
+
+    if (dialog && dialog.open && typeof dialog.close === 'function') {
+        try {
+            dialog.close();
+        } catch {
+            // Already closing.
+        }
+    }
+}
+
+/**
+ * Whether a point lies outside the dialog's own box.
+ *
+ * This is how a backdrop click is detected. The backdrop is a pseudo-element, so it cannot carry a
+ * listener of its own, and a click on it targets the `<dialog>` itself - meaning a plain click
+ * handler cannot tell "clicked the backdrop" from "clicked the dialog". Comparing the pointer
+ * against the dialog's rectangle can.
+ *
+ * The rectangle is read here rather than passed from C# because the coordinates in a Blazor
+ * MouseEventArgs are viewport-relative while the dialog's box is not known to .NET at all.
+ *
+ * @param {string} id The dialog element's id.
+ * @param {number} clientX
+ * @param {number} clientY
+ * @returns {boolean} True when the point is outside the dialog.
+ */
+export function isOutsideDialog(id, clientX, clientY) {
+    const dialog = document.getElementById(id);
+
+    if (!dialog) {
+        return false;
+    }
+
+    const rect = dialog.getBoundingClientRect();
+
+    // A zero-sized rect means the dialog is mid-transition. Reporting "outside" then would close
+    // it on the click that opened it.
+    if (rect.width === 0 && rect.height === 0) {
+        return false;
+    }
+
+    return clientX < rect.left
+        || clientX > rect.right
+        || clientY < rect.top
+        || clientY > rect.bottom;
+}
