@@ -61,7 +61,9 @@ site.
 intent's `-soft` background instead of the neutral overlay. Off by default: a stack of tinted
 toasts is louder than a stack of neutral ones, and the icon already carries the intent. The
 contrast audit gained a case for it — body text on a `-soft` tint was not a pairing it covered
-until this made it reachable.
+until this made it reachable. A tinted toast carries no visible border: a neutral line on a
+tinted panel sits at the same lightness as the tint in dark, so it reads as a grey smear rather
+than an edge. The tint defines the panel and the shadow lifts it.
 
 **`ZenCombobox<TItem>`** — the three things a native `<select>` cannot do: filter, load
 asynchronously, and show more than a line per option. Everything native *can* do is still left to

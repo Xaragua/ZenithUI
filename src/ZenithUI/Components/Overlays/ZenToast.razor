@@ -158,21 +158,41 @@
         _ => "text-content-subtle",
     };
 
+    private bool IsTinted => Instance.Options.Soft && Instance.Intent != ZenIntent.Neutral;
+
     /// <summary>
     /// The toast surface: the neutral overlay, or the intent's soft tint when asked for.
     /// </summary>
-    /// <remarks>
-    /// The border stays neutral on a tinted toast. Colouring it with the intent's fill token would
-    /// put a saturated 1px line around a pale panel, which reads as an alert box rather than a
-    /// notification - and on the dark palette the fill is lighter than the tint, so the border
-    /// would glow.
-    /// </remarks>
-    private string SurfaceClass => Instance.Options.Soft && Instance.Intent != ZenIntent.Neutral
+    private string SurfaceClass => IsTinted
         ? ZenStyles.SoftSurface(Instance.Intent)
         : "bg-surface-overlay";
 
+    /// <summary>
+    /// The border, which a tinted toast does not want.
+    /// </summary>
+    /// <remarks>
+    /// <para>
+    /// A neutral border on a tinted panel looks like dirt, not definition. In the dark palette
+    /// <c>--zen-border</c> sits at L 0.32 and a <c>-soft</c> tint at about L 0.31: the same
+    /// lightness, a different hue, so the line reads as a grey smear around a coloured panel
+    /// rather than an edge.
+    /// </para>
+    /// <para>
+    /// The intent's own colours are no better. <c>-strong</c> is a foreground and far too loud as
+    /// a frame; the fill token is *lighter* than the tint in dark, so the border would glow.
+    /// </para>
+    /// <para>
+    /// So the tint defines the panel and the shadow lifts it off the page. The border is kept at
+    /// <c>transparent</c> rather than dropped, so a soft toast and a neutral one are the same size
+    /// - removing the width would shrink the box by 2px and make the two visibly disagree when
+    /// stacked together.
+    /// </para>
+    /// </remarks>
+    private string BorderClass => IsTinted ? "border border-transparent" : "border border-border";
+
     private string ToastClass => CssBuilder
-        .Default("zen-toast pointer-events-auto flex w-full gap-3 rounded-zen-lg border border-border p-3 shadow-zen-lg")
+        .Default("zen-toast pointer-events-auto flex w-full gap-3 rounded-zen-lg p-3 shadow-zen-lg")
+        .AddClass(BorderClass)
         .AddClass(SurfaceClass)
         .AddClass(Instance.Options.Class)
         .Build()!;

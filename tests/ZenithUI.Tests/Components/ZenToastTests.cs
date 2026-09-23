@@ -172,6 +172,39 @@ public class ZenToastTests : BunitContext
     }
 
     [Fact]
+    public void ATintedToast_HasNoVisibleBorder()
+    {
+        // A neutral border on a tinted panel looks like dirt, not definition: in the dark palette
+        // --zen-border sits at L 0.32 and a -soft tint at about L 0.31, so the line reads as a
+        // grey smear around a coloured panel. The tint defines the panel; the shadow lifts it.
+        //
+        // Transparent rather than absent, so a soft toast and a neutral one are the same size -
+        // dropping the width would shrink the box by 2px and make the two visibly disagree when
+        // stacked together.
+        var host = Render<ZenToastHost>();
+
+        _toasts.Danger("Upload failed", new ZenToastOptions { Soft = true });
+        host.Render();
+
+        var classes = host.Find(".zen-toast").ClassList;
+
+        classes.ShouldContain("border");
+        classes.ShouldContain("border-transparent");
+        classes.ShouldNotContain("border-border");
+    }
+
+    [Fact]
+    public void ANeutralToast_KeepsItsBorder()
+    {
+        var host = Render<ZenToastHost>();
+
+        _toasts.Info("Sync finished");
+        host.Render();
+
+        host.Find(".zen-toast").ClassList.ShouldContain("border-border");
+    }
+
+    [Fact]
     public void TheNeutralSurface_IsTheDefault()
     {
         var host = Render<ZenToastHost>();
