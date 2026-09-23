@@ -6,6 +6,118 @@ All notable changes to ZenithUI are documented here. The format follows
 
 ## [Unreleased]
 
+### Added — M4, data display
+
+**`ZenTable<TItem>` + `ZenColumn<TItem>`** — the milestone's hard component, and the one whose
+mechanism is worth reading before its features.
+
+Columns are child components, so the table's markup depends on what its own children report — and
+a parent builds its entire render tree before any child exists. The reflex fix is
+`StateHasChanged` from `OnAfterRender` and a second pass, which fails precisely where it matters:
+static SSR never renders twice, so a server-rendered table would ship with an empty `<tbody>`, and
+nothing in a test suite that only renders interactively would notice.
+
+`ZenDefer` fixes the ordering instead. The renderer's queue is first-in-first-out, and a new child
+component's parameters are set — so `OnParametersSet` runs — while the frame that introduces it is
+being diffed. A cascade queued ahead of a deferred body therefore registers every column before
+that body renders. One pass, every render mode, and a test that renders under a static renderer
+specifically.
+
+- **What role the table claims is decided by what it can honour.** A flat table stays a plain
+  `<table>` even when rows are selectable. `role="grid"` owes the user arrow-key navigation
+  between cells and this component does not provide it — the same reason `ZenList` refuses to call
+  a static list a listbox. Selection is expressed with real checkboxes, which are announced
+  correctly, operable from the keyboard and submit with a form, without anything being promised.
+- **A hierarchical table has no such option**, because HTML cannot say "this row is a child of
+  that one". So `role="treegrid"`, `aria-level` and `aria-expanded` on rows, and the keyboard
+  contract that comes with the claim: a roving tabindex, Right to expand then descend, Left to
+  collapse then climb, Home/End, and focus moved after the render because ArrowRight descends into
+  a row that did not exist when the key arrived.
+- **Sorting is tri-state**: ascending, descending, then back to the order the data arrived in.
+  That order carries information — very often "newest first" from the server — and a two-state
+  toggle leaves the user no way back to it short of reloading the page. `aria-sort="none"` is
+  stated on every sortable column and omitted on the rest, so the attribute is the affordance
+  rather than a decoration on the one column already sorted.
+- **Paging counts top-level rows**, so a subtree travels with its parent. Paging after flattening
+  would let one expanded row push its siblings onto the next page, and opening a row would look
+  like it had deleted the ones below it.
+- **Select-all governs the page, not the dataset.** The table only knows the items it was handed,
+  and a box that silently selects rows the user has never seen is how a bulk action takes out more
+  than it was meant to.
+- **Below `md` each row becomes a stacked card**, labelled from `data-label` and driven entirely by
+  CSS. The alternative on a phone is a horizontal scrollbar that hides whichever column the user
+  came for. The label is an attribute rather than a duplicated element, so the value exists once in
+  the DOM: the real header association survives, and a screen reader does not hear it twice.
+  `content: attr()` text is not exposed to the accessibility tree, which is usually a drawback and
+  is exactly what is wanted here.
+
+**`ZenTree<TItem>`** — the WAI-ARIA tree pattern, with real nesting.
+
+- **Roving tabindex, not `aria-activedescendant` — the opposite of `ZenList`, deliberately.** A
+  listbox keeps focus on its container because the thing typing into it may be a combobox's text
+  field. A tree has no such partner: its items are what the user navigates, and screen-reader tree
+  mode is built around the focused item being a genuinely focused element. Both remain one tab
+  stop.
+- **The structure states the depth, so the attributes do not.** A `treeitem` holds its children in
+  a nested `<ul role="group">`, which supplies level, set size and position in set. Writing
+  `aria-level` by hand as well would be a second source of truth, and an attribute that merely
+  disagrees with the DOM is invisible to every test that could have caught it. `ZenTable` states
+  all three because it has no such structure — the two components differ because their markup
+  does, not because they disagree.
+- **The flat navigation order is built by the same pass that renders**, so the keyboard cannot move
+  to a node that is not on screen — the failure mode of a cached flat list that every expand and
+  collapse has to remember to invalidate.
+- **A lazily loaded node is drawn as expandable before its children are known.** Drawing no chevron
+  until they arrive hides a subtree behind an interaction nobody can discover. The guess corrects
+  itself: a node whose loader returns nothing becomes a leaf.
+- Type-ahead expires by elapsed time rather than on a timer, so there is nothing to dispose and no
+  callback that can fire after the component is gone.
+
+**`ZenTimeline` + `ZenTimelineItem`** — an `<ol>`, because a timeline is ordered by definition.
+That is what makes a screen reader announce "3 of 7", which is the position a sighted reader takes
+from the connecting line; an unordered list throws it away.
+
+- The connector lives in the marker's flex column with `flex-1`, so it stretches to whatever height
+  the entry turns out to be rather than guessing at a fixed length.
+- The gap between entries is padding on the **body**, not on the `<li>`. A flex child cannot grow
+  into its parent's padding, so a gap on the item would stop every connector short of the next
+  marker and leave a dotted-looking ladder.
+- Both the trailing line and the trailing gap are removed by `:last-child` rules. An item cannot
+  know it is last and the container cannot count a `RenderFragment`, so CSS is the only party that
+  holds the fact.
+- A timestamp renders as `<time datetime>` carrying the round-trip instant while the text carries
+  the culture's formatting. Relative phrasing with no instant behind it renders as a plain span
+  instead: a `<time>` without a valid `datetime` advertises a parseable value it does not have.
+
+**Core** — `ZenStyles.Fill` (an intent's solid fill with no text colour, for a shape that carries
+no text of its own), `ZenAlign`, and `ZenDefer`. `ZenDefer` is public only because the Razor
+compiler resolves markup elements to public component types; nothing in a page has a reason to
+write it.
+
+**Verification** — 500 tests, up from 466.
+
+### Fixed during M4
+
+- **The sort affordance was invisible until hover.** The indicator was `opacity-0` with a
+  `group-hover` reveal, which meant nothing on the page said the table could be sorted at all: a
+  pointer user had to guess, and a touch user, who has no hover, could not have found out. Caught
+  by looking at the rendered page, not by any test — every assertion about `aria-sort` passed
+  throughout. The indicator now rests at low opacity, with hover and the active sort as the two
+  states above it.
+- **`ZenTree` passed `Silent="true"` to a `ZenSpinner` that has no such parameter.** It compiled
+  and rendered, because `ZenComponentBase` captures unmatched values and splats them — so the
+  intent to suppress a duplicate announcement became a stray `silent="true"` attribute on a
+  `<span>`, and the spinner went on announcing "Loading" over a treeitem already carrying
+  `aria-busy`. The suppression is `Label=""`, which is what the component documents.
+
+### Changed
+
+- The plan's "exactly three JS modules" is four. `zen-dom.js` had already landed in M2 and is now
+  used by `ZenTree` and the hierarchical `ZenTable` as well. It was not foreseen because what it
+  fills is not behaviour: `indeterminate` is a DOM property with no attribute and so cannot be
+  expressed in server-rendered markup, and `focus()` has no declarative equivalent. A flat
+  `ZenTable` loads no JavaScript at all.
+
 ### Added — M3, overlays and selection
 
 **`ZenPopover`** — an anchored floating panel, and the positioning `ZenCombobox` and the rest of

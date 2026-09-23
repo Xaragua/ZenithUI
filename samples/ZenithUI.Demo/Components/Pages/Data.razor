@@ -1,0 +1,301 @@
+@page "/data"
+@rendermode InteractiveServer
+
+@*
+    Interactive Server for the page as a whole. Unlike the forms page there is no static-SSR
+    variant to show alongside: a ZenColumn's Field is a delegate and its Columns is a
+    RenderFragment, and neither can cross a static-to-interactive boundary as a parameter. So the
+    table either lives inside an interactive component or the whole page is static.
+
+    The table does render completely under static SSR - that is what ZenDefer is for, and
+    ZenTableTests.Columns_AreCollectedUnderStaticSsrToo asserts it. It just cannot be demonstrated
+    on the same page as an interactive one.
+*@
+
+<PageTitle>Data &middot; ZenithUI</PageTitle>
+
+<header class="max-w-3xl">
+    <h1 class="text-3xl font-bold tracking-tight">Data display</h1>
+    <p class="mt-3 text-content-muted">
+        The three components that show a collection rather than a value. Each claims exactly the
+        ARIA role it can honour: a flat table stays a <code>table</code>, a hierarchical one
+        becomes a <code>treegrid</code> and takes the keyboard contract that comes with it, and a
+        timeline is an ordered list because it is one.
+    </p>
+</header>
+
+<!-- ------------------------------------------------------------------- Table -->
+<section class="mt-10">
+    <h2 class="text-lg font-semibold">ZenTable</h2>
+    <p class="mt-2 max-w-3xl text-sm text-content-muted">
+        Sortable, pageable and selectable. Click a header three times: ascending, descending, then
+        back to the order the data arrived in &mdash; which is information too, and usually means
+        &ldquo;newest first&rdquo;. <strong>Narrow the window below 768px</strong> and each row
+        becomes a labelled card; the labels come from the column titles through
+        <code>data-label</code>, with no JavaScript and no media-query service.
+    </p>
+
+    <div class="mt-4">
+        <ZenTable Items="_orders"
+                  TItem="Order"
+                  Label="Orders"
+                  Selectable="true"
+                  RowText="@(o => o.Reference)"
+                  SelectedItems="_selectedOrders"
+                  SelectedItemsChanged="@(s => _selectedOrders = s)"
+                  PageSize="5"
+                  Striped="true">
+            <Columns>
+                <ZenColumn TItem="Order" Title="Reference" Field="@(o => o.Reference)" Width="9rem" />
+                <ZenColumn TItem="Order" Title="Customer" Field="@(o => o.Customer)" />
+                <ZenColumn TItem="Order" Title="Placed" Field="@(o => o.Placed)" Format="d" Align="ZenAlign.End" />
+                <ZenColumn TItem="Order" Title="Amount" Field="@(o => o.Amount)" Format="C" Align="ZenAlign.End" />
+
+                @* SortBy differs from what is shown: the chip reads "Shipped", but sorting by that
+                   text would order the statuses alphabetically instead of by progress. *@
+                <ZenColumn TItem="Order" Title="Status" SortBy="@(o => (int)o.Status)" Align="ZenAlign.Center">
+                    <CellTemplate>
+                        <ZenBadge Intent="@IntentFor(context.Status)">@context.Status.ToString()</ZenBadge>
+                    </CellTemplate>
+                </ZenColumn>
+            </Columns>
+        </ZenTable>
+    </div>
+
+    <p class="mt-3 text-sm text-content-muted" aria-live="polite">
+        @if (_selectedOrders.Count == 0)
+        {
+            <span>Nothing selected. The header checkbox selects the <em>page</em>, not the dataset.</span>
+        }
+        else
+        {
+            <span>@_selectedOrders.Count selected: @string.Join(", ", _selectedOrders.Select(o => o.Reference))</span>
+        }
+    </p>
+</section>
+
+<!-- ------------------------------------------------------- Hierarchical table -->
+<section class="mt-12">
+    <h2 class="text-lg font-semibold">ZenTable, three levels deep</h2>
+    <p class="mt-2 max-w-3xl text-sm text-content-muted">
+        With a <code>ChildrenProvider</code> the table becomes a <code>treegrid</code>: rows carry
+        <code>aria-level</code> and <code>aria-expanded</code>, and they take a roving tabindex.
+        Click a row and then use the arrow keys &mdash; Right opens a branch and descends into it,
+        Left closes it and climbs back out.
+    </p>
+
+    <div class="mt-4">
+        <ZenTable Items="_regions"
+                  TItem="Segment"
+                  Label="Revenue by region"
+                  ChildrenProvider="@(s => s.Children.Count == 0 ? null : s.Children)"
+                  IsInitiallyExpanded="@(s => s.Name == "EMEA")"
+                  Size="ZenSize.Small"
+                  ResponsiveCollapse="false">
+            <Columns>
+                <ZenColumn TItem="Segment" Title="Segment" Field="@(s => s.Name)" />
+                <ZenColumn TItem="Segment" Title="Accounts" Field="@(s => s.Accounts)" Align="ZenAlign.End" Width="8rem" />
+                <ZenColumn TItem="Segment" Title="Revenue" Field="@(s => s.Revenue)" Format="C0" Align="ZenAlign.End" Width="10rem" />
+            </Columns>
+        </ZenTable>
+    </div>
+
+    <p class="mt-3 text-sm text-content-subtle">
+        <code>ResponsiveCollapse="false"</code> here on purpose: stacking a hierarchy into cards
+        throws away the indentation that was the point of it.
+    </p>
+</section>
+
+<!-- -------------------------------------------------------------------- Tree -->
+<section class="mt-12">
+    <h2 class="text-lg font-semibold">ZenTree</h2>
+    <p class="mt-2 max-w-3xl text-sm text-content-muted">
+        One tab stop, then the arrow keys. Type a letter or two to jump, and press <kbd>*</kbd> to
+        open every branch at the current level.
+    </p>
+
+    <div class="mt-4 grid gap-4 lg:grid-cols-2">
+        <ZenCard Title="In memory" TitleLevel="3">
+            <ZenTree Items="_files"
+                     TItem="Node"
+                     Label="Repository"
+                     ItemText="@(n => n.Name)"
+                     ChildrenProvider="@(n => n.Children.Count == 0 ? null : n.Children)"
+                     IsInitiallyExpanded="@(n => n.Name is "src" or "ZenithUI")"
+                     Value="_selectedNode"
+                     ValueChanged="@(n => _selectedNode = n)" />
+
+            <p class="mt-3 text-sm text-content-muted">
+                Selected: <strong>@(_selectedNode?.Name ?? "nothing")</strong>
+            </p>
+        </ZenCard>
+
+        <ZenCard Title="Loaded on demand" TitleLevel="3">
+            <p class="mb-3 text-sm text-content-muted">
+                Every node here is drawn as expandable before anything is known about it, because
+                the alternative &mdash; no chevron until the children arrive &mdash; hides a
+                subtree behind an interaction nobody can discover. The guess corrects itself: open
+                <strong>archive</strong> and it becomes a leaf.
+            </p>
+
+            <ZenTree Items="_remoteRoots"
+                     TItem="Node"
+                     Label="Remote"
+                     ItemText="@(n => n.Name)"
+                     ChildrenLoader="LoadChildrenAsync" />
+        </ZenCard>
+    </div>
+</section>
+
+<!-- ---------------------------------------------------------------- Timeline -->
+<section class="mt-12">
+    <h2 class="text-lg font-semibold">ZenTimeline</h2>
+    <p class="mt-2 max-w-3xl text-sm text-content-muted">
+        An <code>&lt;ol&gt;</code>, so a screen reader announces &ldquo;3 of 5&rdquo; &mdash; the
+        position a sighted reader takes from the connecting line. The line and the trailing gap
+        stop at the last entry through a <code>:last-child</code> rule, which is the only party
+        that knows which entry is last.
+    </p>
+
+    <div class="mt-4 grid gap-4 lg:grid-cols-2">
+        <ZenCard Title="Order A-1043" TitleLevel="3">
+            <ZenTimeline>
+                <ZenTimelineItem Title="Order placed"
+                                 Timestamp="_now.AddDays(-6)"
+                                 Icon="@ZenIcons.Check"
+                                 Intent="ZenIntent.Success">
+                    Paid by card ending 4242.
+                </ZenTimelineItem>
+
+                <ZenTimelineItem Title="Picked and packed"
+                                 Timestamp="_now.AddDays(-5)"
+                                 Icon="@ZenIcons.Check"
+                                 Intent="ZenIntent.Success" />
+
+                <ZenTimelineItem Title="Held for address check"
+                                 Timestamp="_now.AddDays(-3)"
+                                 Icon="@ZenIcons.Warning"
+                                 Intent="ZenIntent.Warning"
+                                 Current="true">
+                    The delivery postcode did not match the billing address. Waiting on the
+                    customer.
+                </ZenTimelineItem>
+
+                <ZenTimelineItem Title="Dispatch" TimestampText="pending" />
+
+                <ZenTimelineItem Title="Delivery" TimestampText="pending" />
+            </ZenTimeline>
+        </ZenCard>
+
+        <ZenCard Title="Dot markers, compact" TitleLevel="3">
+            <ZenTimeline Size="ZenSize.Small">
+                <ZenTimelineItem Title="v0.3.0" TimestampText="2 days ago" Intent="ZenIntent.Primary" Current="true">
+                    ZenTable, ZenTree and ZenTimeline.
+                </ZenTimelineItem>
+                <ZenTimelineItem Title="v0.2.0" TimestampText="1 week ago">
+                    Overlays, combobox and list.
+                </ZenTimelineItem>
+                <ZenTimelineItem Title="v0.1.0" TimestampText="2 weeks ago">
+                    Tokens, theming and the primitives.
+                </ZenTimelineItem>
+            </ZenTimeline>
+        </ZenCard>
+    </div>
+</section>
+
+@code {
+    private enum OrderStatus { Draft, Placed, Packed, Shipped, Delivered }
+
+    private sealed record Order(string Reference, string Customer, DateTime Placed, decimal Amount, OrderStatus Status);
+
+    private sealed record Segment(string Name, int Accounts, decimal Revenue, List<Segment> Children)
+    {
+        public Segment(string name, int accounts, decimal revenue) : this(name, accounts, revenue, []) { }
+    }
+
+    private sealed record Node(string Name, List<Node> Children)
+    {
+        public Node(string name) : this(name, []) { }
+    }
+
+    private readonly DateTimeOffset _now = DateTimeOffset.Now;
+
+    private IReadOnlyCollection<Order> _selectedOrders = [];
+    private Node? _selectedNode;
+
+    private readonly List<Order> _orders =
+    [
+        new("A-1043", "Wren Logistics", new DateTime(2026, 9, 17), 1240.50m, OrderStatus.Shipped),
+        new("A-1042", "Alder & Co", new DateTime(2026, 9, 16), 89.00m, OrderStatus.Delivered),
+        new("A-1041", "Birch Retail", new DateTime(2026, 9, 16), 4980.25m, OrderStatus.Packed),
+        new("A-1040", "Cedar Works", new DateTime(2026, 9, 15), 312.75m, OrderStatus.Delivered),
+        new("A-1039", "Dogwood Supply", new DateTime(2026, 9, 14), 27.99m, OrderStatus.Draft),
+        new("A-1038", "Elm Freight", new DateTime(2026, 9, 12), 1875.00m, OrderStatus.Delivered),
+        new("A-1037", "Fir Components", new DateTime(2026, 9, 11), 640.10m, OrderStatus.Placed),
+        new("A-1036", "Gorse Trading", new DateTime(2026, 9, 9), 15230.00m, OrderStatus.Delivered),
+    ];
+
+    private readonly List<Segment> _regions =
+    [
+        new("EMEA", 312, 1_840_000m, [
+            new Segment("United Kingdom", 128, 910_000m, [
+                new Segment("Enterprise", 14, 620_000m),
+                new Segment("Mid-market", 114, 290_000m),
+            ]),
+            new Segment("Germany", 96, 540_000m),
+            new Segment("Nordics", 88, 390_000m),
+        ]),
+        new("Americas", 407, 2_610_000m, [
+            new Segment("United States", 356, 2_380_000m),
+            new Segment("Canada", 51, 230_000m),
+        ]),
+        new("APAC", 143, 720_000m),
+    ];
+
+    private readonly List<Node> _files =
+    [
+        new("src", [
+            new Node("ZenithUI", [
+                new Node("Components"),
+                new Node("Core"),
+                new Node("Styles"),
+            ]),
+        ]),
+        new("samples", [new Node("ZenithUI.Demo")]),
+        new("tests", [new Node("ZenithUI.Tests")]),
+        new("docs"),
+    ];
+
+    private readonly List<Node> _remoteRoots =
+    [
+        new("reports"),
+        new("invoices"),
+        new("archive"),
+    ];
+
+    /// <summary>
+    /// Stands in for a network call, slowly enough that the spinner on the chevron is visible.
+    /// </summary>
+    private static async Task<IEnumerable<Node>> LoadChildrenAsync(Node node)
+    {
+        await Task.Delay(600);
+
+        // "archive" comes back empty, which is what turns it from a guessed branch into a leaf.
+        return node.Name switch
+        {
+            "archive" => [],
+            "reports" => [new Node("2024"), new Node("2025"), new Node("2026")],
+            "invoices" => [new Node("Q1"), new Node("Q2"), new Node("Q3")],
+            _ => [new Node($"{node.Name} detail")],
+        };
+    }
+
+    private static ZenIntent IntentFor(OrderStatus status) => status switch
+    {
+        OrderStatus.Delivered => ZenIntent.Success,
+        OrderStatus.Shipped => ZenIntent.Info,
+        OrderStatus.Packed => ZenIntent.Primary,
+        OrderStatus.Draft => ZenIntent.Warning,
+        _ => ZenIntent.Neutral,
+    };
+}

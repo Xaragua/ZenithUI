@@ -944,9 +944,19 @@
     private string SortIconFor(ZenColumn<TItem> column) =>
         _sortColumn == column && _sortDescending ? ZenIcons.ChevronDown : ZenIcons.ChevronUp;
 
+    /// <summary>
+    /// The sort indicator's classes.
+    /// </summary>
+    /// <remarks>
+    /// An unsorted column shows its indicator faintly rather than hiding it until hover. Hidden
+    /// was the first version and it made every header look inert: nothing on the page said the
+    /// table could be sorted, and a pointer user had to guess while a touch user, who has no
+    /// hover at all, could not have found out. A faint chevron is the affordance; hover and the
+    /// active sort are the two states above it.
+    /// </remarks>
     private string SortIconClass(ZenColumn<TItem> column) => CssBuilder
         .Default("size-3.5 shrink-0 transition-opacity")
-        .AddClass(_sortColumn == column ? "opacity-100" : "opacity-0 group-hover:opacity-40")
+        .AddClass(_sortColumn == column ? "opacity-100" : "opacity-35 group-hover:opacity-70")
         .Build()!;
 
     private static string? WidthStyle(ZenColumn<TItem> column) =>

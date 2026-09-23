@@ -3,9 +3,9 @@
 A TailwindCSS component library for Blazor. Render-mode agnostic, themed entirely through CSS
 custom properties, with first-class light and dark palettes.
 
-> **Status: M3 — overlays and selection.** Tokens, theming, core base types, primitives, the full
-> form control set, and the overlay family (modal + toast services, popover, combobox, list) are in
-> place. The table, tree and app shell land in M4–M5.
+> **Status: M4 — data display.** Tokens, theming, core base types, primitives, the full form
+> control set, the overlay family (modal + toast services, popover, combobox, list) and the data
+> components (table, tree, timeline) are in place. The app shell lands in M5.
 
 ## Why another Blazor component library
 
@@ -173,7 +173,7 @@ a palette fix is one edit rather than a guess-and-rerun loop:
 | **M1** ✅ | `ZenIcon`, `ZenButton`, `ZenBadge`, `ZenSpinner`, `ZenSkeleton`, `ZenCard`, `ZenStatCard`, `ZenField`, `ZenInputBase<T>` |
 | **M2** ✅ | Text, textarea, number, currency, date, search, checkbox, radio, select, `ZenToggle`, `ZenRangeSlider`, `ZenForm`, `ZenProgress`, `ZenIndicator`, `ZenDatePicker` |
 | **M3** ✅ | `ZenModal` + modal service, `ZenToast` + toast service, `ZenPopover`, `ZenCombobox`, `ZenList` |
-| **M4** | `ZenTable` (sorting, paging, selection, hierarchy), `ZenTree`, `ZenTimeline` |
+| **M4** ✅ | `ZenTable` + `ZenColumn` (sorting, paging, selection, hierarchy, responsive collapse), `ZenTree`, `ZenTimeline` |
 | **M5** | `ZenAppBar`, `ZenNavMenu`, `ZenSideNav`, `ZenFooter`, `ZenAppShell` |
 | **M6** | Docs, accessibility audit, NuGet publish, v1.0.0 |
 

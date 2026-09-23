@@ -1,6 +1,7 @@
 # ZenithUI — implementation plan
 
-> **Status:** M0, M1 and M2 complete (2026-09-22). M3 next: ZenModal + modal service, ZenToast + toast service.
+> **Status:** M0 through M4 complete (2026-09-23). M5 next: the chrome and layout family —
+> ZenAppBar, ZenNavMenu, ZenSideNav, ZenFooter, ZenAppShell.
 > This is the plan of record. It is kept current: where implementation contradicted the original
 > plan, the plan was corrected and the change noted under [Deviations](#deviations-from-the-original-plan).
 
@@ -280,6 +281,49 @@ pattern).
 - **Responsive default:** below `md`, collapse to a stacked card list driven by `data-label`
   attributes from column titles — pure CSS, no JS, no media-query service.
 
+#### Collecting the columns: `ZenDefer`
+
+A parent builds its entire render tree before any of its child components exist, so a table whose
+markup depends on what its columns report sees none of them on the first pass.
+
+The reflex fix — `StateHasChanged` from `OnAfterRender`, render again — fails exactly where it
+matters. Static SSR never renders a second time, so a server-rendered table would ship with an
+empty `<tbody>`, and the failure is invisible to a test suite that only ever renders interactively.
+
+`ZenDefer` fixes the ordering instead of paying for a second pass. The renderer's queue is FIFO,
+and a new child component's parameters are set — so its `OnParametersSet` runs — while the frame
+that introduces it is being diffed. A table that renders
+
+```razor
+<CascadingValue Value="this" IsFixed="true">@Columns</CascadingValue>
+<ZenDefer>…the table markup…</ZenDefer>
+```
+
+queues the cascade ahead of the defer; the cascade's diff registers every column; only then does
+the deferred body render. One pass, correct under every render mode, with a test for the static
+SSR case specifically.
+
+#### What role the table claims
+
+A flat table stays a plain `<table>` even when rows are selectable. `role="grid"` owes the user
+arrow-key navigation between cells, and this component does not provide it — the same reason
+`ZenList` refuses to call a non-interactive list a listbox. Selection is expressed with real
+checkboxes, which are announced, keyboard-operable and form-submitting without any claim being
+made.
+
+A hierarchical table has no such option, because HTML cannot express "this row is a child of that
+one". So it takes `role="treegrid"` with `aria-level` and `aria-expanded` on rows — and the
+keyboard contract that comes with the claim: a roving tabindex over rows, Right to expand and
+descend, Left to collapse and climb, Home/End, and focus moved after the render because
+ArrowRight descends into a row that did not exist when the key arrived. Rows are the unit of
+navigation; cells are not, because Left and Right are spoken for by the hierarchy and interactive
+cell content stays reachable with Tab.
+
+`ZenTree` states none of `aria-level`, `aria-setsize` or `aria-posinset` and `ZenTable` states
+them all. That is not an inconsistency: a tree's nested `<ul role="group">` supplies them, and
+restating them would be a second source of truth that no test can catch disagreeing with the DOM.
+A table has no such structure to lean on.
+
 ### `ZenModal` and `IZenModalService`
 
 The service exists because the alternative is worse. Without it every page that needs a dialog
@@ -341,15 +385,36 @@ WAI-ARIA tree pattern: `role="tree"` / `treeitem` / `group`, roving `tabindex`, 
 (Left collapses or moves to parent, Right expands or moves to first child), Home/End, type-ahead.
 Lazy children via `Func<TItem, Task<IEnumerable<TItem>>>`.
 
+Roving tabindex here, `aria-activedescendant` in `ZenList` — the two are opposites on purpose. A
+listbox keeps focus on its container because the thing typing into it may be a combobox's text
+field; a tree has no such partner, its items are what the user navigates, and screen-reader tree
+mode is built around the focused item being a genuinely focused element. Both are one tab stop.
+
+The focus ring is drawn on the row rather than on the `<li>` that holds focus, because the `<li>`
+contains the node's entire subtree and an outline on it would encircle every descendant.
+
+A lazily loaded node is drawn as expandable before anything is known about it. Drawing no chevron
+would hide the subtree behind an interaction nobody can discover; the guess corrects itself when
+the loader returns nothing and the node becomes a leaf. Supply `HasChildren` whenever the answer
+is knowable without fetching.
+
 ### JS modules — exactly three
 
 | Module | Responsibility | Status |
 | --- | --- | --- |
 | `zen-theme.js` | localStorage, `data-zen-theme`, `matchMedia` → broadcast to all .NET listeners | ✅ M0 |
 | `zen-popover.js` | Anchored positioning with flip/shift, click-outside, Escape | M3 |
-| `zen-focus.js` | Focus trap, `scrollIntoView` for active listbox/tree items, focus restore | M3 |
+| `zen-focus.js` | Focus trap, `scrollIntoView` for active listbox/tree items, focus restore | ✅ M3 |
+| `zen-dom.js` | Properties with no attribute equivalent, and imperative one-shots: `indeterminate`, `focus`, `blur`, active-element containment | ✅ M2 |
 
 Currency formatting, debouncing and textarea auto-grow are handled in C#/CSS — no JS.
+
+"Exactly three" turned out to be four. `zen-dom.js` was not foreseen because the gap it fills is
+not a behaviour: a checkbox's `indeterminate` is a DOM *property* with no attribute, so it cannot
+be expressed in server-rendered markup at all, and `focus()` has no declarative equivalent either.
+`ZenTree` and the hierarchical `ZenTable` both use it for exactly one call — moving DOM focus to
+the row a roving tabindex has moved to, without which a screen reader stays on the row the user
+has left. A flat table loads no JavaScript at all.
 
 ---
 
@@ -370,7 +435,7 @@ component's bUnit test asserts its required ARIA attributes.
 | **M1** | `ZenIcon`, `ZenButton`, `ZenBadge`, `ZenSpinner`, `ZenSkeleton`, `ZenCard`, `ZenStatCard`, `ZenField`, `ZenInputBase<T>` | A demo page per primitive, verified in both palettes | ✅ |
 | **M2** ✅ | Text, textarea, number, currency, date, search, checkbox (+group), radio group, native select, `ZenToggle`, `ZenRangeSlider`, `ZenForm`, plus the feedback primitives `ZenProgress` and `ZenIndicator` | A demo form binds an `EditForm` + `DataAnnotationsValidator` and shows per-field errors; the same inputs also work **without** an `EditForm` | ✅ |
 | **M3** ✅ | `ZenModal` + `IZenModalService`, `ZenToast` + `IZenToastService`, `ZenPopover`, `ZenCombobox<TItem>`, `ZenList<TItem>` | A dialog can be raised and awaited from a service with no markup on the page; focus returns to the opener on close; combobox passes keyboard + ARIA tests and prerenders as a closed labelled field with JS disabled | ✅ |
-| **M4** | `ZenTable<TItem>` (sort/page/select/hierarchy/responsive collapse), `ZenTree<TItem>`, `ZenTimeline` | Demo renders a 3-level hierarchical table and a lazy-loading tree | |
+| **M4** ✅ | `ZenTable<TItem>` + `ZenColumn<TItem>` (sort/page/select/hierarchy/responsive collapse), `ZenTree<TItem>`, `ZenTimeline` + `ZenTimelineItem` | Demo renders a 3-level hierarchical table and a lazy-loading tree | ✅ |
 | **M5** | `ZenAppBar`, `ZenNavMenu`, `ZenSideNav`, `ZenFooter`, `ZenAppShell` | Shell demo usable at 360 / 768 / 1440 px; drawer traps focus and restores it on close | |
 | **M6** | Docs, a11y audit, `dotnet pack`, NuGet metadata, v1.0.0, **close the consumer-`@theme` gap** | `.nupkg` consumed successfully by a scratch Blazor Server app **and** a Blazor WASM app | |
 
@@ -410,6 +475,11 @@ Recorded because each changed the design rather than merely the code.
 | `Components/_Imports.razor` sits one level down, not at the project root | A root `_Imports.razor` collides with the folder-level `@namespace ZenithUI` files. |
 | `ZenThemeToggle` initializes the service itself | A provider cannot be placed in a static layout, which is where app bars live. |
 | `zen-theme.js` keeps a `Set` of listeners | One module instance is shared by every interactive island on the page. |
+| A fourth JS module, `zen-dom.js` | `indeterminate` is a DOM property with no attribute, and `focus()` has no declarative form. Neither is behaviour, which is why neither was foreseen. |
+| `ZenDefer`, and it is public | A parent renders before its children exist, so a column-collecting table needs ordering rather than a second pass — and static SSR has no second pass to give. Public only because Razor resolves markup elements to public component types. |
+| A selectable flat table is **not** `role="grid"` | The plan implied a grid role followed from selection. A grid owes arrow-key cell navigation; checkboxes deliver accessible selection while promising nothing. |
+| `ZenTable` sorting is tri-state | The order data arrived in carries information — usually "newest first" from the server — and a two-state toggle leaves no way back to it. |
+| `TItem` constrained to `notnull` on `ZenTree` and `ZenTable` | Expansion, lazy-load caching and selection are all keyed by the item. A null node has no identity to key on. |
 
 ## Known gaps
 
