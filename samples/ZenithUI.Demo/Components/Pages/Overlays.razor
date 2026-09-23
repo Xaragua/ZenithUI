@@ -203,6 +203,80 @@
     </div>
 </section>
 
+<!-- ---------------------------------------------------------------- Combobox and list -->
+<section class="mt-12">
+    <h2 class="text-lg font-semibold">ZenCombobox and ZenList</h2>
+    <p class="mt-2 max-w-3xl text-sm text-content-muted">
+        A combobox is for the three things a native <code>&lt;select&gt;</code> cannot do: filter,
+        load asynchronously, and show more than a line per option. Focus never leaves the text
+        input &mdash; the active option is named with <code>aria-activedescendant</code>, which is
+        what lets you keep typing while arrowing through results.
+    </p>
+
+    <div class="mt-4 grid gap-4 md:grid-cols-2">
+        <ZenCard Title="Single and multiple" TitleLevel="3">
+            <div class="space-y-4">
+                <ZenCombobox TItem="string"
+                             Label="Country"
+                             Placeholder="Start typing&hellip;"
+                             Items="Countries"
+                             @bind-Value="_country" />
+
+                <ZenCombobox TItem="string"
+                             Label="Tags"
+                             Placeholder="Pick a few&hellip;"
+                             Multiple="true"
+                             Items="Tags"
+                             @bind-Values="_tags" />
+            </div>
+
+            <p class="mt-4 text-sm text-content-muted">
+                Selected: <code class="text-content">@(_country ?? "none")</code>
+                &middot; tags: <code class="text-content">@(_tags.Count == 0 ? "none" : string.Join(", ", _tags))</code>
+            </p>
+        </ZenCard>
+
+        <ZenCard Title="Asynchronous options" TitleLevel="3">
+            <p class="mb-4 text-sm text-content-muted">
+                The provider is handed a <code>CancellationToken</code> and each keystroke
+                supersedes the request in flight &mdash; so a slow response for a short query
+                cannot land after a fast one for a longer query.
+            </p>
+
+            <ZenCombobox TItem="string"
+                         Label="Search countries"
+                         Placeholder="Type two letters&hellip;"
+                         ItemsProvider="SearchCountriesAsync"
+                         @bind-Value="_asyncCountry" />
+        </ZenCard>
+
+        <ZenCard Title="ZenList, selectable" TitleLevel="3">
+            <p class="mb-4 text-sm text-content-muted">
+                Click in, then use the arrow keys: the cursor moves without committing, and Enter
+                selects. Selecting on every arrow press would fire a change per keystroke.
+            </p>
+
+            <ZenList TItem="string"
+                     Items="Tags"
+                     Selectable="true"
+                     Divided="true"
+                     Label="Tags"
+                     @bind-Value="_listPick" />
+
+            <p class="mt-3 text-sm text-content-muted">
+                Selected: <code class="text-content">@(_listPick ?? "none")</code>
+            </p>
+        </ZenCard>
+
+        <ZenCard Title="Empty and loading" TitleLevel="3">
+            <div class="space-y-4">
+                <ZenList TItem="string" Items="Array.Empty<string>()" EmptyText="No tags yet." />
+                <ZenList TItem="string" Items="Tags" Loading="true" LoadingRowCount="3" />
+            </div>
+        </ZenCard>
+    </div>
+</section>
+
 <!-- ---------------------------------------------------------------- Toast -->
 <section class="mt-12">
     <h2 class="text-lg font-semibold">ZenToast</h2>
@@ -247,6 +321,34 @@
     private bool _openClipped;
     private bool _declarativeOpen;
     private string? _lastAnswer;
+    private string? _country;
+    private string? _asyncCountry;
+    private string? _listPick;
+    private IReadOnlyCollection<string> _tags = [];
+
+    private static readonly string[] Countries =
+    [
+        "Argentina", "Australia", "Austria", "Belgium", "Brazil", "Canada", "Chile", "Denmark",
+        "Finland", "France", "Germany", "Iceland", "India", "Ireland", "Italy", "Japan",
+        "Mexico", "Netherlands", "New Zealand", "Norway", "Poland", "Portugal", "Spain",
+        "Sweden", "Switzerland", "United Kingdom", "United States",
+    ];
+
+    private static readonly string[] Tags =
+    [
+        "accessibility", "billing", "design-system", "performance", "regression", "security",
+    ];
+
+    // Deliberately slow, so the debounce and the cancellation are observable rather than
+    // theoretical. A real provider would be hitting a database or an API.
+    private static async Task<IEnumerable<string>> SearchCountriesAsync(string query, CancellationToken token)
+    {
+        await Task.Delay(350, token);
+
+        return string.IsNullOrWhiteSpace(query)
+            ? Countries
+            : Countries.Where(c => c.Contains(query, StringComparison.CurrentCultureIgnoreCase));
+    }
 
     private static readonly ZenPlacement[] Placements =
     [

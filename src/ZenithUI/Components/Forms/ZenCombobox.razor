@@ -1,0 +1,563 @@
+@namespace ZenithUI
+@typeparam TItem
+@inherits ZenInputBase<TItem>
+@implements IAsyncDisposable
+
+@*
+    A text field that filters a list. The WAI-ARIA combobox pattern, over a ZenPopover listbox.
+
+    Why this exists at all, when ZenSelect wraps a native <select> that works with no JavaScript:
+    native select cannot filter, cannot load options asynchronously, and cannot show more than a
+    line of text per option. Those are the three things a combobox is for. Everything a native
+    element CAN do is still left to ZenSelect - this is not its replacement.
+
+    Focus stays in the text input the whole time. The listbox never receives DOM focus; the active
+    option is named with aria-activedescendant instead. That is what lets the user keep typing
+    while arrowing through results, and it is why the popover is non-modal.
+
+    Without JavaScript this renders as a labelled, closed text field: type-ahead does nothing, but
+    the label, the value and the validation message are all correct and the field still submits.
+    A combobox that prerenders as an empty div is a combobox that breaks the page on a slow
+    connection.
+*@
+
+<ZenField Label="@Label"
+          HelpText="@HelpText"
+          Errors="ValidationMessages"
+          Required="Required"
+          Disabled="Disabled"
+          For="@Id"
+          Size="Size"
+          Class="@FieldClass">
+
+    <ZenPopover @ref="_popover"
+                Open="_open"
+                OpenChanged="HandlePopoverOpenChangedAsync"
+                Placement="ZenPlacement.BottomStart"
+                MatchWidth="true"
+                Role="listbox"
+                Label="@(Label ?? "Suggestions")"
+                Bare="true"
+                CloseOnEscape="false">
+        <Anchor>
+            <div class="@WrapperClass">
+                @if (Multiple && SelectedItems.Count > 0)
+                {
+                    @* Chips come before the input in DOM order so Backspace-to-remove targets the
+                       one visually nearest the caret. *@
+                    foreach (var item in SelectedItems)
+                    {
+                        <span class="inline-flex shrink-0 items-center gap-1 rounded-zen-sm bg-primary-soft px-1.5 py-0.5 text-xs text-primary-strong">
+                            @DisplayFor(item)
+                            <button type="button"
+                                    class="zen-focus rounded-zen-sm"
+                                    tabindex="-1"
+                                    aria-label="@($"{RemoveLabel} {DisplayFor(item)}")"
+                                    @onclick="@(() => ToggleAsync(item))">
+                                <ZenIcon Path="@ZenIcons.Close" class="size-3" />
+                            </button>
+                        </span>
+                    }
+                }
+
+                <input id="@Id"
+                       type="text"
+                       class="@ZenStyles.InputInnerBase"
+                       style="@Style"
+                       role="combobox"
+                       value="@_query"
+                       placeholder="@Placeholder"
+                       disabled="@Disabled"
+                       readonly="@ReadOnly"
+                       autocomplete="off"
+                       aria-expanded="@(_open ? "true" : "false")"
+                       aria-controls="@ListboxId"
+                       aria-autocomplete="list"
+                       aria-activedescendant="@ActiveDescendantId"
+                       aria-invalid="@(IsInvalid ? "true" : null)"
+                       aria-required="@(Required ? "true" : null)"
+                       @attributes="AttributesWithoutClass"
+                       @oninput="HandleQueryInputAsync"
+                       @onkeydown="HandleKeyDownAsync"
+                       @onfocus="HandleFocusAsync" />
+
+                @if (AllowClear && HasSelection && !Disabled && !ReadOnly)
+                {
+                    <button type="button"
+                            class="zen-focus grid shrink-0 place-items-center rounded-zen-sm p-0.5 text-content-subtle hover:text-content"
+                            aria-label="@ClearLabel"
+                            @onclick="ClearAsync">
+                        <ZenIcon Path="@ZenIcons.Close" Size="ZenSize.Small" />
+                    </button>
+                }
+
+                <ZenIcon Path="@ZenIcons.ChevronDown"
+                         Size="ZenSize.Small"
+                         class="pointer-events-none shrink-0 text-content-subtle" />
+            </div>
+        </Anchor>
+
+        <ChildContent>
+            <div id="@ListboxId"
+                 class="max-h-64 overflow-y-auto rounded-zen-lg border border-border bg-surface-overlay p-1 shadow-zen-lg">
+                @if (_loading)
+                {
+                    <p class="px-3 py-2 text-sm text-content-subtle" role="status">@LoadingText</p>
+                }
+                else if (_options.Count == 0)
+                {
+                    @* A live region, so a screen reader hears that filtering produced nothing.
+                       Silence is indistinguishable from "still loading". *@
+                    <p class="px-3 py-2 text-sm text-content-subtle" role="status">@NoResultsText</p>
+                }
+                else
+                {
+                    @foreach (var (item, index) in _options.Select((x, i) => (x, i)))
+                    {
+                        <div id="@OptionId(index)"
+                             class="@OptionClass(IsSelected(item), index == _activeIndex)"
+                             role="option"
+                             aria-selected="@(IsSelected(item) ? "true" : "false")"
+                             @onclick="@(() => ToggleAsync(item))">
+                            @if (ItemTemplate is not null)
+                            {
+                                @ItemTemplate(item)
+                            }
+                            else
+                            {
+                                @DisplayFor(item)
+                            }
+                        </div>
+                    }
+                }
+            </div>
+        </ChildContent>
+    </ZenPopover>
+</ZenField>
+
+@code {
+    private ZenPopover? _popover;
+    private IJSObjectReference? _focus;
+    private CancellationTokenSource? _search;
+    private List<TItem> _options = [];
+    private List<TItem> _selected = [];
+    private string _query = string.Empty;
+    private int _activeIndex = -1;
+    private bool _open;
+    private bool _loading;
+
+    /// <summary>Whether the user has typed since the list opened. See FilterLocally.</summary>
+    private bool _filtering;
+    private bool _disposed;
+
+    /// <summary>Static option list. Ignored when <see cref="ItemsProvider"/> is set.</summary>
+    [Parameter]
+    public IEnumerable<TItem>? Items { get; set; }
+
+    /// <summary>
+    /// Asynchronous option source, called with the current query.
+    /// </summary>
+    /// <remarks>
+    /// Takes a <see cref="CancellationToken"/> because it will be cancelled: every keystroke
+    /// supersedes the request in flight. Without honouring it, a slow response for "ab" can land
+    /// after a fast one for "abcd" and repopulate the list with stale results.
+    /// </remarks>
+    [Parameter]
+    public Func<string, CancellationToken, Task<IEnumerable<TItem>>>? ItemsProvider { get; set; }
+
+    /// <summary>Text shown for an item, in the field and in the list.</summary>
+    [Parameter]
+    public Func<TItem, string>? ItemText { get; set; }
+
+    /// <summary>Custom markup for an option row.</summary>
+    [Parameter]
+    public RenderFragment<TItem>? ItemTemplate { get; set; }
+
+    /// <summary>Allow more than one selection, shown as chips.</summary>
+    [Parameter]
+    public bool Multiple { get; set; }
+
+    /// <summary>The selected items, for multiple selection.</summary>
+    [Parameter]
+    public IReadOnlyCollection<TItem>? Values { get; set; }
+
+    /// <summary>Raised when the selected items change.</summary>
+    [Parameter]
+    public EventCallback<IReadOnlyCollection<TItem>> ValuesChanged { get; set; }
+
+    /// <summary>Offer a clear button once something is selected.</summary>
+    [Parameter]
+    public bool AllowClear { get; set; } = true;
+
+    /// <summary>Message while options are loading.</summary>
+    [Parameter]
+    public string LoadingText { get; set; } = "Searching…";
+
+    /// <summary>Message when filtering matched nothing.</summary>
+    [Parameter]
+    public string NoResultsText { get; set; } = "No matches.";
+
+    /// <summary>Accessible name for the clear button.</summary>
+    [Parameter]
+    public string ClearLabel { get; set; } = "Clear selection";
+
+    /// <summary>Accessible name prefix for a chip's remove button.</summary>
+    [Parameter]
+    public string RemoveLabel { get; set; } = "Remove";
+
+    /// <summary>How long to wait after a keystroke before querying.</summary>
+    /// <remarks>
+    /// Only applies to <see cref="ItemsProvider"/>. Filtering a static list is synchronous and
+    /// debouncing it would only make the UI feel broken.
+    /// </remarks>
+    [Parameter]
+    public int SearchDebounceMilliseconds { get; set; } = 200;
+
+    private string ListboxId => SubId("listbox");
+
+    private string OptionId(int index) => $"{Id}-option-{index}";
+
+    private string? ActiveDescendantId =>
+        _open && _activeIndex >= 0 && _activeIndex < _options.Count ? OptionId(_activeIndex) : null;
+
+    private IReadOnlyList<TItem> SelectedItems => _selected;
+
+    private bool HasSelection => Multiple ? _selected.Count > 0 : CurrentValue is not null;
+
+    private string DisplayFor(TItem item) => ItemText?.Invoke(item) ?? item?.ToString() ?? string.Empty;
+
+    private bool IsSelected(TItem item) =>
+        Multiple
+            ? _selected.Contains(item)
+            : EqualityComparer<TItem>.Default.Equals(CurrentValue, item);
+
+    // ---- Parameter sync ----------------------------------------------------------------------
+
+    /// <inheritdoc />
+    protected override void OnParametersSet()
+    {
+        _selected = Multiple ? [.. Values ?? []] : [];
+
+        // The field shows the selection when it is not being typed into. Skipped while the popover
+        // is open, or every re-render would overwrite what the user is halfway through typing.
+        if (!_open && !Multiple)
+        {
+            _query = CurrentValue is null ? string.Empty : DisplayFor(CurrentValue);
+        }
+    }
+
+    // ---- Options -----------------------------------------------------------------------------
+
+    private async Task LoadOptionsAsync()
+    {
+        if (ItemsProvider is null)
+        {
+            _options = FilterLocally();
+            _loading = false;
+            ResetActive();
+            return;
+        }
+
+        // Cancel the request in flight. A slow response for "ab" landing after a fast one for
+        // "abcd" would otherwise repopulate the list with results for a query the user has
+        // already moved past.
+        _search?.Cancel();
+        _search?.Dispose();
+        _search = new CancellationTokenSource();
+
+        var token = _search.Token;
+        var query = _query;
+
+        _loading = true;
+        StateHasChanged();
+
+        try
+        {
+            if (SearchDebounceMilliseconds > 0)
+            {
+                await Task.Delay(SearchDebounceMilliseconds, token);
+            }
+
+            var results = await ItemsProvider(query, token);
+
+            if (token.IsCancellationRequested || _disposed)
+            {
+                return;
+            }
+
+            _options = [.. results];
+            _loading = false;
+            ResetActive();
+            StateHasChanged();
+        }
+        catch (OperationCanceledException)
+        {
+            // Superseded by a later keystroke. The newer request owns the state now, so this one
+            // must not clear the loading flag on its way out.
+        }
+    }
+
+    private List<TItem> FilterLocally()
+    {
+        var source = Items ?? [];
+
+        // `!_filtering` is what makes a selected combobox usable. The field shows the selection's
+        // own text, so filtering by it on open would match only the item already chosen - leaving
+        // the user unable to pick anything else without clearing the field first. The list filters
+        // from the first keystroke, not from the first open.
+        if (!_filtering || string.IsNullOrWhiteSpace(_query))
+        {
+            return [.. source];
+        }
+
+        return [.. source.Where(item =>
+            DisplayFor(item).Contains(_query, StringComparison.CurrentCultureIgnoreCase))];
+    }
+
+    /// <summary>
+    /// Puts the cursor on the first option, or nowhere when the list is empty.
+    /// </summary>
+    /// <remarks>
+    /// The first option is highlighted but NOT selected. Auto-selecting it means a user who types
+    /// and tabs away commits a value they never chose - the classic autocomplete complaint.
+    /// </remarks>
+    private void ResetActive() => _activeIndex = _options.Count > 0 ? 0 : -1;
+
+    // ---- Interaction -------------------------------------------------------------------------
+
+    private async Task HandleFocusAsync()
+    {
+        if (Disabled || ReadOnly || _open)
+        {
+            return;
+        }
+
+        await OpenAsync();
+    }
+
+    private async Task OpenAsync()
+    {
+        _open = true;
+        _filtering = false;
+        await LoadOptionsAsync();
+    }
+
+    private async Task HandleQueryInputAsync(ChangeEventArgs args)
+    {
+        _query = args.Value?.ToString() ?? string.Empty;
+        _filtering = true;
+
+        if (!_open)
+        {
+            _open = true;
+        }
+
+        // Typing past a single selection clears it. Leaving the old value bound while the field
+        // shows different text is the state where a form saves something the user cannot see.
+        if (!Multiple && CurrentValue is not null && _query != DisplayFor(CurrentValue))
+        {
+            await ValueChanged.InvokeAsync(default);
+        }
+
+        await LoadOptionsAsync();
+    }
+
+    private async Task HandleKeyDownAsync(KeyboardEventArgs args)
+    {
+        switch (args.Key)
+        {
+            case "ArrowDown":
+                if (!_open)
+                {
+                    await OpenAsync();
+                    return;
+                }
+
+                _activeIndex = Math.Min(_activeIndex + 1, _options.Count - 1);
+                await ScrollActiveIntoViewAsync();
+                break;
+
+            case "ArrowUp":
+                _activeIndex = Math.Max(_activeIndex - 1, 0);
+                await ScrollActiveIntoViewAsync();
+                break;
+
+            case "Home" when _open:
+                _activeIndex = _options.Count > 0 ? 0 : -1;
+                await ScrollActiveIntoViewAsync();
+                break;
+
+            case "End" when _open:
+                _activeIndex = _options.Count - 1;
+                await ScrollActiveIntoViewAsync();
+                break;
+
+            case "Enter":
+                if (_open && _activeIndex >= 0 && _activeIndex < _options.Count)
+                {
+                    await ToggleAsync(_options[_activeIndex]);
+                }
+
+                break;
+
+            case "Escape":
+                // Escape closes the list. It does NOT clear the field - a user who opened the list
+                // by accident should not lose what they had typed to get rid of it.
+                await CloseAsync();
+                break;
+
+            case "Backspace" when Multiple && _query.Length == 0 && _selected.Count > 0:
+                // Backspace on an empty query removes the last chip, the behaviour every
+                // tag-input has trained users to expect.
+                await ToggleAsync(_selected[^1]);
+                break;
+
+            case "Tab":
+                // Tab commits nothing and closes. Committing the highlighted option here is the
+                // other classic autocomplete complaint: tabbing out of a field should not change
+                // its value.
+                await CloseAsync();
+                break;
+        }
+    }
+
+    private async Task ToggleAsync(TItem item)
+    {
+        if (Multiple)
+        {
+            var next = new List<TItem>(_selected);
+
+            if (!next.Remove(item))
+            {
+                next.Add(item);
+            }
+
+            _selected = next;
+            _query = string.Empty;
+
+            await ValuesChanged.InvokeAsync(next);
+            await LoadOptionsAsync();
+            return;
+        }
+
+        _query = DisplayFor(item);
+        await ValueChanged.InvokeAsync(item);
+        await CloseAsync();
+    }
+
+    private async Task ClearAsync()
+    {
+        _query = string.Empty;
+
+        if (Multiple)
+        {
+            _selected = [];
+            await ValuesChanged.InvokeAsync(Array.Empty<TItem>());
+        }
+        else
+        {
+            await ValueChanged.InvokeAsync(default);
+        }
+
+        await LoadOptionsAsync();
+    }
+
+    private async Task CloseAsync()
+    {
+        _open = false;
+        _activeIndex = -1;
+        _filtering = false;
+
+        // The field goes back to showing the selection, undoing any abandoned typing.
+        if (!Multiple)
+        {
+            _query = CurrentValue is null ? string.Empty : DisplayFor(CurrentValue);
+        }
+        else
+        {
+            _query = string.Empty;
+        }
+
+        await Task.CompletedTask;
+    }
+
+    private Task HandlePopoverOpenChangedAsync(bool open) => open ? OpenAsync() : CloseAsync();
+
+    /// <summary>Keeps the active option visible as the cursor moves.</summary>
+    /// <remarks>
+    /// Guarded on <c>RendererInfo.IsInteractive</c> and deferred to JavaScript because scroll
+    /// position is a browser fact. Silently skipped during prerender, where the list is not on
+    /// screen to scroll.
+    /// </remarks>
+    private async Task ScrollActiveIntoViewAsync()
+    {
+        if (!RendererInfo.IsInteractive || ActiveDescendantId is null || _disposed)
+        {
+            return;
+        }
+
+        try
+        {
+            _focus ??= await JS.InvokeAsync<IJSObjectReference>(
+                "import", "./_content/ZenithUI/js/zen-focus.js");
+
+            await _focus.InvokeVoidAsync("scrollItemIntoView", ListboxId, ActiveDescendantId);
+        }
+        catch (JSDisconnectedException)
+        {
+        }
+        catch (OperationCanceledException)
+        {
+        }
+    }
+
+    [Inject]
+    private IJSRuntime JS { get; set; } = default!;
+
+    /// <inheritdoc />
+    public async ValueTask DisposeAsync()
+    {
+        _disposed = true;
+
+        _search?.Cancel();
+        _search?.Dispose();
+        _search = null;
+
+        if (_focus is not null)
+        {
+            try
+            {
+                await _focus.DisposeAsync();
+            }
+            catch (JSDisconnectedException)
+            {
+            }
+            catch (OperationCanceledException)
+            {
+            }
+
+            _focus = null;
+        }
+
+        GC.SuppressFinalize(this);
+    }
+
+    // ---- Styling -----------------------------------------------------------------------------
+
+    private string WrapperClass => CssBuilder
+        .Default(ZenStyles.InputWrapperBase)
+        .AddClass(ZenStyles.InputSize(Size))
+        .AddClass(ZenStyles.InputRadius(Size))
+        .AddClass("flex flex-wrap items-center gap-1")
+        .AddClass("h-auto min-h-9", Multiple)
+        .Build()!;
+
+    private string OptionClass(bool selected, bool active) => CssBuilder
+        .Default("cursor-pointer rounded-zen-sm px-3 py-2 text-sm transition-colors")
+        .AddClass("text-content", !selected)
+        .AddClass("bg-primary-soft font-medium text-primary-strong", selected)
+        // The keyboard cursor is a background change rather than the focus ring: DOM focus is in
+        // the input, so a ring drawn here would mean two focus indicators on screen at once.
+        .AddClass("bg-surface-sunken", active && !selected)
+        .Build()!;
+}

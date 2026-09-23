@@ -6,7 +6,7 @@ All notable changes to ZenithUI are documented here. The format follows
 
 ## [Unreleased]
 
-### Added — M3, overlays (in progress)
+### Added — M3, overlays and selection
 
 **`ZenPopover`** — an anchored floating panel, and the positioning `ZenCombobox` and the rest of
 M3 build on.
@@ -43,6 +43,37 @@ not in Firefox yet, so `zen-popover.js` computes the coordinates.
   closes it.
 - Dialogs stack, keyed by instance. A confirmation raised from inside an editor appears above it.
 
+**`ZenToast` + `IZenToastService`** — `Toasts.Success("Order saved.")`, with no markup at the call
+site.
+
+- Errors are announced assertively (`role="alert"`) and everything else politely
+  (`role="status"`). An assertive region interrupts whatever a screen reader is reading, which is
+  right for a failure and rude for "Saved".
+- Errors do not auto-dismiss. One that vanishes on a timer is one the user may never have seen,
+  with no way to bring it back.
+- The dismiss timer pauses on **focus** as well as hover. Hover alone is the usual implementation
+  and it fails the two users who most need the pause — someone reading with a screen reader, and
+  someone tabbing to the action button.
+- The stack is capped at five, dropping the oldest. A loop that fails once per item raises a toast
+  per item, and a column tall enough to cover the page hides the UI needed to fix the problem.
+
+**`ZenCombobox<TItem>`** — the three things a native `<select>` cannot do: filter, load
+asynchronously, and show more than a line per option. Everything native *can* do is still left to
+`ZenSelect`.
+
+- Focus never leaves the text input; the active option is named with `aria-activedescendant`. That
+  is what lets the user keep typing while arrowing through results.
+- The first option is highlighted but **not** selected, and Tab commits nothing. Those are the two
+  behaviours autocompletes are most often complained about for: committing a value the user never
+  chose, and changing a field's value on the way out of it.
+- `ItemsProvider` receives a `CancellationToken` and every keystroke supersedes the request in
+  flight, so a slow response for `ab` cannot land after a fast one for `abcd`.
+- Prerenders as a closed, labelled text field carrying its value — the M3 exit criterion.
+
+**`ZenList<TItem>`** — a list that stays on the page. Plain `<ul>` when it is just a list;
+`role="listbox"` with arrow-key navigation when it is selectable. Giving a non-interactive list
+listbox semantics promises a widget the user cannot operate.
+
 **JavaScript** — `zen-popover.js` and `zen-focus.js` land, completing the three modules the plan
 allows for. Nothing in either implements behaviour: they measure the viewport, move focus, and
 report a pointer going down outside a subtree. Every decision stays in C#.
@@ -69,6 +100,17 @@ report a pointer going down outside a subtree. Every decision stays in C#.
   nothing, and left `CloseOnEscape` silently a lie. It compiled, it rendered, and every test
   passed; only the served HTML showed it. The suppression moved to a `cancel` listener in
   `zen-focus.js`, and a test now asserts no `@on`/`@bind` text survives into a component's markup.
+- **`ZenList`'s keyboard handling was silently absent.** A Razor comment sat between attributes
+  inside the `<ul>` tag. A comment there swallows every attribute that follows it — `@onkeydown`
+  included — and the component renders looking entirely correct. Caught by the arrow-key tests;
+  the comment now sits above the element and says why.
+- **A combobox with a selection could not be changed without clearing it first.** The field shows
+  the selected item's own text, so opening the list filtered by that text and matched only the
+  item already chosen. The list now filters from the first keystroke rather than from the first
+  open.
+- **`ZenList` drew a keyboard cursor on a list nobody had touched.** The cursor starts on the first
+  row, so an untouched list sat there with a focus ring on it, which reads as a rendering bug. It
+  is now gated on the listbox actually holding focus.
 - **`ZenButton` never rendered its `id`.** `ZenComponentBase` gives every component an `Id`
   parameter with a generated fallback, but a component that does not emit it makes that parameter a
   silent no-op — on the one primitive most often referenced by id, for `aria-controls` from a

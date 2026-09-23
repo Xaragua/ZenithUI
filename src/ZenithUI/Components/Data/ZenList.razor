@@ -74,6 +74,8 @@ else if (Selectable)
         aria-multiselectable="@(Multiple ? "true" : null)"
         aria-activedescendant="@ActiveDescendantId"
         tabindex="0"
+        @onfocus="@(() => _hasFocus = true)"
+        @onblur="@(() => _hasFocus = false)"
         @onkeydown="HandleKeyDownAsync"
         @attributes="AttributesWithoutClass">
         @foreach (var (item, index) in Items.Select((x, i) => (x, i)))
@@ -123,6 +125,7 @@ else
 
 @code {
     private int _activeIndex;
+    private bool _hasFocus;
 
     /// <summary>The items to render.</summary>
     [Parameter]
@@ -346,8 +349,12 @@ else
         // solid-filled rows reads as a column of buttons rather than a set of choices.
         .AddClass("bg-primary-soft font-medium text-primary-strong", selected)
         .AddClass("cursor-not-allowed opacity-50", disabled)
-        // The keyboard cursor is shown even though the listbox itself holds focus - without it,
-        // arrowing through the list moves an indicator nobody can see.
-        .AddClass("zen-focus-always", active)
+        // The keyboard cursor is drawn on the active row because DOM focus stays on the listbox -
+        // without it, arrowing through the list would move an indicator nobody can see.
+        //
+        // Gated on the listbox actually having focus. The cursor starts on the first row, so an
+        // untouched list would otherwise sit there with a focus ring on a row the user has never
+        // interacted with, which reads as a rendering bug.
+        .AddClass("zen-focus-always", active && _hasFocus)
         .Build()!;
 }
