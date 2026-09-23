@@ -1,0 +1,39 @@
+<Project>
+
+  <!--
+    Puts ZenithUI's Tailwind theme where a consuming application's own Tailwind build can reach it.
+
+    An application that writes Tailwind classes of its own runs its own Tailwind, and a utility is
+    compiled by the build that scans the markup using it - so `bg-surface` in THAT project's
+    markup needs ZenithUI's `@theme` present in THAT project's build. The theme ships inside the
+    .nupkg, and neither Tailwind's `@import` nor a relative path can name a file under
+    ~/.nuget/packages without hardcoding a machine-specific path and a version number. Copying it
+    into the project's intermediate directory gives the import a stable, checked-in-able spelling:
+
+        @import "../obj/zenithui/zenith.theme.css";
+
+    See docs/theming.md. To force the copy before your own Tailwind step rather than relying on
+    target ordering, add DependsOnTargets="ZenithCopyTheme" to it.
+  -->
+
+  <PropertyGroup>
+    <ZenithThemeSource Condition="'$(ZenithThemeSource)' == ''">$([MSBuild]::NormalizePath('$(MSBuildThisFileDirectory)', '..', 'tailwind', 'zenith.theme.css'))</ZenithThemeSource>
+    <ZenithThemeDirectory Condition="'$(ZenithThemeDirectory)' == ''">$(BaseIntermediateOutputPath)zenithui\</ZenithThemeDirectory>
+    <ZenithThemeDestination Condition="'$(ZenithThemeDestination)' == ''">$(ZenithThemeDirectory)zenith.theme.css</ZenithThemeDestination>
+  </PropertyGroup>
+
+  <!--
+    Runs before anything that could plausibly shell out to Tailwind. The Inputs/Outputs pair makes
+    it a no-op once copied; the file changes only when the package version does.
+  -->
+  <Target Name="ZenithCopyTheme"
+          BeforeTargets="PrepareForBuild;BeforeBuild;BeforeRebuild"
+          Condition="'$(ZenithSkipThemeCopy)' != 'true' And Exists('$(ZenithThemeSource)')"
+          Inputs="$(ZenithThemeSource)"
+          Outputs="$(ZenithThemeDestination)">
+    <Copy SourceFiles="$(ZenithThemeSource)"
+          DestinationFiles="$(ZenithThemeDestination)"
+          SkipUnchangedFiles="true" />
+  </Target>
+
+</Project>

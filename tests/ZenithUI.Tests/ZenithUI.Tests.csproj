@@ -38,6 +38,14 @@
     <Content Include="..\..\src\ZenithUI\Styles\components\*.css"
              Link="Styles\%(Filename)%(Extension)"
              CopyToOutputDirectory="PreserveNewest" />
+
+    <!--
+      The generated consumer theme. It is an output of the referenced project's build, which the
+      project reference orders ahead of this copy - see ConsumerThemeTests for what it guards.
+    -->
+    <Content Include="..\..\src\ZenithUI\tailwind\zenith.theme.css"
+             Link="Tailwind\%(Filename)%(Extension)"
+             CopyToOutputDirectory="PreserveNewest" />
   </ItemGroup>
 
   <ItemGroup>

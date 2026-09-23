@@ -65,6 +65,18 @@ jobs:
           fi
           echo "Found zenith.css in $package"
 
+          # The consumer @theme and the targets file that delivers it. Without either, an app
+          # running its own Tailwind restores a package that builds fine and compiles none of
+          # ZenithUI's semantic utilities for its own markup - see docs/theming.md.
+          for required in 'tailwind/zenith.theme.css' 'build/ZenithUI.targets' 'buildTransitive/ZenithUI.targets'; do
+            if ! unzip -l "$package" | grep -q "$required"; then
+              echo "::error::$required is missing from $package."
+              unzip -l "$package"
+              exit 1
+            fi
+            echo "Found $required in $package"
+          done
+
       - name: Upload packages
         uses: actions/upload-artifact@v4
         with:

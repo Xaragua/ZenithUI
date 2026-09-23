@@ -524,6 +524,8 @@ Recorded because each changed the design rather than merely the code.
 | A group's expansion comes from its own `Href`, not from its children | A parent builds its render tree before any child exists, so `open` is written before a link knows whether it matches. `ZenDefer` cannot help: a nav link renders the markup that goes *inside* the element whose attribute depends on it. The alternative is a second pass, which static SSR does not have. |
 | Three elements in the chrome carry **no `display` utility at all** | A consumer running their own Tailwind emits `.flex` and almost certainly not `.lg\:hidden`, and their sheet loads last into the same `utilities` layer. See the note below — this was a real, shipped-looking bug. |
 | `ZenSideNav`'s explicit `Id` outranks the shell cascade | The only way to wire a nav the cascade cannot reach: one the consumer made an interactive island under a static shell. |
+| The consumer `@theme` ships as a **generated, flattened file plus an MSBuild copy**, not an npm package | The plan offered a companion npm package or a `$(NuGetPackageRoot)` import. The first splits one version across two registries; the second hardcodes a machine path and a version number in a checked-in stylesheet. A targets file in the package puts the file at a stable relative path inside the consumer's own project, which is neither. |
+| That file carries the library's **whole candidate list**, not just `@theme` | `@theme` alone fixes only half the problem. The other half is cascade order, and the only way two stylesheets can stop disagreeing about `lg:hidden` is for both to emit it. The list comes from `@tailwindcss/oxide` — Tailwind's own scanner — so it cannot drift from what the library was built with. |
 
 ### The cascade-order trap a precompiled component library walks into
 
@@ -546,13 +548,16 @@ popover state, the library states it in its own `@layer components` rule and put
 utility on the element.** Hence `.zen-sidenav`, `.zen-sidenav-bar` and `.zen-nav-toggle`.
 
 The same hazard applies in weaker form to any responsive variant competing with an unprefixed
-utility (`sm:px-6` against `px-4`), where the cost is cosmetic rather than structural. M6's
-consumer-`@theme` work is what removes the class of bug: one Tailwind build that scans the library's
-markup emits both halves in the right order.
+utility (`sm:px-6` against `px-4`), where the cost is cosmetic rather than structural.
+
+M6 closed the class of bug rather than the instances. The generated `tailwind/zenith.theme.css`
+carries every candidate the library's own markup contains, so a consumer's Tailwind build emits the
+same rules ZenithUI's stylesheet does and the two cannot disagree about a shared utility — whichever
+one the browser parses last. The three `@layer components` display rules stay as they are: they are
+correct on their own terms, and they also protect an app that links `zenith.css` without ever
+importing the theme.
 
 ## Known gaps
 
-- **Consumer `@theme` import from NuGet.** An app that runs its own Tailwind needs to import
-  ZenithUI's `@theme` so `bg-surface` compiles in its markup. The demo does this by relative path,
-  which only works from a source checkout. The real fix is a companion npm package or a documented
-  `$(NuGetPackageRoot)` import. Scheduled for M6.
+_None currently open. The consumer-`@theme` gap closed in M6 — see
+[`theming.md`](theming.md#if-your-app-runs-its-own-tailwind)._

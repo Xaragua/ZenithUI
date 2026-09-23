@@ -23,6 +23,7 @@ samples/ZenithUI.Demo/wwwroot/app.css
 src/ZenithUI/wwwroot/zenith.css
 src/ZenithUI/wwwroot/zenith.nopreflight.css
 src/ZenithUI/wwwroot/*.css.map
+src/ZenithUI/tailwind/
 
 # Test results
 TestResults/

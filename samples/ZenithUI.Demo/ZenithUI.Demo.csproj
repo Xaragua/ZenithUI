@@ -30,8 +30,9 @@
     this project's .razor files. Any consuming app that writes Tailwind classes of its own does
     exactly this - see Styles/app.css.
 
-    The token stylesheets are listed as inputs so that editing a palette value rebuilds the demo's
-    CSS too, not just the library's.
+    The library's generated theme is listed as an input so that editing a palette value or adding
+    a utility to a component rebuilds the demo's CSS too, not just the library's. It is the same
+    artifact the .nupkg ships; the demo reaches it by relative path because it builds from source.
   -->
   <Target Name="DemoRestoreNpm" Condition="!Exists('$(MSBuildProjectDirectory)\node_modules')">
     <Exec Command="npm ci --no-audit --no-fund" WorkingDirectory="$(MSBuildProjectDirectory)"
@@ -44,7 +45,7 @@
     <DemoTailwindInput Include="@(DemoStyle)" />
     <DemoTailwindInput Include="Components\**\*.razor" />
     <DemoTailwindInput Include="..\ZenithUI.Demo.Client\**\*.razor" />
-    <DemoTailwindInput Include="..\..\src\ZenithUI\Styles\tokens\*.css" />
+    <DemoTailwindInput Include="..\..\src\ZenithUI\tailwind\zenith.theme.css" />
   </ItemGroup>
 
   <Target Name="BuildDemoTailwind"

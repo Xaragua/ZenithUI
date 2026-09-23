@@ -4,13 +4,15 @@
   "private": true,
   "description": "Tailwind CSS build pipeline for the ZenithUI Blazor component library.",
   "scripts": {
-    "css:build": "npm run css:build:full && npm run css:build:nopreflight",
+    "css:build": "npm run css:build:full && npm run css:build:nopreflight && npm run css:build:theme",
     "css:build:full": "tailwindcss -i ./Styles/zenith.css -o ./wwwroot/zenith.css --minify",
     "css:build:nopreflight": "tailwindcss -i ./Styles/zenith.nopreflight.css -o ./wwwroot/zenith.nopreflight.css --minify",
+    "css:build:theme": "node ./tools/build-theme.mjs",
     "css:watch": "tailwindcss -i ./Styles/zenith.css -o ./wwwroot/zenith.css --watch"
   },
   "devDependencies": {
     "@tailwindcss/cli": "^4.1.0",
+    "@tailwindcss/oxide": "^4.1.0",
     "tailwindcss": "^4.1.0"
   }
 }

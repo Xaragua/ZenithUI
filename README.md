@@ -64,9 +64,22 @@ So:
 | Your app | What to do |
 | --- | --- |
 | No Tailwind of its own | Link `zenith.css`. Semantic utilities are all there. |
-| Runs Tailwind | Link `zenith.nopreflight.css`, and import ZenithUI's `@theme` into your own entry so `bg-surface` compiles for your markup too. |
+| Runs Tailwind | Link `zenith.nopreflight.css`, and add one import to your own Tailwind entry point (below). |
 
-`samples/ZenithUI.Demo/Styles/app.css` is a working example of the second case.
+The package ships a flattened `zenith.theme.css` and an MSBuild target that copies it into your
+project's `obj/` on build, so the import is a stable relative path rather than a version-stamped
+path into your NuGet cache:
+
+```css
+@import "tailwindcss";
+@source "../Components/**/*.razor";
+@import "../obj/zenithui/zenith.theme.css";
+```
+
+That is what makes `bg-surface` compile for *your* markup — and it carries every class ZenithUI's
+own components use, so the two stylesheets cannot disagree about a shared utility. See
+[`docs/theming.md`](docs/theming.md) for why that second half matters;
+`samples/ZenithUI.Demo/Styles/app.css` is a working example.
 
 **3. Add a theme switcher** wherever it belongs:
 
@@ -186,6 +199,7 @@ repository root, because it is the GitHub landing page.
 | Document | Contents |
 | --- | --- |
 | [`docs/plan.md`](docs/plan.md) | The implementation plan of record — architecture, component inventory, milestones, and the design decisions behind them |
+| [`docs/theming.md`](docs/theming.md) | The token surface, the three-state light/dark model, rebranding, and what an app running its own Tailwind has to do |
 | [`docs/CHANGELOG.md`](docs/CHANGELOG.md) | What shipped, and what was fixed along the way |
 
 ## License

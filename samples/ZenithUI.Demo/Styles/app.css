@@ -11,9 +11,14 @@
  * would without ZenithUI. An application that does not can skip all of this and link
  * `_content/ZenithUI/zenith.css` alone - the safelist guarantees the semantic utilities are there.
  *
- * The token and @theme imports below are what make `bg-surface` and `rounded-zen-lg` resolve in
- * THIS project's markup: `@theme` has to be present in the build that compiles a utility, not
- * merely in some other stylesheet on the page.
+ * The theme import below is what makes `bg-surface` and `rounded-zen-lg` resolve in THIS project's
+ * markup: `@theme` has to be present in the build that compiles a utility, not merely in some
+ * other stylesheet on the page. It also carries every candidate ZenithUI's own markup contains,
+ * so that this sheet and the library's agree on what a shared utility means no matter which of
+ * the two the browser parses last - see docs/theming.md.
+ *
+ * The path here is a source checkout's. An app consuming the NuGet package imports the identical
+ * file from `../obj/zenithui/zenith.theme.css`, where build/ZenithUI.targets puts it.
  */
 
 @import "tailwindcss" source(none);
@@ -21,9 +26,7 @@
 @source "../Components/**/*.razor";
 @source "../../ZenithUI.Demo.Client/**/*.razor";
 
-@import "../../../src/ZenithUI/Styles/tokens/base.css";
-@import "../../../src/ZenithUI/Styles/tokens/dark.css";
-@import "../../../src/ZenithUI/Styles/tokens/theme.css";
+@import "../../../src/ZenithUI/tailwind/zenith.theme.css";
 
 /* ---- Demo-only rules ------------------------------------------------------
  * Note what is absent: no colours, no spacing scale, no component styling. If the demo needed
