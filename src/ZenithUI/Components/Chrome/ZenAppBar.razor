@@ -1,0 +1,153 @@
+@namespace ZenithUI
+
+@inherits ZenComponentBase
+
+@*
+    The application's top bar: a <header> landmark holding a brand, optional centre content and a
+    cluster of actions.
+
+    The menu button is the part worth reading. It is a plain <button popovertarget>, pointed at the
+    side nav's element id - no click handler, no state, no render mode. That is deliberate and it
+    is the only design that works where app bars actually live: inside a layout, which can never be
+    interactive because `Body` is a RenderFragment and a render fragment cannot cross a render-mode
+    boundary. A toggle built on an @onclick would have been demonstrable and unusable.
+
+    `popovertarget` is resolved by the browser against the document, not by Blazor against a render
+    tree, so the button also works when the bar and the nav are separate interactive islands.
+*@
+
+<header class="@RootClass(BarClass)" style="@Style" @attributes="AttributesWithoutClass">
+    <div class="@InnerClass">
+        @if (ShowsMenuToggle)
+        {
+            <button type="button"
+                    class="zen-nav-toggle zen-focus size-9 shrink-0 place-items-center rounded-zen-md text-content-muted transition-colors hover:bg-surface-sunken hover:text-content"
+                    popovertarget="@MenuTargetId"
+                    popovertargetaction="toggle"
+                    aria-label="@MenuLabel">
+                <ZenIcon Path="@ZenIcons.Menu" />
+            </button>
+        }
+
+        @if (Brand is not null)
+        {
+            <div class="flex min-w-0 shrink-0 items-center gap-2 font-semibold tracking-tight">
+                @Brand
+            </div>
+        }
+
+        @if (ChildContent is not null)
+        {
+            <div class="flex min-w-0 flex-1 items-center">
+                @ChildContent
+            </div>
+        }
+
+        @if (Actions is not null)
+        {
+            @* `ms-auto` rather than a spacer element: with no centre content the actions still
+               need to reach the end of the bar, and an empty flex child to push them there is a
+               node that exists only to be invisible. *@
+            <div class="ms-auto flex shrink-0 items-center gap-2">
+                @Actions
+            </div>
+        }
+    </div>
+
+    @if (Below is not null)
+    {
+        <div class="@BelowClass">
+            @Below
+        </div>
+    }
+</header>
+
+@code {
+    [CascadingParameter]
+    private ZenShellContext? Shell { get; set; }
+
+    /// <summary>Leading content: a logo, a product name, a link home.</summary>
+    [Parameter]
+    public RenderFragment? Brand { get; set; }
+
+    /// <summary>
+    /// Centre content, usually a horizontal <c>ZenNavMenu</c>. Grows to fill the bar.
+    /// </summary>
+    [Parameter]
+    public RenderFragment? ChildContent { get; set; }
+
+    /// <summary>Trailing content, aligned to the end of the bar.</summary>
+    [Parameter]
+    public RenderFragment? Actions { get; set; }
+
+    /// <summary>
+    /// A second row under the main one - a breadcrumb, a filter strip, a narrow-screen nav.
+    /// </summary>
+    /// <remarks>
+    /// Inside the sticky region, so it stays with the bar. Its height adds to
+    /// <c>--zen-appbar-height</c>'s worth of offset, which is why a shell using this should set
+    /// its own <c>--zen-sidenav-top</c>.
+    /// </remarks>
+    [Parameter]
+    public RenderFragment? Below { get; set; }
+
+    /// <summary>Keeps the bar pinned to the top of the viewport as the page scrolls.</summary>
+    [Parameter]
+    public bool Sticky { get; set; } = true;
+
+    /// <summary>Draws the rule along the bottom edge.</summary>
+    [Parameter]
+    public bool Bordered { get; set; } = true;
+
+    /// <summary>Maximum width of the bar's content, matched to the page's content column.</summary>
+    [Parameter]
+    public ZenContentWidth MaxWidth { get; set; } = ZenContentWidth.Full;
+
+    /// <summary>
+    /// Renders the narrow-screen menu button. Suppress it for a shell with no side nav.
+    /// </summary>
+    [Parameter]
+    public bool ShowMenuToggle { get; set; } = true;
+
+    /// <summary>
+    /// Element id of the side nav the menu button reveals. Taken from the enclosing
+    /// <c>ZenAppShell</c> when there is one.
+    /// </summary>
+    [Parameter]
+    public string? MenuTarget { get; set; }
+
+    /// <summary>Accessible name for the menu button.</summary>
+    [Parameter]
+    public string MenuLabel { get; set; } = "Open navigation";
+
+    private string? MenuTargetId => MenuTarget ?? Shell?.NavId;
+
+    /// <summary>
+    /// Whether to draw the menu button at all: only when there is something for it to open.
+    /// </summary>
+    /// <remarks>
+    /// A button whose <c>popovertarget</c> names no element is inert but perfectly focusable, so a
+    /// keyboard user lands on a control that does nothing and is given no clue why.
+    /// </remarks>
+    private bool ShowsMenuToggle => ShowMenuToggle && MenuTargetId is not null;
+
+    private string BarClass => CssBuilder
+        // `bg-surface-raised/85` with a blur rather than an opaque fill: content scrolling under a
+        // solid bar just disappears, and the translucency is what tells the user there is more
+        // above. The fallback is the same colour at full opacity, so a browser without
+        // backdrop-filter loses the effect and nothing else.
+        .Default("z-30 w-full bg-surface-raised/85 text-content backdrop-blur")
+        .AddClass("sticky top-0", Sticky)
+        .AddClass("border-b border-border", Bordered)
+        .Build()!;
+
+    private string InnerClass => CssBuilder
+        .Default("mx-auto flex h-appbar items-center gap-3 px-4 sm:px-6")
+        .AddClass(ZenStyles.ContentWidth(MaxWidth))
+        .Build()!;
+
+    private string BelowClass => CssBuilder
+        .Default("mx-auto flex items-center gap-1 px-4 pb-2 sm:px-6")
+        .AddClass(ZenStyles.ContentWidth(MaxWidth))
+        .Build()!;
+}

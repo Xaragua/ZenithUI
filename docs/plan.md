@@ -1,7 +1,7 @@
 # ZenithUI — implementation plan
 
-> **Status:** M0 through M4 complete (2026-09-23). M5 next: the chrome and layout family —
-> ZenAppBar, ZenNavMenu, ZenSideNav, ZenFooter, ZenAppShell.
+> **Status:** M0 through M5 complete (2026-09-23). M6 next: docs, the accessibility audit,
+> packaging and v1.0.0 — including closing the consumer-`@theme` gap.
 > This is the plan of record. It is kept current: where implementation contradicted the original
 > plan, the plan was corrected and the change noted under [Deviations](#deviations-from-the-original-plan).
 
@@ -268,6 +268,34 @@ pattern).
 **Chrome & layout** — `ZenAppBar`, `ZenNavMenu` + `ZenNavLink`, `ZenSideNav` (off-canvas below
 `lg`), `ZenFooter`, `ZenAppShell`.
 
+### The shell needs no render mode, and that constraint chose its design
+
+A shell lives in a layout. A layout can never be interactive, because `Body` is a `RenderFragment`
+and a render fragment cannot cross a render-mode boundary — so a drawer toggled by `@onclick` and a
+`bool` would demo beautifully on the page that showed it off and be unusable in the only place a
+shell goes.
+
+So `ZenSideNav` renders **one** `<aside>` carrying `popover="auto"`. Above `lg` it is a sticky rail
+and the popover is never opened; below `lg` a bare `<button popovertarget>` in the app bar toggles
+it. `popovertarget` is resolved by the browser against the document rather than by Blazor against a
+render tree, which is also why the button works when the bar and the nav are separate interactive
+islands. The platform then supplies the top layer, `::backdrop`, Escape, click-outside dismissal,
+focus restore to the invoker, and — verified in-browser — an implicit `expanded` state on the
+invoker in the accessibility tree.
+
+One element rather than a rail plus a drawer: two would put every link in the DOM twice, with
+duplicate ids and a navigation announced twice on every page.
+
+What a render mode *adds*, through a single `bindDrawer` call: a focus trap (`popover="auto"` does
+not confine Tab), a scroll lock, and dismissal when a link inside is followed under enhanced
+navigation — which swaps the page with no event the platform treats as a dismissal. All three are
+absent without it, not broken.
+
+`ZenAppShell` contributes the skip link, the `<main>` landmark with `tabindex="-1"` for it to aim
+at, the cascaded ids that join the bar to the nav, and `--zen-sidenav-top` — how far down the
+viewport a sticky rail begins, which is the one measurement neither component can derive, since CSS
+gives an element no way to measure a sticky sibling.
+
 ### `ZenTable<TItem>` — the hardest component
 
 - Columns are child components registering through `CascadingValue<ZenTable<TItem>>`:
@@ -444,7 +472,7 @@ component's bUnit test asserts its required ARIA attributes.
 | **M2** ✅ | Text, textarea, number, currency, date, search, checkbox (+group), radio group, native select, `ZenToggle`, `ZenRangeSlider`, `ZenForm`, plus the feedback primitives `ZenProgress` and `ZenIndicator` | A demo form binds an `EditForm` + `DataAnnotationsValidator` and shows per-field errors; the same inputs also work **without** an `EditForm` | ✅ |
 | **M3** ✅ | `ZenModal` + `IZenModalService`, `ZenToast` + `IZenToastService`, `ZenPopover`, `ZenCombobox<TItem>`, `ZenList<TItem>` | A dialog can be raised and awaited from a service with no markup on the page; focus returns to the opener on close; combobox passes keyboard + ARIA tests and prerenders as a closed labelled field with JS disabled | ✅ |
 | **M4** ✅ | `ZenTable<TItem>` + `ZenColumn<TItem>` (sort/page/select/hierarchy/detail rows/responsive collapse), `ZenEmptyState`, `ZenTree<TItem>`, `ZenTimeline` + `ZenTimelineItem` | Demo renders a 3-level hierarchical table and a lazy-loading tree | ✅ |
-| **M5** | `ZenAppBar`, `ZenNavMenu`, `ZenSideNav`, `ZenFooter`, `ZenAppShell` | Shell demo usable at 360 / 768 / 1440 px; drawer traps focus and restores it on close | |
+| **M5** ✅ | `ZenAppBar`, `ZenNavMenu` + `ZenNavLink`, `ZenSideNav`, `ZenFooter`, `ZenAppShell` | Shell demo usable at 360 / 768 / 1440 px; drawer traps focus and restores it on close | ✅ |
 | **M6** | Docs, a11y audit, `dotnet pack`, NuGet metadata, v1.0.0, **close the consumer-`@theme` gap** | `.nupkg` consumed successfully by a scratch Blazor Server app **and** a Blazor WASM app | |
 
 ---
@@ -490,6 +518,35 @@ Recorded because each changed the design rather than merely the code.
 | The table's page-size control is a bare `<select>` | `ZenSelect` is a form control and registers a field in any cascading `EditContext`. A table inside an `EditForm` would have its page size join that form's validation. |
 | `ZenTable` sorting is tri-state | The order data arrived in carries information — usually "newest first" from the server — and a two-state toggle leaves no way back to it. |
 | `TItem` constrained to `notnull` on `ZenTree` and `ZenTable` | Expansion, lazy-load caching and selection are all keyed by the item. A null node has no identity to key on. |
+| The side-nav drawer is a **popover**, not Blazor state | A layout cannot be interactive, so a shell whose nav needed a render mode could not be used as a layout. The platform's `popovertarget` crosses boundaries Blazor's cascade cannot. |
+| `ZenNavLink` does not wrap Blazor's `NavLink` | `NavLink` decides the same thing and spends it on a CSS class only — it never sets `aria-current`. The active item was visible to sighted users and silent to everyone else. |
+| Three elements in the chrome carry **no `display` utility at all** | A consumer running their own Tailwind emits `.flex` and almost certainly not `.lg\:hidden`, and their sheet loads last into the same `utilities` layer. See the note below — this was a real, shipped-looking bug. |
+| `ZenSideNav`'s explicit `Id` outranks the shell cascade | The only way to wire a nav the cascade cannot reach: one the consumer made an interactive island under a static shell. |
+
+### The cascade-order trap a precompiled component library walks into
+
+Found in the browser during M5, after every test passed.
+
+A library that ships precompiled CSS **alongside** a consumer running their own Tailwind has two
+stylesheets writing into the same `utilities` layer, and within a layer the later file wins. The
+consumer's build emits only what *they* use. So `.flex` is almost certainly in their sheet and
+`.lg\:hidden` almost certainly is not — and a library component written as `class="flex lg:hidden"`
+is `display: flex` at every width, in every app but the ones that happened to use `lg:hidden` in
+their own markup.
+
+On the drawer the same collision was worse than cosmetic. An unopened popover is hidden by a **UA**
+rule, and any author `display` outranks the UA origin whatever the specificity — so `.flex` on the
+`<aside>` left the drawer permanently on screen, overlapping the page, with no scrim and no top
+layer. It read as a broken component and was a cascade-order accident.
+
+The fix is narrow and the rule is general: **where `display` is decided by a breakpoint or by
+popover state, the library states it in its own `@layer components` rule and puts no display
+utility on the element.** Hence `.zen-sidenav`, `.zen-sidenav-bar` and `.zen-nav-toggle`.
+
+The same hazard applies in weaker form to any responsive variant competing with an unprefixed
+utility (`sm:px-6` against `px-4`), where the cost is cosmetic rather than structural. M6's
+consumer-`@theme` work is what removes the class of bug: one Tailwind build that scans the library's
+markup emits both halves in the right order.
 
 ## Known gaps
 

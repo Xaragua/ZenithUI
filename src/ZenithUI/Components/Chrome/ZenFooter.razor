@@ -1,0 +1,72 @@
+@namespace ZenithUI
+
+@inherits ZenComponentBase
+
+@*
+    The page footer: a <footer> landmark with a centred content column.
+
+    Start and End are separate slots rather than one row the caller aligns themselves, because the
+    two halves have to stack on a narrow screen and swap to a row on a wide one - and a caller who
+    writes that flex container by hand gets it right until the first long copyright line.
+*@
+
+<footer class="@RootClass(FooterClass)" style="@Style" @attributes="AttributesWithoutClass">
+    <div class="@InnerClass">
+        @if (Start is not null || End is not null)
+        {
+            <div class="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+                <div class="min-w-0">
+                    @Start
+                </div>
+
+                @if (End is not null)
+                {
+                    <div class="flex shrink-0 flex-wrap items-center gap-4">
+                        @End
+                    </div>
+                }
+            </div>
+        }
+
+        @ChildContent
+    </div>
+</footer>
+
+@code {
+    /// <summary>Footer content, rendered below <see cref="Start"/> and <see cref="End"/>.</summary>
+    [Parameter]
+    public RenderFragment? ChildContent { get; set; }
+
+    /// <summary>Leading content - a copyright line, a product name.</summary>
+    [Parameter]
+    public RenderFragment? Start { get; set; }
+
+    /// <summary>Trailing content - secondary links, a version string.</summary>
+    [Parameter]
+    public RenderFragment? End { get; set; }
+
+    /// <summary>Maximum width of the content column, matched to the page's.</summary>
+    [Parameter]
+    public ZenContentWidth MaxWidth { get; set; } = ZenContentWidth.Full;
+
+    /// <summary>Draws the rule along the top edge.</summary>
+    [Parameter]
+    public bool Bordered { get; set; } = true;
+
+    /// <summary>
+    /// Fills the footer with the sunken surface, separating it from the page above.
+    /// </summary>
+    [Parameter]
+    public bool Filled { get; set; }
+
+    private string FooterClass => CssBuilder
+        .Default("w-full text-sm text-content-muted")
+        .AddClass("border-t border-border", Bordered)
+        .AddClass("bg-surface-sunken", Filled)
+        .Build()!;
+
+    private string InnerClass => CssBuilder
+        .Default("mx-auto flex flex-col gap-3 px-4 py-6 sm:px-6")
+        .AddClass(ZenStyles.ContentWidth(MaxWidth))
+        .Build()!;
+}

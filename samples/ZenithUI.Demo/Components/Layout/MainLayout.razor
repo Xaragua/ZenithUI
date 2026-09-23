@@ -1,84 +1,112 @@
 @inherits LayoutComponentBase
 
 @*
-    Interim demo shell. ZenAppShell replaces all of this in M5 - until then the demo hand-rolls a
-    header and sidebar so the token system has something real to be judged against.
+    The demo's shell, and the point of M5: this file used to hand-roll a header, two navs and a
+    footer because the library had none. It is now composition, and the thing worth noticing is
+    what is NOT here.
 
-    The layout is static SSR; only the theme toggle is interactive. That is the point worth
-    noticing: a page can be entirely server-rendered HTML and still carry a working ZenithUI
-    control, because interactivity is opted into per component rather than per application.
+    THERE IS NO @rendermode ON THE SHELL. The layout is static SSR - it has to be, because @Body is
+    a RenderFragment and a render fragment cannot cross a render-mode boundary - and the navigation
+    works anyway, drawer included. The menu button is a <button popovertarget> pointed at the side
+    nav's id; the browser does the rest. Only the theme toggle is an interactive island.
 
-    ZenThemeProvider is deliberately NOT used here. It would have to wrap @Body, and a
-    RenderFragment cannot be passed as a parameter across a static-to-interactive boundary - so a
-    provider in a layout is always static, and a static provider never gets a JavaScript runtime
-    to initialize against. See Components/Pages/Theming.razor for the provider in the role it
-    exists for.
+    Narrow the window below 1024px and the rail becomes a drawer. Open it with keyboard and
+    JavaScript both disabled and it still opens: that is the platform's popover, not ours.
+
+    ZenThemeProvider is still deliberately absent. It would have to wrap @Body, and a static
+    provider never gets a JavaScript runtime to initialize against. See Pages/Theming.razor for the
+    provider in the role it exists for.
 *@
 
-<div class="min-h-screen bg-surface text-content">
-    <header class="sticky top-0 z-30 border-b border-border bg-surface-raised/85 backdrop-blur">
-        <div class="mx-auto flex h-appbar max-w-6xl items-center gap-4 px-4 sm:px-6">
-            <a href="/" class="zen-focus flex items-center gap-2 rounded-zen-sm font-semibold tracking-tight">
-                <span class="grid size-7 place-items-center rounded-zen-md bg-primary text-sm text-primary-content">Z</span>
-                <span>ZenithUI</span>
-            </a>
+<ZenAppShell MaxWidth="ZenContentWidth.Wide">
 
-            <nav class="ml-2 hidden items-center gap-1 md:flex" aria-label="Sections">
-                @foreach (var link in NavLinks)
-                {
-                    <NavLink href="@link.Href"
-                             Match="@(link.Href.Length == 0 ? NavLinkMatch.All : NavLinkMatch.Prefix)"
-                             class="zen-focus rounded-zen-sm px-3 py-1.5 text-sm text-content-muted transition-colors hover:bg-surface-sunken hover:text-content"
-                             ActiveClass="bg-surface-sunken text-content! font-medium">
-                        @link.Label
-                    </NavLink>
-                }
-            </nav>
+    <Header>
+        <ZenAppBar>
+            <Brand>
+                <a href="/" class="zen-focus flex items-center gap-2 rounded-zen-sm">
+                    <span class="grid size-7 place-items-center rounded-zen-md bg-primary text-sm text-primary-content">Z</span>
+                    <span>ZenithUI</span>
+                </a>
+            </Brand>
 
-            <div class="ml-auto flex items-center gap-2">
+            <ChildContent>
+                @* The bar's nav is hidden below `lg`, where the same links are in the drawer.
+                   Hidden rather than duplicated-and-hidden: `hidden` is display:none, so these
+                   links leave the accessibility tree entirely and are not announced twice. *@
+                <ZenNavMenu Orientation="ZenNavOrientation.Horizontal"
+                            Label="Sections"
+                            Class="ms-2 hidden lg:flex">
+                    @foreach (var link in NavLinks)
+                    {
+                        <ZenNavLink Href="@link.Href" Text="@link.Label" />
+                    }
+                </ZenNavMenu>
+            </ChildContent>
+
+            <Actions>
                 <ZenThemeToggle Mode="ZenThemeToggleMode.Segmented"
                                 Size="ZenSize.Small"
                                 @rendermode="InteractiveServer" />
-            </div>
-        </div>
+            </Actions>
+        </ZenAppBar>
+    </Header>
 
-        <nav class="flex items-center gap-1 overflow-x-auto border-t border-border px-4 pb-2 md:hidden"
-             aria-label="Sections">
-            @foreach (var link in NavLinks)
-            {
-                <NavLink href="@link.Href"
-                         Match="@(link.Href.Length == 0 ? NavLinkMatch.All : NavLinkMatch.Prefix)"
-                         class="zen-focus shrink-0 rounded-zen-sm px-3 py-1.5 text-sm text-content-muted"
-                         ActiveClass="bg-surface-sunken text-content! font-medium">
-                    @link.Label
-                </NavLink>
-            }
-        </nav>
-    </header>
+    <SideNav>
+        @* No render mode. The drawer opens, closes, dismisses on Escape and returns focus to the
+           button without one. Giving it InteractiveServer would add the focus trap and the scroll
+           lock - see ZenSideNav's bindDrawer call - but the trade is a circuit per page, and the
+           shell is meant to show the floor rather than the ceiling. *@
+        <ZenSideNav Label="Sections">
+            <Header>
+                <span class="font-semibold tracking-tight">ZenithUI</span>
+            </Header>
 
-    <main class="mx-auto max-w-6xl px-4 py-8 sm:px-6 sm:py-10">
+            <ChildContent>
+                <ZenNavMenu Landmark="false">
+                    @foreach (var link in NavLinks)
+                    {
+                        <ZenNavLink Href="@link.Href" Text="@link.Label" Icon="@link.Icon" />
+                    }
+                </ZenNavMenu>
+            </ChildContent>
+
+            <Footer>
+                <p class="px-3 text-xs text-content-subtle">Milestone M5</p>
+            </Footer>
+        </ZenSideNav>
+    </SideNav>
+
+    <Footer>
+        <ZenFooter MaxWidth="ZenContentWidth.Wide">
+            <Start>
+                <p>ZenithUI &middot; milestone M5 &mdash; chrome, layout and navigation.</p>
+                <p class="mt-1 text-content-subtle">
+                    Every colour on this page resolves through a <code>--zen-*</code> custom
+                    property. Switching the theme repaints without re-rendering a single component.
+                </p>
+            </Start>
+
+            <End>
+                <a href="/shell" class="zen-focus rounded-zen-sm hover:text-content">Shell</a>
+                <a href="/tokens" class="zen-focus rounded-zen-sm hover:text-content">Tokens</a>
+            </End>
+        </ZenFooter>
+    </Footer>
+
+    <ChildContent>
         @Body
-    </main>
 
-    @* One host per document renders every dialog IZenModalService has open. It lives in the
-       layout rather than on a page so a dialog survives navigation between pages, and so pages
-       do not each have to remember to include one. *@
-    <ZenModalHost @rendermode="InteractiveServer" />
+        @* One host per document renders every dialog IZenModalService has open. It lives in the
+           layout rather than on a page so a dialog survives navigation between pages, and so pages
+           do not each have to remember to include one. *@
+        <ZenModalHost @rendermode="InteractiveServer" />
 
-    @* Same rule as the modal host: exactly one per document, or every toast renders - and
-       announces - twice. *@
-    <ZenToastHost Position="ZenToastPosition.BottomEnd" @rendermode="InteractiveServer" />
+        @* Same rule as the modal host: exactly one per document, or every toast renders - and
+           announces - twice. *@
+        <ZenToastHost Position="ZenToastPosition.BottomEnd" @rendermode="InteractiveServer" />
+    </ChildContent>
 
-    <footer class="border-t border-border">
-        <div class="mx-auto flex max-w-6xl flex-col gap-1 px-4 py-6 text-sm text-content-muted sm:px-6">
-            <p>ZenithUI &middot; milestone M1 &mdash; foundation, tokens, theming and primitives.</p>
-            <p class="text-content-subtle">
-                Every colour on this page resolves through a <code>--zen-*</code> custom property.
-                Switching the theme repaints without re-rendering a single component.
-            </p>
-        </div>
-    </footer>
-</div>
+</ZenAppShell>
 
 <div id="blazor-error-ui" data-nosnippet>
     An unhandled error has occurred.
@@ -87,15 +115,16 @@
 </div>
 
 @code {
-    private static readonly (string Href, string Label)[] NavLinks =
+    private static readonly (string Href, string Label, string Icon)[] NavLinks =
     [
-        ("", "Overview"),
-        ("tokens", "Tokens"),
-        ("primitives", "Primitives"),
-        ("forms", "Forms"),
-        ("theming", "Theming"),
-        ("overlays", "Overlays"),
-        ("data", "Data"),
-        ("render-modes", "Render modes"),
+        ("", "Overview", ZenIcons.Inbox),
+        ("tokens", "Tokens", ZenIcons.Sun),
+        ("primitives", "Primitives", ZenIcons.Check),
+        ("forms", "Forms", ZenIcons.Search),
+        ("theming", "Theming", ZenIcons.Moon),
+        ("overlays", "Overlays", ZenIcons.Info),
+        ("data", "Data", ZenIcons.Calendar),
+        ("shell", "Shell", ZenIcons.Menu),
+        ("render-modes", "Render modes", ZenIcons.Monitor),
     ];
 }

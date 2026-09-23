@@ -1,0 +1,190 @@
+@page "/shell"
+
+@*
+    No render mode, and that is the demonstration. Every component on this page - and the shell
+    wrapping it - is static HTML and CSS. The drawer this page describes is the one framing it:
+    narrow the window and use the menu button in the bar above.
+*@
+
+<PageTitle>Shell &middot; ZenithUI</PageTitle>
+
+<header class="max-w-3xl">
+    <h1 class="text-3xl font-bold tracking-tight">Chrome and layout</h1>
+    <p class="mt-3 text-content-muted">
+        The five components that frame an application. They are already framing this page:
+        <code>MainLayout.razor</code> is a <code>ZenAppShell</code>, and it carries
+        <strong>no render mode at all</strong>. A layout cannot have one &mdash;
+        <code>@@Body</code> is a <code>RenderFragment</code>, and a render fragment cannot cross a
+        render-mode boundary &mdash; so a shell that needed interactivity to open its own
+        navigation could not be used as a layout, which is the only place a shell goes.
+    </p>
+</header>
+
+<!-- ------------------------------------------------------------------- The drawer -->
+<section class="mt-10">
+    <h2 class="text-lg font-semibold">The drawer is a popover</h2>
+    <p class="mt-2 max-w-3xl text-sm text-content-muted">
+        <code>ZenSideNav</code> renders one <code>&lt;aside&gt;</code>, not a rail and a drawer.
+        Above <code>lg</code> it is a sticky column; below it, <code>popover="auto"</code> takes
+        over and the app bar's menu button is a bare <code>&lt;button popovertarget&gt;</code>.
+        <strong>Narrow this window below 1024px</strong> and open it: the top layer, the scrim,
+        Escape, click-outside dismissal and focus returning to the button are all the browser's,
+        with no JavaScript loaded and no circuit open.
+    </p>
+
+    <div class="mt-4 grid gap-4 md:grid-cols-2">
+        <ZenCard Title="What the platform gives" TitleLevel="3">
+            <ul class="space-y-1.5 text-sm text-content-muted">
+                <li>Toggling from any button in the document, by id</li>
+                <li>The top layer, so no ancestor's <code>overflow</code> can clip it</li>
+                <li><code>::backdrop</code>, with no extra element</li>
+                <li>Escape, and dismissal on a click outside</li>
+                <li>Focus returned to the button that opened it</li>
+                <li>
+                    A closed drawer removed from the tab order, because the UA hides an unopened
+                    popover with <code>display: none</code>
+                </li>
+            </ul>
+        </ZenCard>
+
+        <ZenCard Title="What a render mode adds" TitleLevel="3">
+            <ul class="space-y-1.5 text-sm text-content-muted">
+                <li>A focus trap &mdash; <code>popover="auto"</code> does not confine Tab</li>
+                <li>A scroll lock on the page behind</li>
+                <li>
+                    Dismissal when a link inside is followed under enhanced navigation, which
+                    swaps the page without any event the platform treats as a dismissal
+                </li>
+            </ul>
+            <p class="mt-3 text-sm text-content-subtle">
+                All three are installed by one call to <code>bindDrawer</code> and are absent, not
+                broken, without it.
+            </p>
+        </ZenCard>
+    </div>
+</section>
+
+<!-- ------------------------------------------------------------------- Nav links -->
+<section class="mt-10">
+    <h2 class="text-lg font-semibold">ZenNavMenu and ZenNavLink</h2>
+    <p class="mt-2 max-w-3xl text-sm text-content-muted">
+        A menu is a <strong>list</strong>, so a screen reader announces &ldquo;list, 5
+        items&rdquo; and offers to skip it. A link sets <code>aria-current="page"</code> when it
+        matches the location &mdash; Blazor's own <code>NavLink</code> decides the same thing and
+        spends it on a CSS class only, so the active item is visible to sighted users and
+        announced to nobody.
+    </p>
+
+    <div class="mt-4 grid gap-4 lg:grid-cols-2">
+        <ZenCard Title="Vertical, grouped" TitleLevel="3">
+            <ZenNavMenu Title="Workspace" Landmark="false">
+                <ZenNavLink Href="/shell" Text="Overview" Icon="@ZenIcons.Inbox" />
+                <ZenNavLink Href="/shell/reports" Text="Reports" Icon="@ZenIcons.TrendUp">
+                    <Trailing>
+                        <ZenBadge Intent="ZenIntent.Primary" Size="ZenSize.Small">4</ZenBadge>
+                    </Trailing>
+                </ZenNavLink>
+                <ZenNavLink Href="/shell/billing" Text="Billing" Icon="@ZenIcons.Calendar" Disabled="true" />
+            </ZenNavMenu>
+
+            <ZenNavMenu Title="Account" Landmark="false">
+                <ZenNavLink Href="/shell/profile" Text="Profile" Icon="@ZenIcons.Success" />
+                <ZenNavLink Href="/shell/settings" Text="Settings" Icon="@ZenIcons.Monitor" />
+            </ZenNavMenu>
+
+            <p class="mt-3 text-sm text-content-subtle">
+                &ldquo;Overview&rdquo; is current: this page is <code>/shell</code>. A
+                <code>Title</code> also names its <code>&lt;nav&gt;</code> landmark, which is how
+                a grouped side nav gets distinguishable regions rather than three announcements
+                of &ldquo;navigation&rdquo;.
+            </p>
+        </ZenCard>
+
+        <ZenCard Title="Horizontal" TitleLevel="3">
+            <ZenNavMenu Orientation="ZenNavOrientation.Horizontal" Landmark="false">
+                <ZenNavLink Href="/shell" Text="Overview" />
+                <ZenNavLink Href="/shell/activity" Text="Activity" />
+                <ZenNavLink Href="/shell/members" Text="Members" />
+                <ZenNavLink Href="/shell/settings" Text="Settings" />
+            </ZenNavMenu>
+
+            <p class="mt-4 text-sm text-content-muted">
+                Matching follows <code>NavLink</code>'s rules, with one addition: a link with no
+                <code>Match</code> set picks its own. Exact for the application root, prefix for
+                everything else &mdash; because a root link defaulting to prefix matches every
+                page in the app, which is how a hand-written nav ends up with two items
+                highlighted.
+            </p>
+            <p class="mt-3 text-sm text-content-subtle">
+                The prefix test requires a path separator, so <code>/order</code> does not match
+                <code>/orders</code>; and a query string is ignored unless the link carries one,
+                so a paged table does not deselect its own nav item on page two.
+            </p>
+        </ZenCard>
+    </div>
+</section>
+
+<!-- ------------------------------------------------------------------- App bar -->
+<section class="mt-10">
+    <h2 class="text-lg font-semibold">ZenAppBar</h2>
+    <p class="mt-2 max-w-3xl text-sm text-content-muted">
+        Four slots &mdash; <code>Brand</code>, <code>ChildContent</code>, <code>Actions</code> and
+        an optional <code>Below</code> row that stays inside the sticky region. The bar at the top
+        of this page is one; here is another, with a second row.
+    </p>
+
+    <div class="mt-4 overflow-hidden rounded-zen-lg border border-border">
+        <ZenAppBar Sticky="false" ShowMenuToggle="false" Class="relative">
+            <Brand>
+                <span class="grid size-7 place-items-center rounded-zen-md bg-accent text-sm text-accent-content">N</span>
+                <span>Northwind</span>
+            </Brand>
+
+            <ChildContent>
+                <ZenNavMenu Orientation="ZenNavOrientation.Horizontal" Label="Example sections" Class="ms-2">
+                    <ZenNavLink Href="/shell" Text="Dashboard" />
+                    <ZenNavLink Href="/shell/orders" Text="Orders" />
+                    <ZenNavLink Href="/shell/catalog" Text="Catalog" />
+                </ZenNavMenu>
+            </ChildContent>
+
+            <Actions>
+                <ZenBadge Intent="ZenIntent.Success" Variant="ZenVariant.Soft">Live</ZenBadge>
+                <ZenButton Size="ZenSize.Small" Intent="ZenIntent.Primary">New order</ZenButton>
+            </Actions>
+
+            <Below>
+                <p class="text-sm text-content-subtle">
+                    A <code>Below</code> row: a breadcrumb, a filter strip, a narrow-screen nav.
+                </p>
+            </Below>
+        </ZenAppBar>
+
+        <div class="bg-surface px-4 py-8 text-sm text-content-muted sm:px-6">
+            Page content would sit here.
+        </div>
+
+        <ZenFooter Filled="true" Bordered="true">
+            <Start>
+                <p>&copy; 2026 Northwind Traders</p>
+            </Start>
+            <End>
+                <a href="/shell" class="zen-focus rounded-zen-sm hover:text-content">Privacy</a>
+                <a href="/shell" class="zen-focus rounded-zen-sm hover:text-content">Terms</a>
+            </End>
+        </ZenFooter>
+    </div>
+</section>
+
+<!-- ------------------------------------------------------------------- Skip link -->
+<section class="mt-10">
+    <h2 class="text-lg font-semibold">The skip link</h2>
+    <p class="mt-2 max-w-3xl text-sm text-content-muted">
+        <strong>Press Tab now</strong>, from the top of this page. The first stop is a
+        &ldquo;Skip to main content&rdquo; link that is invisible until it takes focus. It points
+        at the shell's <code>&lt;main&gt;</code>, which carries <code>tabindex="-1"</code> &mdash;
+        without that the browser scrolls to the landmark and leaves focus where it was, so the
+        next Tab goes back to the second nav link, which is precisely what the skip link exists to
+        avoid.
+    </p>
+</section>

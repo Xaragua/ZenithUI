@@ -1,0 +1,279 @@
+@namespace ZenithUI
+
+@inherits ZenComponentBase
+@implements IDisposable
+
+@*
+    A navigation link that knows whether it is the current page.
+
+    Why this does not wrap Blazor's NavLink. NavLink decides the same thing and expresses it only
+    as a CSS class - it never sets `aria-current`. So a sighted user sees the active item and a
+    screen reader user is told nothing: the link reads identically to the seven around it. The
+    matching logic here follows NavLink's rules exactly, and the answer is spent on the attribute
+    as well as the class.
+
+    `aria-current="page"` rather than "true". A nav is usually a set of pages, and "page" is the
+    token that says so; "true" is the vague fallback for a set whose kind is unclear.
+
+    Matching is recomputed on LocationChanged. Under static SSR that event never fires, which is
+    correct rather than a limitation: a static render IS one location, and every navigation is a
+    fresh document with a fresh render.
+*@
+
+@if (InList)
+{
+    <li>@Anchor</li>
+}
+else
+{
+    @Anchor
+}
+
+@code {
+    private string? _hrefAbsolute;
+    private bool _active;
+
+    [Inject]
+    private NavigationManager Nav { get; set; } = default!;
+
+    [CascadingParameter]
+    private ZenNavContext? NavMenu { get; set; }
+
+    /// <summary>Destination, relative to the application base or absolute.</summary>
+    [Parameter]
+    public string? Href { get; set; }
+
+    /// <summary>Link text. Ignored when <see cref="ChildContent"/> is supplied.</summary>
+    [Parameter]
+    public string? Text { get; set; }
+
+    /// <summary>Link content, for a label that is more than a string.</summary>
+    [Parameter]
+    public RenderFragment? ChildContent { get; set; }
+
+    /// <summary>Leading icon markup, typically a <see cref="ZenIcons"/> constant.</summary>
+    [Parameter]
+    public string? Icon { get; set; }
+
+    /// <summary>Trailing content - a count badge, a status dot, a chevron.</summary>
+    [Parameter]
+    public RenderFragment? Trailing { get; set; }
+
+    /// <summary>
+    /// How <see cref="Href"/> is compared against the current location.
+    /// </summary>
+    /// <remarks>
+    /// Left null it is chosen per link: exact for the application root, prefix for everything
+    /// else. A root link defaulting to prefix matches every page in the app, which is how a
+    /// hand-written nav ends up with two items highlighted - and it is never what was wanted.
+    /// </remarks>
+    [Parameter]
+    public NavLinkMatch? Match { get; set; }
+
+    /// <summary>Renders the link as the current page regardless of the location.</summary>
+    /// <remarks>
+    /// For a nav driven by something other than the URL - a wizard step, a detail pane. Setting it
+    /// marks the link current for assistive technology too, so do not use it for mere emphasis.
+    /// </remarks>
+    [Parameter]
+    public bool? Active { get; set; }
+
+    /// <summary>Marks the link as unavailable.</summary>
+    /// <remarks>
+    /// Rendered as a <c>span</c> rather than a disabled anchor, because there is no such thing:
+    /// HTML has no <c>disabled</c> for <c>&lt;a&gt;</c>, and <c>pointer-events: none</c> stops the
+    /// mouse while leaving the link in the tab order and followable with Enter.
+    /// </remarks>
+    [Parameter]
+    public bool Disabled { get; set; }
+
+    private bool IsActive => Active ?? _active;
+
+    private bool InList => NavMenu?.InList ?? false;
+
+    private ZenNavOrientation Orientation => NavMenu?.Orientation ?? ZenNavOrientation.Vertical;
+
+    /// <inheritdoc />
+    protected override void OnInitialized() =>
+        Nav.LocationChanged += HandleLocationChanged;
+
+    /// <inheritdoc />
+    protected override void OnParametersSet()
+    {
+        _hrefAbsolute = Href is null ? null : Nav.ToAbsoluteUri(Href).AbsoluteUri;
+        _active = ShouldMatch(Nav.Uri);
+    }
+
+    private void HandleLocationChanged(object? sender, LocationChangedEventArgs args)
+    {
+        var active = ShouldMatch(args.Location);
+
+        if (active != _active)
+        {
+            _active = active;
+            StateHasChanged();
+        }
+    }
+
+    // ---- Matching ----------------------------------------------------------------------------
+
+    /// <summary>
+    /// Whether this link's destination is the location given.
+    /// </summary>
+    /// <remarks>
+    /// The query and fragment are dropped from the current location unless the link itself carries
+    /// one. Otherwise <c>/orders</c> would stop matching the moment the page added
+    /// <c>?page=2</c> - and a paged table deselecting its own nav item is a bug nobody attributes
+    /// to the nav.
+    /// </remarks>
+    private bool ShouldMatch(string currentUri)
+    {
+        if (_hrefAbsolute is null)
+        {
+            return false;
+        }
+
+        var current = _hrefAbsolute.AsSpan().IndexOfAny('?', '#') >= 0
+            ? currentUri
+            : Trim(currentUri);
+
+        if (EqualsIgnoringTrailingSlash(current, _hrefAbsolute))
+        {
+            return true;
+        }
+
+        return EffectiveMatch == NavLinkMatch.Prefix
+            && IsStrictlyPrefixWithSeparator(current, _hrefAbsolute);
+    }
+
+    /// <summary>
+    /// The match mode in force: the caller's, or exact for a link pointing at the application root
+    /// and prefix for anything else.
+    /// </summary>
+    private NavLinkMatch EffectiveMatch =>
+        Match ?? (IsBaseUri ? NavLinkMatch.All : NavLinkMatch.Prefix);
+
+    private bool IsBaseUri =>
+        _hrefAbsolute is not null && EqualsIgnoringTrailingSlash(_hrefAbsolute, Nav.BaseUri);
+
+    private static string Trim(string uri)
+    {
+        var cut = uri.AsSpan().IndexOfAny('?', '#');
+
+        return cut < 0 ? uri : uri[..cut];
+    }
+
+    /// <summary>
+    /// Compares two absolute URIs, treating a trailing slash as insignificant.
+    /// </summary>
+    /// <remarks>
+    /// <c>NavigationManager.BaseUri</c> always ends in a slash and <c>ToAbsoluteUri("")</c> does
+    /// not, so the application root would never match itself without this.
+    /// </remarks>
+    private static bool EqualsIgnoringTrailingSlash(string left, string right) =>
+        string.Equals(TrimEndSlash(left), TrimEndSlash(right), StringComparison.OrdinalIgnoreCase);
+
+    private static string TrimEndSlash(string value) =>
+        value.Length > 1 && value[^1] == '/' ? value[..^1] : value;
+
+    /// <summary>
+    /// Whether <paramref name="value"/> continues <paramref name="prefix"/> at a path boundary.
+    /// </summary>
+    /// <remarks>
+    /// The separator test is what stops <c>/order</c> matching <c>/orders</c>. A plain
+    /// <c>StartsWith</c> highlights the wrong item in any nav whose routes share a stem, which is
+    /// most of them.
+    /// </remarks>
+    private static bool IsStrictlyPrefixWithSeparator(string value, string prefix)
+    {
+        var trimmed = TrimEndSlash(prefix);
+
+        if (value.Length <= trimmed.Length
+            || !value.StartsWith(trimmed, StringComparison.OrdinalIgnoreCase))
+        {
+            return false;
+        }
+
+        return value[trimmed.Length] is '/' or '?' or '#';
+    }
+
+    // ---- Rendering ---------------------------------------------------------------------------
+
+    private RenderFragment Anchor => builder =>
+    {
+        var seq = 0;
+
+        builder.OpenElement(seq++, Disabled ? "span" : "a");
+        builder.AddAttribute(seq++, "class", RootClass(LinkClass));
+        builder.AddAttribute(seq++, "style", Style);
+
+        if (Disabled)
+        {
+            // Announced as unavailable without being reachable: a span carries no implicit role,
+            // so the link semantics are restored explicitly and then marked disabled.
+            builder.AddAttribute(seq++, "role", "link");
+            builder.AddAttribute(seq++, "aria-disabled", "true");
+        }
+        else
+        {
+            builder.AddAttribute(seq++, "href", Href);
+            builder.AddAttribute(seq++, "aria-current", IsActive ? "page" : null);
+        }
+
+        builder.AddMultipleAttributes(seq++, AttributesWithoutClass);
+        builder.AddContent(seq++, Content);
+        builder.CloseElement();
+    };
+
+    private RenderFragment Content => builder =>
+    {
+        var seq = 0;
+
+        if (Icon is not null)
+        {
+            builder.OpenComponent<ZenIcon>(seq++);
+            builder.AddComponentParameter(seq++, nameof(ZenIcon.Path), Icon);
+            builder.AddComponentParameter(seq++, nameof(ZenIcon.Size), ZenSize.Small);
+            builder.CloseComponent();
+        }
+
+        builder.OpenElement(seq++, "span");
+        builder.AddAttribute(seq++, "class", "min-w-0 truncate");
+
+        if (ChildContent is not null)
+        {
+            builder.AddContent(seq++, ChildContent);
+        }
+        else
+        {
+            builder.AddContent(seq++, Text);
+        }
+
+        builder.CloseElement();
+
+        if (Trailing is not null)
+        {
+            builder.OpenElement(seq++, "span");
+            builder.AddAttribute(seq++, "class", "ms-auto flex shrink-0 items-center gap-1");
+            builder.AddContent(seq++, Trailing);
+            builder.CloseElement();
+        }
+    };
+
+    private string LinkClass => CssBuilder
+        .Default("zen-focus flex items-center gap-2.5 rounded-zen-md px-3 text-sm transition-colors")
+        // A vertical link fills its column and reads as a row; a horizontal one is a chip in a bar
+        // and must not stretch to the height of whatever else is in it.
+        .AddClass("w-full py-2", Orientation == ZenNavOrientation.Vertical)
+        .AddClass("py-1.5", Orientation == ZenNavOrientation.Horizontal)
+        // The active item is a surface change plus weight, not a colour change. A coloured label
+        // in a list of neutral ones reads as a link to somewhere else rather than as "you are
+        // here", and the tinted background survives both palettes without a contrast audit.
+        .AddClass("bg-surface-sunken font-medium text-content", IsActive && !Disabled)
+        .AddClass("text-content-muted hover:bg-surface-sunken hover:text-content", !IsActive && !Disabled)
+        .AddClass("cursor-not-allowed text-content-subtle", Disabled)
+        .Build()!;
+
+    /// <inheritdoc cref="IDisposable.Dispose" />
+    public void Dispose() => Nav.LocationChanged -= HandleLocationChanged;
+}

@@ -1,0 +1,197 @@
+@namespace ZenithUI
+
+@inherits ZenJsComponentBase
+
+@*
+    The side navigation: a persistent rail from `lg` up, an off-canvas drawer below it.
+
+    ONE ELEMENT, TWO LAYOUTS. The obvious implementation renders a rail and a drawer and hides one
+    of them, which puts every link in the DOM twice - duplicate ids, and a screen reader that
+    announces the navigation twice on every page.
+
+    THE DRAWER IS A POPOVER, and that is the load-bearing decision. `popover="auto"` gives the
+    narrow layout its open and close, Escape, click-outside dismissal, the top layer and focus
+    restore to the button that opened it, with no JavaScript and no render mode. It has to work
+    that way: a side nav lives in a layout, and a layout can never be interactive, because `Body`
+    is a RenderFragment and render fragments cannot cross a render-mode boundary. A drawer built on
+    an @onclick and a bool would demo beautifully and then be unusable in the only place it goes.
+
+    Above `lg` the popover is simply never opened - the menu button that targets it is hidden there
+    - and `.zen-sidenav` overrides the UA rule that hides an unopened popover. Below `lg` that rule
+    is left in place, which is what keeps a closed drawer out of the tab order and the
+    accessibility tree without an `inert` attribute to maintain.
+
+    NOTE THE ABSENCE OF DISPLAY UTILITIES on the aside and on its title bar. `display` is owned by
+    the rules in components/base.css, because a `flex` utility here would outrank the UA rule that
+    hides a closed popover and leave the drawer permanently on screen. The comment above
+    `.zen-sidenav` has the full reasoning.
+
+    WHAT INTERACTIVITY ADDS, when the consumer gives the component a render mode: a focus trap and
+    a scroll lock while the drawer is open, and dismissal when a link inside it is followed by
+    enhanced navigation - which swaps the page underneath without any event the platform would
+    treat as a dismissal. See bindDrawer in zen-focus.js. None of it is required for the nav to
+    work; all of it is missing from the popover API.
+*@
+
+<aside id="@NavId"
+       popover="auto"
+       class="@RootClass(NavClass)"
+       style="@Style"
+       aria-label="@Label"
+       @attributes="AttributesWithoutClass">
+
+    @if (Header is not null || ShowCloseButton)
+    {
+        <div class="zen-sidenav-bar h-appbar shrink-0 items-center gap-2 border-b border-border px-4">
+            <div class="min-w-0 flex-1">
+                @Header
+            </div>
+
+            @if (ShowCloseButton)
+            {
+                @* `popovertargetaction="hide"` rather than a handler, for the same reason the
+                   opener is declarative: this button has to work in a static layout. *@
+                <button type="button"
+                        class="zen-focus -me-1 grid shrink-0 place-items-center rounded-zen-sm p-1 text-content-subtle transition-colors hover:bg-surface-sunken hover:text-content"
+                        popovertarget="@NavId"
+                        popovertargetaction="hide"
+                        aria-label="@CloseLabel">
+                    <ZenIcon Path="@ZenIcons.Close" Size="ZenSize.Small" />
+                </button>
+            }
+        </div>
+    }
+
+    @* The title bar above is overlay-only because it exists to close the drawer. A rail needs its
+       own heading, which the consumer puts at the top of ChildContent. *@
+    <div class="flex min-h-0 flex-1 flex-col gap-1 overflow-y-auto p-3">
+        @ChildContent
+    </div>
+
+    @if (Footer is not null)
+    {
+        <div class="shrink-0 border-t border-border p-3">
+            @Footer
+        </div>
+    }
+</aside>
+
+@code {
+    /// <summary>
+    /// The viewport width below which the nav behaves as an overlay drawer.
+    /// </summary>
+    /// <remarks>
+    /// <para>
+    /// Matches the <c>@@media (width &gt;= 64rem)</c> rule on <c>.zen-sidenav</c> in
+    /// <c>Styles/components/base.css</c>, which is Tailwind's <c>lg</c> and the breakpoint that
+    /// hides the menu button and the drawer's title bar.
+    /// </para>
+    /// <para>
+    /// Stated in both places because there is no single place it could live: a media query cannot
+    /// read a custom property, so CSS has to carry a literal, and JavaScript needs the same
+    /// literal to decide whether an open drawer is the kind that should trap focus.
+    /// </para>
+    /// </remarks>
+    private const string OverlayQuery = "(width < 64rem)";
+
+    [CascadingParameter]
+    private ZenShellContext? Shell { get; set; }
+
+    /// <inheritdoc />
+    protected override string? ModulePath => "./_content/ZenithUI/js/zen-focus.js";
+
+    /// <summary>The navigation content, usually one or more <c>ZenNavMenu</c> groups.</summary>
+    [Parameter]
+    public RenderFragment? ChildContent { get; set; }
+
+    /// <summary>
+    /// Content for the drawer's title bar, shown only while the nav is an overlay.
+    /// </summary>
+    /// <remarks>
+    /// Narrow-screen only on purpose: the rail sits below an app bar that already carries the
+    /// brand, and repeating it at the top of the column is a second logo on one screen.
+    /// </remarks>
+    [Parameter]
+    public RenderFragment? Header { get; set; }
+
+    /// <summary>Content pinned below the links - a user card, a version string.</summary>
+    [Parameter]
+    public RenderFragment? Footer { get; set; }
+
+    /// <summary>Accessible name for the landmark.</summary>
+    [Parameter]
+    public string Label { get; set; } = "Main navigation";
+
+    /// <summary>Shows the drawer's close button on narrow screens.</summary>
+    [Parameter]
+    public bool ShowCloseButton { get; set; } = true;
+
+    /// <summary>Accessible name for the close button.</summary>
+    [Parameter]
+    public string CloseLabel { get; set; } = "Close navigation";
+
+    /// <summary>Confines Tab to the drawer while it is open. Requires interactivity.</summary>
+    /// <remarks>
+    /// The popover API does not trap focus, so without this a keyboard user tabs off the end of
+    /// the drawer and into the page it is covering - where the focus ring is behind a scrim and
+    /// effectively invisible.
+    /// </remarks>
+    [Parameter]
+    public bool TrapFocus { get; set; } = true;
+
+    /// <summary>Stops the page behind the drawer scrolling. Requires interactivity.</summary>
+    [Parameter]
+    public bool LockScroll { get; set; } = true;
+
+    /// <summary>
+    /// Closes the drawer when a link inside it is followed. Requires interactivity.
+    /// </summary>
+    /// <remarks>
+    /// Only matters under enhanced navigation, which replaces the page content without a document
+    /// load - so nothing dismisses the drawer and it is left in the top layer over the page the
+    /// user just asked for. A full page load takes the drawer with it either way.
+    /// </remarks>
+    [Parameter]
+    public bool CloseOnNavigate { get; set; } = true;
+
+    /// <summary>
+    /// The element id the app bar's menu button targets.
+    /// </summary>
+    /// <remarks>
+    /// An explicit <see cref="ZenComponentBase.Id"/> outranks the shell's. It is the only way to
+    /// wire a nav that cannot receive the cascade - one the consumer made an interactive island,
+    /// where the shell around it is static - and the caller pins the same literal on
+    /// <c>ZenAppBar.MenuTarget</c>. Letting the cascade win there would silently discard the id
+    /// and leave a menu button pointed at nothing.
+    /// </remarks>
+    private string NavId =>
+        string.Equals(Id, GeneratedId, StringComparison.Ordinal) ? Shell?.NavId ?? Id : Id;
+
+    /// <summary>
+    /// One class, and no utilities at all - unusually for this library.
+    /// </summary>
+    /// <remarks>
+    /// Position, width, the slide, the flex column and the <c>lg</c> rail all live in
+    /// <c>.zen-sidenav</c>. Partly because a logical-direction transform gated on a breakpoint and
+    /// a popover state is not something utilities express without becoming unreadable; mostly
+    /// because <c>display</c> has to be stated somewhere a consumer's own Tailwind build cannot
+    /// outrank by accident. See the comment above the rule.
+    /// </remarks>
+    private string NavClass => "zen-sidenav";
+
+    // ---- Progressive enhancement ---------------------------------------------------------------
+
+    /// <inheritdoc />
+    protected override async Task OnModuleReadyAsync() =>
+        await InvokeModuleVoidAsync("bindDrawer", NavId, new
+        {
+            trap = TrapFocus,
+            lockScroll = LockScroll,
+            closeOnNavigate = CloseOnNavigate,
+            query = OverlayQuery,
+        });
+
+    /// <inheritdoc />
+    protected override async Task OnModuleDisposingAsync() =>
+        await InvokeModuleVoidAsync("unbindDrawer", NavId);
+}

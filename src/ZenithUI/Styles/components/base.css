@@ -655,3 +655,211 @@
     }
   }
 }
+
+/*
+ * ZenSideNav, which has two lives in one element.
+ *
+ * Above the `lg` breakpoint it is a persistent rail in normal flow. Below it, it is an off-canvas
+ * drawer. Those are different enough that the obvious implementation renders two elements and
+ * hides one - which duplicates every link in the DOM, duplicates their ids, and makes a screen
+ * reader announce the navigation twice.
+ *
+ * THE DRAWER IS A POPOVER. `popover="auto"` is what lets the narrow layout work with no
+ * JavaScript and no render mode: a `<button popovertarget>` anywhere in the document toggles it,
+ * Escape and a click outside dismiss it, focus returns to the button on close, and the panel is in
+ * the top layer so no ancestor's `overflow` can clip it. All of that is platform behaviour, which
+ * matters more here than anywhere else in the library - an app shell lives in a *layout*, and a
+ * layout can never be interactive, because `Body` is a RenderFragment and a render fragment cannot
+ * cross a render-mode boundary.
+ *
+ * ABOVE `lg` THE POPOVER IS SIMPLY NOT USED, and the UA rule that hides an unopened popover
+ * (`[popover]:not(:popover-open) { display: none }`) is overridden here. Specificity never enters
+ * into it: author styles outrank the UA origin whatever their selectors look like. Below `lg` that
+ * UA rule is left alone, which is what keeps a closed drawer out of the tab order and out of the
+ * accessibility tree without an `inert` attribute or a visibility dance.
+ *
+ * The breakpoint is stated twice, here and as `ZenSideNav.OverlayQuery`. A media query cannot read
+ * a custom property, so there is no third place that could own it; the C# constant carries a
+ * comment pointing back at this rule.
+ */
+
+/*
+ * WHY `display` IS DECLARED HERE AND NEVER AS A UTILITY ON THESE ELEMENTS.
+ *
+ * A library that ships precompiled CSS alongside a consumer who runs their own Tailwind has two
+ * stylesheets writing into the same `utilities` layer, and within a layer the later file wins. The
+ * consumer's build only emits what IT uses - so `.flex` is almost certainly in their sheet and
+ * `.lg\:hidden` almost certainly is not, and a library component that wrote `class="flex
+ * lg:hidden"` would be `display: flex` at every width, in every app but the ones that happened to
+ * use `lg:hidden` in their own markup.
+ *
+ * On the drawer the same collision is worse than cosmetic: an unopened popover is hidden by a UA
+ * rule, and ANY author `display` outranks the UA origin whatever the specificity. A `.flex` on the
+ * `<aside>` leaves the drawer permanently on screen, overlapping the page, with no scrim and no
+ * top layer - which reads as a broken component and is a cascade-order accident.
+ *
+ * So these three elements carry no display utility at all, and the rules below own the property
+ * outright. Everything else about them is still utilities.
+ */
+
+@layer components {
+  .zen-sidenav {
+    /* Which way the panel slides in from. Flipped for RTL, and read by the keyframes below. */
+    --zen-drawer-from: -100%;
+
+    width: var(--zen-sidenav-width);
+    background-color: var(--zen-surface-raised);
+    color: var(--zen-content);
+  }
+
+  /*
+   * The drawer's own title bar and the app bar's menu button: present only while the nav is an
+   * overlay. Both exist to open or close a drawer, and at `lg` there is no drawer to operate.
+   */
+  .zen-sidenav-bar {
+    display: flex;
+  }
+
+  .zen-nav-toggle {
+    display: grid;
+  }
+
+  @media (width >= 64rem) {
+    .zen-sidenav-bar,
+    .zen-nav-toggle {
+      display: none;
+    }
+  }
+
+  [dir="rtl"] .zen-sidenav {
+    --zen-drawer-from: 100%;
+  }
+
+  /*
+   * The open drawer. Every one of these declarations is undoing something the UA stylesheet does
+   * to an open popover: it sets `inset: 0` with `margin: auto` to centre the panel in the
+   * viewport, plus a border and padding. Without the reset the nav lands mid-screen as a bordered
+   * box - the same fight `.zen-popover` picks a few rules up.
+   */
+  .zen-sidenav:popover-open {
+    /* The column that lets Footer pin to the bottom while the links scroll between. Stated here,
+       not as a `flex` utility, for the reason at the top of this section. */
+    display: flex;
+    flex-direction: column;
+    position: fixed;
+    inset-block: 0;
+    inset-inline-start: 0;
+    inset-inline-end: auto;
+    margin: 0;
+    padding: 0;
+    border: none;
+    border-inline-end: 1px solid var(--zen-border);
+    max-width: calc(100% - 3rem);
+    max-height: none;
+    height: 100%;
+    overflow-y: auto;
+
+    /* A flick of the drawer must not chain into scrolling the page behind it. */
+    overscroll-behavior: contain;
+    box-shadow: var(--zen-shadow-lg);
+    animation: zen-drawer-in 220ms cubic-bezier(0.2, 0.9, 0.3, 1);
+  }
+
+  /*
+   * The scrim. A popover gets a `::backdrop` for free, so the drawer needs no extra element - and
+   * because it only exists while the panel is in the top layer, it cannot leak into the `lg`
+   * layout where there is nothing to dim.
+   */
+  .zen-sidenav::backdrop {
+    background-color: var(--zen-backdrop);
+  }
+
+  .zen-sidenav:popover-open::backdrop {
+    animation: zen-backdrop-in 220ms ease-out;
+  }
+
+  @media (prefers-reduced-motion: reduce) {
+    .zen-sidenav:popover-open,
+    .zen-sidenav:popover-open::backdrop {
+      animation: none;
+    }
+  }
+
+  /*
+   * The rail. `position: sticky` with a matching height is what keeps a long nav beside a long
+   * page: the column scrolls internally once it runs out of room, instead of sliding away with
+   * the article.
+   *
+   * `--zen-sidenav-top` is how far down the viewport the rail starts, which only the shell knows -
+   * it is the app bar's height when that bar is sticky and zero when it is not. ZenAppShell sets
+   * it; the fallback here keeps a hand-assembled shell looking right.
+   */
+  @media (width >= 64rem) {
+    .zen-sidenav {
+      display: flex;
+      flex-direction: column;
+      position: sticky;
+      top: var(--zen-sidenav-top, var(--zen-appbar-height));
+      height: calc(100dvh - var(--zen-sidenav-top, var(--zen-appbar-height)));
+      flex: none;
+      overflow-y: auto;
+      border-inline-end: 1px solid var(--zen-border);
+      animation: none;
+    }
+  }
+}
+
+@keyframes zen-drawer-in {
+  from {
+    transform: translateX(var(--zen-drawer-from, -100%));
+  }
+
+  to {
+    transform: none;
+  }
+}
+
+@layer components {
+  /*
+   * The shell's skip link.
+   *
+   * Hidden until it takes focus, which makes it the first thing a keyboard user reaches and
+   * invisible to everyone else. `clip-path` rather than `display: none` or `visibility: hidden`,
+   * because both of those remove the link from the tab order - and a skip link that cannot be
+   * tabbed to is decoration.
+   *
+   * `:focus` rather than `:focus-visible`. The link is only ever reached by keyboard, and
+   * `:focus-visible` is a heuristic that has been known to withhold the match on a programmatic
+   * focus - which would leave the user's focus inside an element they cannot see.
+   */
+  .zen-skip-link {
+    position: absolute;
+    width: 1px;
+    height: 1px;
+    padding: 0;
+    margin: -1px;
+    overflow: hidden;
+    clip-path: inset(50%);
+    white-space: nowrap;
+    border-width: 0;
+  }
+
+  .zen-skip-link:focus {
+    position: fixed;
+    inset-block-start: 0.75rem;
+    inset-inline-start: 0.75rem;
+    z-index: 60;
+    width: auto;
+    height: auto;
+    margin: 0;
+    padding: 0.5rem 0.875rem;
+    overflow: visible;
+    clip-path: none;
+    border-radius: var(--zen-radius-md);
+    background-color: var(--zen-primary);
+    color: var(--zen-primary-content);
+    box-shadow: var(--zen-shadow-lg);
+    outline: var(--zen-ring-width) solid var(--zen-ring);
+    outline-offset: 2px;
+  }
+}

@@ -441,3 +441,134 @@ export function isOutsideDialog(id, clientX, clientY) {
         || clientY < rect.top
         || clientY > rect.bottom;
 }
+
+/**
+ * Drawers currently bound by {@link bindDrawer}, keyed by element id, each holding the listeners
+ * to remove and whether it is presently holding a scroll lock.
+ */
+const drawers = new Map();
+
+/**
+ * Upgrades a `popover` side nav with the two things the popover API does not provide.
+ *
+ * WHAT THE PLATFORM ALREADY DOES, and is therefore absent here: showing and hiding on a
+ * `popovertarget` button, Escape, light dismiss, the top layer, `::backdrop`, and returning focus
+ * to the invoker on close. All of that works with no JavaScript at all, which is the whole reason
+ * ZenSideNav is a popover - an app shell lives in a layout, and a layout cannot be interactive.
+ *
+ * WHAT IS MISSING. `popover="auto"` does not confine Tab, so a keyboard user tabs off the end of
+ * the drawer into the page it is covering; and it does not stop that page scrolling underneath.
+ *
+ * WHY THE TOGGLE LISTENER LIVES HERE rather than an `@ontoggle` handler in Razor. The trap and the
+ * lock have to be installed in the same task as the state change, and a Blazor event on a Server
+ * circuit is a round trip - so the drawer would open, and a moment later become trapped. The
+ * *policy* is still C#'s: whether to trap, whether to lock, when to close, and the breakpoint
+ * below which any of it applies are all passed in.
+ *
+ * The media query is re-evaluated on every toggle rather than watched. It is only read at the
+ * moment the drawer opens, so a listener would buy nothing; and re-reading means a resize past the
+ * breakpoint while the drawer is open cannot leave a trap installed over a nav that has gone back
+ * to being an ordinary column.
+ *
+ * @param {string} id The drawer element's id.
+ * @param {object} options
+ * @param {boolean} [options.trap] Confine Tab within the drawer while it is open.
+ * @param {boolean} [options.lockScroll] Prevent the page behind from scrolling.
+ * @param {boolean} [options.closeOnNavigate] Hide the drawer when a link inside it is activated.
+ * @param {string} [options.query] Media query that must match for any of this to apply.
+ */
+export function bindDrawer(id, options) {
+    const drawer = document.getElementById(id);
+
+    if (!drawer || drawers.has(id)) {
+        return;
+    }
+
+    const settings = options || {};
+    const state = { locked: false };
+
+    const isOverlay = () =>
+        !settings.query || window.matchMedia(settings.query).matches;
+
+    const onToggle = (event) => {
+        if (event.newState === 'open') {
+            if (!isOverlay()) {
+                return;
+            }
+
+            if (settings.trap) {
+                // Ahead of the trap: an empty tab ring would otherwise leave focus on the invoker,
+                // outside the container the trap is about to confine Tab to.
+                focusFirst(id);
+                trapFocus(id);
+            }
+
+            if (settings.lockScroll) {
+                lockScroll();
+                state.locked = true;
+            }
+
+            return;
+        }
+
+        releaseTrap(id);
+
+        // Guarded by the flag rather than by `settings.lockScroll`, so a drawer that opened while
+        // the layout was wide - and therefore took no lock - cannot release someone else's.
+        if (state.locked) {
+            unlockScroll();
+            state.locked = false;
+        }
+    };
+
+    /**
+     * Closing on navigation is not cosmetic. Blazor's enhanced navigation swaps the page content
+     * without a document load, so nothing dismisses the drawer: it stays in the top layer, over
+     * the page the user just asked for.
+     */
+    const onClick = (event) => {
+        if (!settings.closeOnNavigate || !drawer.matches(':popover-open')) {
+            return;
+        }
+
+        const link = event.target.closest?.('a[href]');
+
+        // A link opening elsewhere leaves this page - and this drawer - exactly where it was.
+        if (link && drawer.contains(link) && link.target !== '_blank') {
+            drawer.hidePopover();
+        }
+    };
+
+    drawer.addEventListener('toggle', onToggle);
+    drawer.addEventListener('click', onClick);
+    drawers.set(id, { onToggle, onClick, state });
+}
+
+/**
+ * Removes a binding installed by {@link bindDrawer}.
+ *
+ * A drawer disposed while open still holds a scroll lock and a trap, and neither goes away with
+ * the element - the lock is on `document.body` and would leave the page permanently unscrollable.
+ *
+ * @param {string} id The drawer element's id.
+ */
+export function unbindDrawer(id) {
+    const entry = drawers.get(id);
+
+    if (!entry) {
+        return;
+    }
+
+    const drawer = document.getElementById(id);
+
+    drawer?.removeEventListener('toggle', entry.onToggle);
+    drawer?.removeEventListener('click', entry.onClick);
+
+    releaseTrap(id);
+
+    if (entry.state.locked) {
+        unlockScroll();
+    }
+
+    drawers.delete(id);
+}

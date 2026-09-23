@@ -329,6 +329,20 @@ public static class ZenStyles
     /// <summary>Corner radius matching an input size. Mirrors <see cref="ControlRadius"/>.</summary>
     public static string InputRadius(ZenSize size) => ControlRadius(size);
 
+    /// <summary>Maximum width of a centred content column.</summary>
+    /// <remarks>
+    /// Returned alongside <c>mx-auto</c> by the shell components, never on its own - a max-width
+    /// with no auto margin pins the column to the start edge, which on a wide display looks like a
+    /// layout that forgot to finish.
+    /// </remarks>
+    public static string ContentWidth(ZenContentWidth width) => width switch
+    {
+        ZenContentWidth.Narrow => "max-w-3xl",
+        ZenContentWidth.Medium => "max-w-5xl",
+        ZenContentWidth.Wide => "max-w-7xl",
+        _ => "max-w-none",
+    };
+
     /// <summary>Shadow for a surface raised above the page.</summary>
     /// <param name="elevation">How far above the page the surface sits.</param>
     /// <returns>A shadow utility, or <see langword="null"/> for <see cref="ZenElevation.None"/>.</returns>

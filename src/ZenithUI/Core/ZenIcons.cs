@@ -21,6 +21,9 @@ public static class ZenIcons
     /// <summary>Checkmark. Selection, success states.</summary>
     public const string Check = """<path d="m5 13 4 4L19 7" />""";
 
+    /// <summary>Three stacked bars. The toggle that reveals an off-canvas side nav.</summary>
+    public const string Menu = """<path d="M4 7h16M4 12h16M4 17h16" />""";
+
     /// <summary>Cross. Dismiss, clear, close.</summary>
     public const string Close = """<path d="M18 6 6 18M6 6l12 12" />""";
 

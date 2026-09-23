@@ -69,4 +69,8 @@
 @source inline("zen-timeline");
 @source inline("zen-timeline-line");
 @source inline("zen-timeline-body");
+@source inline("zen-sidenav");
+@source inline("zen-skip-link");
+@source inline("zen-sidenav-bar");
+@source inline("zen-nav-toggle");
 @source inline("{bg,hover:bg}-surface-hover");

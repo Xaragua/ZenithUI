@@ -284,3 +284,36 @@ public enum ZenAlign
     /// <summary>The side text ends at. For numbers, amounts and dates.</summary>
     End,
 }
+
+/// <summary>
+/// How wide a centred content column may grow before it stops and gutters take over.
+/// </summary>
+/// <remarks>
+/// An enum rather than a caller-supplied class, because a consumer who does not run Tailwind has
+/// no way to add <c>max-w-5xl</c> to a precompiled stylesheet. The values here are literals the
+/// library's own build emits, so they exist in <c>zenith.css</c> whatever the consumer does.
+/// </remarks>
+public enum ZenContentWidth
+{
+    /// <summary>Edge to edge. The right choice for a dashboard or an app with its own side rail.</summary>
+    Full,
+
+    /// <summary>A reading measure. Documentation, settings, a single form.</summary>
+    Narrow,
+
+    /// <summary>The default for a content page with a header and a footer.</summary>
+    Medium,
+
+    /// <summary>Roomy, but still bounded on a very wide display.</summary>
+    Wide,
+}
+
+/// <summary>The axis a navigation menu lays its links out along.</summary>
+public enum ZenNavOrientation
+{
+    /// <summary>Stacked. The side nav case, and the default.</summary>
+    Vertical,
+
+    /// <summary>In a row. An app bar's section links.</summary>
+    Horizontal,
+}

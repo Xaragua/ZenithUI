@@ -1,0 +1,123 @@
+@namespace ZenithUI
+
+@inherits ZenComponentBase
+
+@*
+    A group of navigation links.
+
+    Two structural decisions worth stating.
+
+    It is a LIST. A screen reader announces "list, 7 items" and offers to skip the whole thing,
+    which is the difference between navigating a site and reading every link in it. A row of bare
+    anchors in a <nav> gives up that count for nothing.
+
+    It is a <nav> LANDMARK only when it is a standalone region. A page with several unlabelled nav
+    landmarks is worse than a page with one: "navigation" announced three times tells the user
+    nothing about which is which. So Label sets the accessible name, Title supplies one when it is
+    the visible heading anyway, and a menu nested inside another nav renders as a plain list.
+*@
+
+@if (IsLandmark)
+{
+    <nav class="@RootClass(MenuClass)"
+         style="@Style"
+         aria-label="@AccessibleName"
+         aria-labelledby="@(AccessibleName is null && Title is not null ? TitleId : null)"
+         @attributes="AttributesWithoutClass">
+        @Inner
+    </nav>
+}
+else
+{
+    <div class="@RootClass(MenuClass)" style="@Style" @attributes="AttributesWithoutClass">
+        @Inner
+    </div>
+}
+
+@code {
+    /// <summary>The links, typically <c>ZenNavLink</c> components.</summary>
+    [Parameter]
+    public RenderFragment? ChildContent { get; set; }
+
+    /// <summary>
+    /// Accessible name for the landmark. Give every nav on a page a distinct one.
+    /// </summary>
+    [Parameter]
+    public string? Label { get; set; }
+
+    /// <summary>
+    /// A visible section heading above the links - "Reports", "Settings".
+    /// </summary>
+    /// <remarks>
+    /// When there is no <see cref="Label"/>, this names the landmark through
+    /// <c>aria-labelledby</c>, so a grouped side nav gets distinguishable regions for free.
+    /// </remarks>
+    [Parameter]
+    public string? Title { get; set; }
+
+    /// <summary>The axis the links are laid out along.</summary>
+    [Parameter]
+    public ZenNavOrientation Orientation { get; set; } = ZenNavOrientation.Vertical;
+
+    /// <summary>
+    /// Renders a <c>&lt;nav&gt;</c> landmark. Turn it off for a group inside an existing nav.
+    /// </summary>
+    /// <remarks>
+    /// Nested landmarks of the same type are not invalid, but they are not useful either - the
+    /// inner one is announced as a separate navigation region the user then has to explore to
+    /// discover is part of the outer one.
+    /// </remarks>
+    [Parameter]
+    public bool Landmark { get; set; } = true;
+
+    private bool IsLandmark => Landmark;
+
+    private string TitleId => SubId("title");
+
+    private string? AccessibleName => Label;
+
+    private string MenuClass => Orientation == ZenNavOrientation.Horizontal
+        ? "flex min-w-0 items-center"
+        : "flex min-w-0 flex-col";
+
+    private string ListClass => Orientation == ZenNavOrientation.Horizontal
+        // `overflow-x-auto` rather than wrapping: an app bar that grows a second row when the
+        // window narrows moves everything below it, and the page appears to jump on resize.
+        ? "flex min-w-0 items-center gap-1 overflow-x-auto"
+        : "flex flex-col gap-0.5";
+
+    private RenderFragment Inner => builder =>
+    {
+        var seq = 0;
+
+        if (Title is not null)
+        {
+            builder.OpenElement(seq++, "h2");
+            builder.AddAttribute(seq++, "id", TitleId);
+            builder.AddAttribute(
+                seq++,
+                "class",
+                "px-3 pb-1.5 pt-3 text-xs font-semibold uppercase tracking-wide text-content-subtle");
+            builder.AddContent(seq++, Title);
+            builder.CloseElement();
+        }
+
+        builder.OpenElement(seq++, "ul");
+        builder.AddAttribute(seq++, "class", ListClass);
+
+        // The cascade is what lets ZenNavLink render its own <li> - and only when there is a list
+        // to put it in. A link used on its own, outside any menu, renders the anchor bare.
+        builder.OpenComponent<CascadingValue<ZenNavContext>>(seq++);
+        builder.AddComponentParameter(
+            seq++,
+            nameof(CascadingValue<ZenNavContext>.Value),
+            new ZenNavContext(Orientation, InList: true));
+        builder.AddComponentParameter(
+            seq++,
+            nameof(CascadingValue<ZenNavContext>.ChildContent),
+            ChildContent);
+        builder.CloseComponent();
+
+        builder.CloseElement();
+    };
+}

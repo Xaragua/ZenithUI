@@ -1,0 +1,146 @@
+@namespace ZenithUI
+
+@inherits ZenComponentBase
+
+@*
+    The page frame: skip link, app bar, optional side rail, main content, footer.
+
+    What the shell actually contributes, beyond arranging four slots:
+
+      - THE SKIP LINK. First in the tab order, invisible until focused, pointing at <main>. Without
+        it a keyboard user tabs through the entire navigation on every page.
+      - THE <main> LANDMARK with an id, which is what the skip link and `FocusOnNavigate` need to
+        aim at. Rendered here rather than left to the page, because a page that forgets it leaves
+        the document with no main region at all.
+      - THE IDS THAT JOIN THE PIECES, cascaded as ZenShellContext, so the app bar's menu button can
+        name the side nav without the caller wiring an id by hand.
+      - `--zen-sidenav-top`, the one measurement neither the bar nor the nav can work out alone:
+        how far down the viewport a sticky rail begins. It is the app bar's height when that bar is
+        sticky and zero when it is not, and the rail's `position: sticky` offset and its height are
+        both derived from it.
+
+    THE SHELL DOES NOT NEED A RENDER MODE. Every part of it, including opening and closing the
+    drawer, is HTML and CSS. That is not a nice-to-have: a layout cannot be interactive, because
+    `Body` is a RenderFragment and a render fragment cannot cross a render-mode boundary - so a
+    shell that needed interactivity could not be used as a layout, which is the only place a shell
+    goes.
+*@
+
+<div class="@RootClass(ShellClass)" style="@ShellStyle" @attributes="AttributesWithoutClass">
+    <CascadingValue Value="Context" IsFixed="true">
+        @if (ShowSkipLink)
+        {
+            <a class="zen-skip-link" href="#@MainId">@SkipLinkText</a>
+        }
+
+        @Header
+
+        <div class="flex min-h-0 w-full flex-1">
+            @SideNav
+
+            <div class="flex min-w-0 flex-1 flex-col">
+                @* `tabindex="-1"` so the skip link can actually move focus here. An id alone
+                   scrolls the page and leaves focus where it was, which means the next Tab goes
+                   back to the second nav link - the exact outcome the skip link exists to avoid. *@
+                <main id="@MainId" tabindex="-1" class="@MainClass">
+                    @ChildContent
+                </main>
+
+                @Footer
+            </div>
+        </div>
+    </CascadingValue>
+</div>
+
+@code {
+    /// <summary>The page content, rendered inside <c>&lt;main&gt;</c>.</summary>
+    [Parameter]
+    public RenderFragment? ChildContent { get; set; }
+
+    /// <summary>The top bar, usually a <c>ZenAppBar</c>.</summary>
+    [Parameter]
+    public RenderFragment? Header { get; set; }
+
+    /// <summary>The side navigation, usually a <c>ZenSideNav</c>.</summary>
+    [Parameter]
+    public RenderFragment? SideNav { get; set; }
+
+    /// <summary>The page footer, usually a <c>ZenFooter</c>.</summary>
+    [Parameter]
+    public RenderFragment? Footer { get; set; }
+
+    /// <summary>Maximum width of the main content column.</summary>
+    [Parameter]
+    public ZenContentWidth MaxWidth { get; set; } = ZenContentWidth.Full;
+
+    /// <summary>Removes the padding around <c>&lt;main&gt;</c>, for an edge-to-edge page.</summary>
+    [Parameter]
+    public bool Flush { get; set; }
+
+    /// <summary>
+    /// Whether the header is pinned. Drives the sticky rail's offset as well as the bar itself.
+    /// </summary>
+    /// <remarks>
+    /// Stated here as well as on <c>ZenAppBar</c> because the two answer different questions. The
+    /// bar's parameter decides whether the bar sticks; this one tells the rail how far down the
+    /// viewport to start, which the rail cannot discover - a sticky sibling is not something CSS
+    /// lets an element measure.
+    /// </remarks>
+    [Parameter]
+    public bool StickyHeader { get; set; } = true;
+
+    /// <summary>
+    /// Height reserved for a sticky header, as a CSS length. Defaults to the app bar token.
+    /// </summary>
+    /// <remarks>
+    /// Override it when the bar carries a second row through <c>ZenAppBar.Below</c>, which makes
+    /// it taller than <c>--zen-appbar-height</c> alone.
+    /// </remarks>
+    [Parameter]
+    public string? HeaderHeight { get; set; }
+
+    /// <summary>Renders the skip link.</summary>
+    [Parameter]
+    public bool ShowSkipLink { get; set; } = true;
+
+    /// <summary>Text of the skip link.</summary>
+    [Parameter]
+    public string SkipLinkText { get; set; } = "Skip to main content";
+
+    /// <summary>
+    /// Element id for <c>&lt;main&gt;</c>. Set it to give <c>FocusOnNavigate</c> a fixed target.
+    /// </summary>
+    [Parameter]
+    public string? MainElementId { get; set; }
+
+    private string MainId => MainElementId ?? SubId("main");
+
+    private string NavId => SubId("nav");
+
+    /// <summary>
+    /// The ids handed to the chrome inside. <c>IsFixed</c> because both are derived from
+    /// <see cref="ZenComponentBase.Id"/>, which is assigned in the constructor and never changes -
+    /// so the subscription bookkeeping a mutable cascade pays for would buy nothing.
+    /// </summary>
+    private ZenShellContext Context => new(NavId, MainId);
+
+    private string ShellClass => "zen-root flex min-h-dvh w-full flex-col";
+
+    /// <summary>
+    /// The sticky offset for the rail, merged ahead of any caller <c>Style</c> so the caller can
+    /// still override it.
+    /// </summary>
+    private string ShellStyle =>
+        $"--zen-sidenav-top: {(StickyHeader ? HeaderHeight ?? "var(--zen-appbar-height)" : "0px")};{Style}";
+
+    private string MainClass => CssBuilder
+        .Default("w-full min-w-0 flex-1")
+        .AddClass("mx-auto", MaxWidth != ZenContentWidth.Full)
+        .AddClass(ZenStyles.ContentWidth(MaxWidth))
+        .AddClass("px-4 py-8 sm:px-6 sm:py-10", !Flush)
+        // `outline-none` on the landmark itself: it only ever takes focus programmatically, from
+        // the skip link or FocusOnNavigate, and a ring drawn around the whole page is noise rather
+        // than information. The element the user then tabs to shows its own.
+        .AddClass("outline-none")
+        .Build()!;
+}

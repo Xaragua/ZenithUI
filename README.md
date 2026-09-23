@@ -1,11 +1,12 @@
-# ZenithUI
+| **M5** ✅ | `ZenAppBar`, `ZenNavMenu` + `ZenNavLink`, `ZenSideNav` (off-canvas drawer with no render mode), `ZenFooter`, `ZenAppShell` |# ZenithUI
 
 A TailwindCSS component library for Blazor. Render-mode agnostic, themed entirely through CSS
 custom properties, with first-class light and dark palettes.
 
-> **Status: M4 — data display.** Tokens, theming, core base types, primitives, the full form
-> control set, the overlay family (modal + toast services, popover, combobox, list) and the data
-> components (table, tree, timeline) are in place. The app shell lands in M5.
+> **Status: M5 — chrome and layout.** Tokens, theming, core base types, primitives, the full form
+> control set, the overlay family (modal + toast services, popover, combobox, list), the data
+> components (table, tree, timeline) and the application shell (app bar, side nav, nav menu,
+> footer) are in place. Packaging and the docs pass land in M6.
 
 ## Why another Blazor component library
 
@@ -174,7 +175,7 @@ a palette fix is one edit rather than a guess-and-rerun loop:
 | **M2** ✅ | Text, textarea, number, currency, date, search, checkbox, radio, select, `ZenToggle`, `ZenRangeSlider`, `ZenForm`, `ZenProgress`, `ZenIndicator`, `ZenDatePicker` |
 | **M3** ✅ | `ZenModal` + modal service, `ZenToast` + toast service, `ZenPopover`, `ZenCombobox`, `ZenList` |
 | **M4** ✅ | `ZenTable` + `ZenColumn` (sorting, paging, selection, hierarchy, detail rows, responsive collapse), `ZenEmptyState`, `ZenTree`, `ZenTimeline` |
-| **M5** | `ZenAppBar`, `ZenNavMenu`, `ZenSideNav`, `ZenFooter`, `ZenAppShell` |
+| **M5** ✅ | `ZenAppBar`, `ZenNavMenu` + `ZenNavLink`, `ZenSideNav` (off-canvas drawer needing no render mode), `ZenFooter`, `ZenAppShell` |
 | **M6** | Docs, accessibility audit, NuGet publish, v1.0.0 |
 
 ## Documentation

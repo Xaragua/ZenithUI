@@ -6,6 +6,85 @@ All notable changes to ZenithUI are documented here. The format follows
 
 ## [Unreleased]
 
+### Added — M5, chrome and layout
+
+**`ZenAppShell`, `ZenAppBar`, `ZenSideNav`, `ZenNavMenu` + `ZenNavLink`, `ZenFooter`** — the frame
+around an application, and a milestone whose design was decided almost entirely by one constraint.
+
+**A shell lives in a layout, and a layout can never be interactive.** `Body` is a `RenderFragment`,
+and a render fragment cannot cross a render-mode boundary. So a side nav that opened its drawer
+through an `@onclick` and a `bool` would have demoed beautifully on the page that showed it off and
+been unusable in the only place a shell goes. The demo's `MainLayout.razor` is now a `ZenAppShell`
+carrying no render mode at all, drawer included.
+
+- **The drawer is a `popover`.** `ZenSideNav` renders one `<aside>` with `popover="auto"`: a sticky
+  rail above `lg`, an off-canvas drawer below it, toggled by a bare `<button popovertarget>` in the
+  app bar. `popovertarget` is resolved by the browser against the document rather than by Blazor
+  against a render tree, so the button also works when the bar and the nav are separate interactive
+  islands. The platform supplies the top layer, `::backdrop`, Escape, click-outside dismissal and
+  focus restore to the invoker — and, confirmed against the accessibility tree rather than assumed,
+  an implicit `expanded` state on the invoker that flips with the drawer. None of that is code here.
+- **One element, not two.** A rail plus a drawer would put every link in the DOM twice: duplicate
+  ids, and a navigation announced twice on every page. Below `lg` the UA rule that hides an unopened
+  popover is what keeps the closed drawer out of the tab order and the accessibility tree, with no
+  `inert` attribute to maintain; above `lg` that rule is overridden and the element is simply a
+  column.
+- **What a render mode adds, and it is additive.** One `bindDrawer` call installs a focus trap
+  (`popover="auto"` does not confine Tab), a scroll lock, and dismissal when a link inside is
+  followed under enhanced navigation — which swaps the page with no event the platform treats as a
+  dismissal. Each is *absent* without interactivity, not broken. The media query is re-read on every
+  toggle rather than watched, so a resize past the breakpoint cannot leave a trap installed over a
+  nav that has gone back to being an ordinary column.
+- **`ZenNavLink` does not wrap Blazor's `NavLink`.** `NavLink` works out whether it is the current
+  page and spends the answer on a CSS class alone — it never sets `aria-current`. The active item
+  was visible to sighted users and silent to everyone else. The matching rules are `NavLink`'s, with
+  one addition: a link with no `Match` picks its own, exact for the application root and prefix
+  otherwise, because a root link defaulting to prefix matches every page in the app. The prefix test
+  requires a path separator, so `/order` does not match `/orders`; and a query string is ignored
+  unless the link carries one, so a paged table does not deselect its own nav item on page two.
+- **A nav menu is a list.** A screen reader announces "list, 7 items" and offers to skip it, which
+  is the difference between navigating a site and reading every link in it. It is a `<nav>` landmark
+  only when it is a standalone region: several unlabelled navigation landmarks on one page are worse
+  than one, so `Title` names its own region through `aria-labelledby` and a nested group renders as
+  a plain list.
+- **A disabled nav link is a `<span role="link" aria-disabled>`.** There is no `disabled` for `<a>`,
+  and `pointer-events: none` stops the mouse while leaving the link in the tab order and followable
+  with Enter.
+- **`ZenAppShell` contributes what a page cannot assemble itself**: the skip link, the `<main>`
+  landmark with `tabindex="-1"` for it to aim at — without which the browser scrolls to the landmark
+  and leaves focus where it was, sending the next Tab back into the nav — the cascaded ids that join
+  the bar to the drawer, and `--zen-sidenav-top`, which is how far down the viewport a sticky rail
+  begins. That last one is the only measurement neither component can derive, because CSS gives an
+  element no way to measure a sticky sibling.
+
+### Fixed during M5
+
+**Three elements in the chrome now carry no `display` utility, and the library states `display`
+itself.** Every test passed; the demo showed a side nav sitting permanently on top of the page at
+phone width, and a hamburger button on a 1440px desktop.
+
+A library shipping precompiled CSS **alongside** a consumer running their own Tailwind has two
+stylesheets writing into the same `utilities` layer, and within a layer the later file wins. The
+consumer's build emits only what *they* use — so `.flex` was in the demo's `app.css` and
+`.lg\:hidden` was not, and `class="flex lg:hidden"` meant `display: flex` at every width.
+
+On the drawer it was worse than cosmetic. An unopened popover is hidden by a **UA** rule, and any
+author `display` outranks the UA origin whatever the specificity, so `.flex` on the `<aside>` left
+the drawer permanently on screen with no scrim and no top layer. It read as a broken component and
+was a cascade-order accident.
+
+`.zen-sidenav`, `.zen-sidenav-bar` and `.zen-nav-toggle` now own the property outright in
+`@layer components`, and the elements carry no display utility at all. Everything else about them is
+still utilities. The general rule, and the reason it is written on the rules themselves: where
+`display` is decided by a breakpoint or by popover state, it cannot be left to a utility whose
+source order depends on whose stylesheet loaded last.
+
+**An explicit `Id` on `ZenSideNav` was silently discarded inside a shell.** The cascade won, so the
+one situation the parameter exists for — a nav the consumer made an interactive island under a
+static shell, wired by hand to the app bar's `MenuTarget` — produced a menu button pointed at an
+element that did not exist. An explicit id now outranks the cascade, matching `ZenAppBar.MenuTarget`,
+which already behaved that way.
+
 ### Added — M4, data display
 
 **`ZenTable<TItem>` + `ZenColumn<TItem>`** — the milestone's hard component, and the one whose
