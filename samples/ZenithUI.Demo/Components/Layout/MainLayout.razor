@@ -60,6 +60,11 @@
         @Body
     </main>
 
+    @* One host per document renders every dialog IZenModalService has open. It lives in the
+       layout rather than on a page so a dialog survives navigation between pages, and so pages
+       do not each have to remember to include one. *@
+    <ZenModalHost @rendermode="InteractiveServer" />
+
     <footer class="border-t border-border">
         <div class="mx-auto flex max-w-6xl flex-col gap-1 px-4 py-6 text-sm text-content-muted sm:px-6">
             <p>ZenithUI &middot; milestone M1 &mdash; foundation, tokens, theming and primitives.</p>
@@ -85,6 +90,7 @@
         ("primitives", "Primitives"),
         ("forms", "Forms"),
         ("theming", "Theming"),
+        ("overlays", "Overlays"),
         ("render-modes", "Render modes"),
     ];
 }

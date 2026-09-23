@@ -24,6 +24,12 @@ const savedFocus = new Map();
 const traps = new Map();
 
 /**
+ * `cancel` listeners suppressing the platform's own Escape handling, keyed by dialog id.
+ * See {@link showModal} for why this cannot be done from Razor.
+ */
+const cancelBlockers = new Map();
+
+/**
  * Scroll-lock depth. Modals stack, so the lock is reference counted: the second modal to open
  * must not unlock the page when the first one closes.
  */
@@ -336,9 +342,15 @@ export function scrollItemIntoView(containerId, itemId) {
  * it, which removes the background from the tab order *and* from the accessibility tree, something
  * a keydown-based focus trap cannot do; and the `::backdrop` pseudo-element.
  *
- * Escape is deliberately NOT left to the platform - the component cancels the browser's default
- * and routes it through C#, so a dialog can refuse to close while a form in it is dirty. Without
- * that, `showModal` closes on Escape with no way to intervene.
+ * Escape is deliberately NOT left to the platform. The browser's own handling closes a dialog with
+ * no chance to intervene, so the `cancel` event is suppressed here and the key is routed through
+ * C# instead - which is what lets a dialog refuse to close while its form is dirty, and what makes
+ * ZenModal's CloseOnEscape parameter mean anything.
+ *
+ * The suppression has to live here rather than in Razor. `oncancel` is a recognised Blazor event,
+ * but it is registered without preventDefault support, so `@@oncancel:preventDefault` is not a
+ * directive Razor understands - it compiles to a literal HTML attribute that does nothing, and the
+ * dialog closes anyway. A listener is the only route that actually works.
  *
  * @param {string} id The dialog element's id.
  * @returns {boolean} Whether the dialog was opened.
@@ -352,6 +364,13 @@ export function showModal(id) {
 
     if (dialog.open) {
         return true;
+    }
+
+    if (!cancelBlockers.has(id)) {
+        const onCancel = (event) => event.preventDefault();
+
+        dialog.addEventListener('cancel', onCancel);
+        cancelBlockers.set(id, onCancel);
     }
 
     try {
@@ -370,6 +389,12 @@ export function showModal(id) {
  */
 export function closeModal(id) {
     const dialog = document.getElementById(id);
+    const onCancel = cancelBlockers.get(id);
+
+    if (onCancel) {
+        dialog?.removeEventListener('cancel', onCancel);
+        cancelBlockers.delete(id);
+    }
 
     if (dialog && dialog.open && typeof dialog.close === 'function') {
         try {

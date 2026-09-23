@@ -1,0 +1,307 @@
+@page "/overlays"
+@rendermode InteractiveServer
+@inject IZenModalService Modals
+
+@*
+    Interactive Server throughout: every overlay here needs a JavaScript runtime to position or
+    show itself. That is the honest boundary for this family of components - unlike the forms
+    page, there is no meaningful static-SSR story for a panel that has to measure the viewport.
+
+    ZenModalHost lives in MainLayout, not here. One host per document renders every dialog the
+    service has open; a second would render each dialog twice.
+*@
+
+<PageTitle>Overlays &middot; ZenithUI</PageTitle>
+
+<header class="max-w-3xl">
+    <h1 class="text-3xl font-bold tracking-tight">Overlays</h1>
+    <p class="mt-3 text-content-muted">
+        Floating surfaces, and the services that raise them. Every one of these is in the browser's
+        <strong>top layer</strong>, so no ancestor's <code>overflow</code> or <code>z-index</code>
+        can clip or bury it &mdash; the failure that makes hand-rolled dropdowns break inside
+        scrolling panes.
+    </p>
+</header>
+
+<!-- ---------------------------------------------------------------- Popover -->
+<section class="mt-10">
+    <h2 class="text-lg font-semibold">ZenPopover</h2>
+    <p class="mt-2 max-w-3xl text-sm text-content-muted">
+        An anchored panel that flips when it would leave the viewport and shifts along its axis to
+        stay inside. Scroll the page with one open: it tracks its anchor rather than closing, which
+        is the behaviour a panel that vanishes on a stray wheel nudge fails to deliver.
+    </p>
+
+    <div class="mt-4 grid gap-4 md:grid-cols-2">
+        <ZenCard Title="Placements" TitleLevel="3">
+            <p class="mb-4 text-sm text-content-muted">
+                Placements are logical: <code>Start</code> and <code>End</code> follow the writing
+                direction rather than naming a physical side.
+            </p>
+
+            <div class="flex flex-wrap items-center gap-2">
+                @foreach (var placement in Placements)
+                {
+                    <ZenPopover Open="@(_openPlacement == placement)"
+                                OpenChanged="@(open => TogglePlacement(placement, open))"
+                                Placement="placement"
+                                Label="@($"{placement} example")">
+                        <Anchor>
+                            <ZenButton Variant="ZenVariant.Outline"
+                                       Size="ZenSize.Small"
+                                       OnClick="@(() => TogglePlacement(placement, _openPlacement != placement))">
+                                @placement.ToString()
+                            </ZenButton>
+                        </Anchor>
+                        <ChildContent>
+                            <div class="px-3 py-2 text-sm">
+                                <p class="font-medium">@placement.ToString()</p>
+                                <p class="mt-1 text-content-muted">Anchored, flipped and shifted.</p>
+                            </div>
+                        </ChildContent>
+                    </ZenPopover>
+                }
+            </div>
+        </ZenCard>
+
+        <ZenCard Title="Inside a clipping container" TitleLevel="3">
+            <p class="mb-4 text-sm text-content-muted">
+                This box has <code>overflow: hidden</code> and a fixed height. An absolutely
+                positioned panel would be cut off at its edge; a top-layer one is not.
+            </p>
+
+            <div class="h-24 overflow-hidden rounded-zen-md border border-border bg-surface-sunken p-3">
+                <ZenPopover Open="_openClipped"
+                            OpenChanged="@(open => _openClipped = open)"
+                            Placement="ZenPlacement.BottomStart"
+                            Label="Escapes the clip">
+                    <Anchor>
+                        <ZenButton Size="ZenSize.Small"
+                                   Intent="ZenIntent.Primary"
+                                   OnClick="@(() => _openClipped = !_openClipped)">
+                            Open inside the clip
+                        </ZenButton>
+                    </Anchor>
+                    <ChildContent>
+                        <div class="w-56 px-3 py-2 text-sm">
+                            <p class="font-medium">Not clipped</p>
+                            <p class="mt-1 text-content-muted">
+                                The panel is in the top layer, so the container's
+                                <code>overflow</code> never applies to it.
+                            </p>
+                        </div>
+                    </ChildContent>
+                </ZenPopover>
+            </div>
+        </ZenCard>
+    </div>
+</section>
+
+<!-- ---------------------------------------------------------------- Modal -->
+<section class="mt-12">
+    <h2 class="text-lg font-semibold">ZenModal</h2>
+    <p class="mt-2 max-w-3xl text-sm text-content-muted">
+        A native <code>&lt;dialog&gt;</code> opened with <code>showModal()</code>. Tab through it:
+        the page behind is <code>inert</code>, which removes it from the tab order and from the
+        accessibility tree &mdash; something a keydown focus trap cannot do. Escape closes it, and
+        focus returns to the button that opened it.
+    </p>
+
+    <div class="mt-4 grid gap-4 md:grid-cols-2">
+        <ZenCard Title="Declarative" TitleLevel="3">
+            <p class="mb-4 text-sm text-content-muted">
+                A <code>ZenModal</code> in the page's own markup, bound to a field. Right for a
+                dialog that belongs to one page and needs no result.
+            </p>
+
+            <ZenButton Intent="ZenIntent.Primary" OnClick="@(() => _declarativeOpen = true)">
+                Open dialog
+            </ZenButton>
+
+            @* Once one slot is named, every slot has to be - so the body is wrapped explicitly. *@
+            <ZenModal @bind-Open="_declarativeOpen"
+                      Title="Shipping address"
+                      Size="ZenModalSize.Medium">
+                <ChildContent>
+                    <p class="text-sm text-content-muted">
+                        The body scrolls independently of the title bar and footer, so a long form
+                        never pushes its own actions off screen.
+                    </p>
+
+                    <div class="mt-4 space-y-3">
+                        <ZenTextInput Label="Street" Placeholder="221B Baker Street" />
+                        <ZenTextInput Label="City" Placeholder="London" />
+                    </div>
+                </ChildContent>
+
+                <Footer>
+                    <ZenButton Variant="ZenVariant.Ghost" OnClick="@(() => _declarativeOpen = false)">
+                        Cancel
+                    </ZenButton>
+                    <ZenButton Intent="ZenIntent.Primary" OnClick="@(() => _declarativeOpen = false)">
+                        Save
+                    </ZenButton>
+                </Footer>
+            </ZenModal>
+        </ZenCard>
+
+        <ZenCard Title="From the service" TitleLevel="3">
+            <p class="mb-4 text-sm text-content-muted">
+                <code>await Modals.ConfirmAsync(...)</code> &mdash; no markup on this page, and the
+                answer arrives as a return value rather than a state change.
+            </p>
+
+            <div class="flex flex-wrap gap-2">
+                <ZenButton Intent="ZenIntent.Danger" OnClick="ConfirmDeleteAsync">
+                    Delete order
+                </ZenButton>
+
+                <ZenButton Variant="ZenVariant.Outline" OnClick="ShowStackedAsync">
+                    Stacked dialogs
+                </ZenButton>
+            </div>
+
+            @if (_lastAnswer is not null)
+            {
+                <p class="mt-4 text-sm" role="status">
+                    Returned:
+                    <code class="text-content">@_lastAnswer</code>
+                </p>
+            }
+        </ZenCard>
+
+        <ZenCard Title="Sizes" TitleLevel="3">
+            <div class="flex flex-wrap gap-2">
+                @foreach (var size in Sizes)
+                {
+                    <ZenButton Variant="ZenVariant.Outline"
+                               Size="ZenSize.Small"
+                               OnClick="@(() => ShowSizeAsync(size))">
+                        @size.ToString()
+                    </ZenButton>
+                }
+            </div>
+        </ZenCard>
+
+        <ZenCard Title="Dismissal" TitleLevel="3">
+            <p class="mb-4 text-sm text-content-muted">
+                Escape is on by default; a backdrop click is not. A mis-aimed click is easy, and
+                losing a half-filled form to one is worse than aiming for the close button.
+            </p>
+
+            <div class="flex flex-wrap gap-2">
+                <ZenButton Variant="ZenVariant.Outline" Size="ZenSize.Small" OnClick="ShowBackdropDismissibleAsync">
+                    Backdrop closes
+                </ZenButton>
+
+                <ZenButton Variant="ZenVariant.Outline" Size="ZenSize.Small" OnClick="ShowUndismissableAsync">
+                    Escape refused
+                </ZenButton>
+            </div>
+        </ZenCard>
+    </div>
+</section>
+
+@code {
+    private ZenPlacement? _openPlacement;
+    private bool _openClipped;
+    private bool _declarativeOpen;
+    private string? _lastAnswer;
+
+    private static readonly ZenPlacement[] Placements =
+    [
+        ZenPlacement.BottomStart,
+        ZenPlacement.Bottom,
+        ZenPlacement.BottomEnd,
+        ZenPlacement.TopStart,
+        ZenPlacement.Top,
+        ZenPlacement.TopEnd,
+        ZenPlacement.Start,
+        ZenPlacement.End,
+    ];
+
+    private static readonly ZenModalSize[] Sizes =
+    [
+        ZenModalSize.Small,
+        ZenModalSize.Medium,
+        ZenModalSize.Large,
+        ZenModalSize.ExtraLarge,
+        ZenModalSize.Full,
+    ];
+
+    // One open at a time, so the page does not fill with panels. Opening a second closes the
+    // first, which is also what a real menu bar does.
+    private void TogglePlacement(ZenPlacement placement, bool open) =>
+        _openPlacement = open ? placement : null;
+
+    private async Task ConfirmDeleteAsync()
+    {
+        var confirmed = await Modals.ConfirmAsync(
+            "Delete this order?",
+            "Order #4021 and its three line items will be removed. This cannot be undone.",
+            new ZenConfirmOptions
+            {
+                ConfirmText = "Delete order",
+                ConfirmIntent = ZenIntent.Danger,
+            });
+
+        _lastAnswer = confirmed ? "true (confirmed)" : "false (cancelled)";
+    }
+
+    private async Task ShowStackedAsync()
+    {
+        // The case a per-page `bool _isOpen` cannot express: a confirmation raised from inside
+        // another dialog has to appear above it, not replace it.
+        var outer = await Modals.ConfirmAsync(
+            "Publish changes?",
+            "You will be asked to confirm once more.",
+            new ZenConfirmOptions { ConfirmText = "Continue" });
+
+        if (!outer)
+        {
+            _lastAnswer = "false (cancelled at the first step)";
+            return;
+        }
+
+        var inner = await Modals.ConfirmAsync(
+            "Really publish?",
+            "This makes the changes visible to everyone.",
+            new ZenConfirmOptions { ConfirmText = "Publish" });
+
+        _lastAnswer = inner ? "true (both confirmed)" : "false (cancelled at the second step)";
+    }
+
+    private Task ShowSizeAsync(ZenModalSize size) =>
+        Modals.ConfirmAsync(
+            $"{size} dialog",
+            "Every size still shrinks to fit a narrow viewport - the scale is a maximum, not a fixed width.",
+            new ZenConfirmOptions { Size = size, ConfirmText = "Close", CancelText = "Dismiss" });
+
+    private Task ShowBackdropDismissibleAsync() =>
+        Modals.ShowAsync<ZenConfirmDialog>(
+            new Dictionary<string, object?>
+            {
+                ["Message"] = "Click the dimmed area outside this dialog to dismiss it.",
+                ["Options"] = new ZenConfirmOptions { ConfirmText = "Got it" },
+            },
+            new ZenModalOptions
+            {
+                Title = "Backdrop dismissal",
+                Size = ZenModalSize.Small,
+                CloseOnBackdropClick = true,
+            });
+
+    private Task ShowUndismissableAsync() =>
+        Modals.ShowAsync<ZenConfirmDialog>(
+            new Dictionary<string, object?>
+            {
+                ["Message"] = "Escape does nothing here. The close button and the buttons below still work - a dialog with no way out at all is a trap.",
+                ["Options"] = new ZenConfirmOptions { ConfirmText = "Acknowledge" },
+            },
+            new ZenModalOptions
+            {
+                Title = "Escape refused",
+                Size = ZenModalSize.Small,
+                CloseOnEscape = false,
+            });
+}

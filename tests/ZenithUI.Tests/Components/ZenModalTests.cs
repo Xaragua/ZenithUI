@@ -316,6 +316,26 @@ public class ZenModalTests : BunitContext
     }
 
     [Fact]
+    public void Modal_LeaksNoRazorDirectivesIntoTheMarkup()
+    {
+        // Regression. The dialog carried `@oncancel:preventDefault="true"` to stop the browser
+        // closing it on Escape behind the component's back. `oncancel` is a recognised Blazor
+        // event but is registered WITHOUT preventDefault support, so that is not a directive the
+        // compiler understands - it passed straight through as a literal HTML attribute, did
+        // nothing, and left CloseOnEscape silently a lie. It compiled and it rendered; only the
+        // served HTML showed it.
+        //
+        // Asserted over the whole markup rather than that one attribute, because the failure mode
+        // is general: any misspelled or unsupported directive degrades to literal text.
+        var markup = Render<ZenModal>(p => p
+            .Add(x => x.Open, true)
+            .Add(x => x.Title, "Settings")).Markup;
+
+        markup.ShouldNotContain("@on", Case.Sensitive);
+        markup.ShouldNotContain("@bind", Case.Sensitive);
+    }
+
+    [Fact]
     public void Modal_RendersItsFooterSlot()
     {
         var cut = Render<ZenModal>(p => p

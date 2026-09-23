@@ -6,6 +6,62 @@ All notable changes to ZenithUI are documented here. The format follows
 
 ## [Unreleased]
 
+### Added — M3, overlays (in progress)
+
+**`ZenPopover`** — an anchored floating panel, and the positioning `ZenCombobox` and the rest of
+M3 build on.
+
+`position: absolute` inside a relative wrapper — what `ZenDatePicker` still does — has two failure
+modes no stylesheet can reach: any ancestor with `overflow: hidden` clips the panel, and it cannot
+move when it runs out of room at the viewport edge. The `popover` attribute puts the panel in the
+top layer, where neither applies. CSS Anchor Positioning would remove the JavaScript too, but is
+not in Firefox yet, so `zen-popover.js` computes the coordinates.
+
+- `popover="manual"`, not `"auto"`. Auto brings its own light-dismiss and Escape handling, which
+  takes both decisions away from the owning component — a combobox needs Escape to clear its active
+  option before it closes, and light-dismiss fires after the click has already landed on whatever
+  was underneath. Dismissal is on `pointerdown` instead, which also handles the drag-out case a
+  click listener gets wrong.
+- The attribute is emitted only once the renderer is interactive. A `[popover]` element is
+  `display: none` until `showPopover()` runs, so emitting it during prerender would render an open
+  panel nobody can see.
+- Placements stay logical as far as the browser. Resolving `start`/`end` in C# would need the
+  writing direction, which can come from a `dir` attribute anywhere up the tree or from a
+  stylesheet — only the browser knows which applies.
+
+**`ZenModal` + `IZenModalService`** — a dialog reads as a function call:
+`var result = await Modals.ShowAsync<Editor>()`, or `await Modals.ConfirmAsync(title, message)`.
+
+- Native `<dialog>` with `showModal()`, for the top layer, `inert` on everything behind, and
+  `::backdrop`. The `inert` part is the one a keydown focus trap cannot reproduce: it removes the
+  background from the accessibility tree as well as the tab order, so a screen reader user cannot
+  browse the page behind a "trapped" dialog.
+- Escape is taken back from the platform and routed through C#, which is what lets
+  `CloseOnEscape="false"` mean something.
+- Focus restore is explicit rather than left to `<dialog>`, whose own restore only runs while the
+  element is still in the document — and a service-raised dialog is removed in the same render that
+  closes it.
+- Dialogs stack, keyed by instance. A confirmation raised from inside an editor appears above it.
+
+**JavaScript** — `zen-popover.js` and `zen-focus.js` land, completing the three modules the plan
+allows for. Nothing in either implements behaviour: they measure the viewport, move focus, and
+report a pointer going down outside a subtree. Every decision stays in C#.
+
+### Fixed during M3
+
+- **`ZenModal`'s Escape suppression was a literal HTML attribute.** The dialog carried
+  `@oncancel:preventDefault="true"` so the browser could not close it behind the component's back.
+  `oncancel` is a recognised Blazor event but is registered *without* preventDefault support, so
+  that is not a directive the Razor compiler understands — it passed through as literal text, did
+  nothing, and left `CloseOnEscape` silently a lie. It compiled, it rendered, and every test
+  passed; only the served HTML showed it. The suppression moved to a `cancel` listener in
+  `zen-focus.js`, and a test now asserts no `@on`/`@bind` text survives into a component's markup.
+- **`ZenButton` never rendered its `id`.** `ZenComponentBase` gives every component an `Id`
+  parameter with a generated fallback, but a component that does not emit it makes that parameter a
+  silent no-op — on the one primitive most often referenced by id, for `aria-controls` from a
+  popover trigger or a dialog naming which button to focus first. Found writing the confirm-dialog
+  focus test, which could not work until it was fixed.
+
 ### Changed — the primary intent is emerald
 
 The default palette's primary quartet moved from blue (hue 264) to emerald (hue 163) in both light

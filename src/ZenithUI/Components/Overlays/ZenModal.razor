@@ -31,8 +31,6 @@
         aria-label="@(TitleText is null ? Label : null)"
         aria-describedby="@DescribedBy"
         @onclose="HandleNativeCloseAsync"
-        @oncancel:preventDefault="true"
-        @oncancel="HandleNativeCancelAsync"
         @onkeydown="HandleKeyDownAsync"
         @onclick="HandleClickAsync"
         @attributes="AttributesWithoutClass">
@@ -221,31 +219,26 @@
     /// <summary>Asks the owner to close. The owner decides; this component never closes itself.</summary>
     private Task RequestCloseAsync() => OpenChanged.InvokeAsync(false);
 
-    private async Task HandleKeyDownAsync(KeyboardEventArgs args)
-    {
-        // Escape arrives here as well as through the `cancel` event, because a key pressed while
-        // focus is inside the dialog bubbles first. Both routes are handled: `cancel` covers the
-        // case where the dialog itself holds focus.
-        if (args.Key == "Escape" && Open)
-        {
-            if (CloseOnEscape)
-            {
-                await RequestCloseAsync();
-            }
-        }
-    }
-
     /// <summary>
-    /// The platform's own Escape handling, suppressed and re-routed.
+    /// The only Escape handler. The platform's own is suppressed in <c>zen-focus.js</c>.
     /// </summary>
     /// <remarks>
-    /// <c>@oncancel:preventDefault</c> stops the browser closing the dialog behind the component's
-    /// back. Without it, <c>CloseOnEscape="false"</c> would be a lie and the C# state would drift
-    /// out of sync with the DOM.
+    /// <para>
+    /// Suppression cannot be expressed in Razor. <c>oncancel</c> is a recognised Blazor event but
+    /// is registered without preventDefault support, so <c>@@oncancel:preventDefault</c> is not a
+    /// directive the compiler understands - it passes through as a literal HTML attribute that
+    /// does nothing, and the browser closes the dialog regardless. That is exactly the shape of
+    /// bug this library is meant not to ship: it compiles, it renders, and
+    /// <see cref="CloseOnEscape"/> is silently a lie.
+    /// </para>
+    /// <para>
+    /// Escape reaches this handler because <c>showModal</c> always puts focus inside the dialog,
+    /// so the key bubbles to it whether a child or the dialog itself holds focus.
+    /// </para>
     /// </remarks>
-    private async Task HandleNativeCancelAsync()
+    private async Task HandleKeyDownAsync(KeyboardEventArgs args)
     {
-        if (CloseOnEscape && Open)
+        if (args.Key == "Escape" && Open && CloseOnEscape)
         {
             await RequestCloseAsync();
         }
