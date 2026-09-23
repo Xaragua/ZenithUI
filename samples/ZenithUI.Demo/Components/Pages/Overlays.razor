@@ -1,6 +1,7 @@
 @page "/overlays"
 @rendermode InteractiveServer
 @inject IZenModalService Modals
+@inject IZenToastService Toasts
 
 @*
     Interactive Server throughout: every overlay here needs a JavaScript runtime to position or
@@ -202,6 +203,45 @@
     </div>
 </section>
 
+<!-- ---------------------------------------------------------------- Toast -->
+<section class="mt-12">
+    <h2 class="text-lg font-semibold">ZenToast</h2>
+    <p class="mt-2 max-w-3xl text-sm text-content-muted">
+        Transient notifications, raised from anywhere. Hover one or Tab into it and the dismiss
+        timer stops &mdash; focus counts, not just the pointer, because a screen-reader user and a
+        keyboard user reaching for the action both hold focus without a pointer ever being over it.
+    </p>
+
+    <div class="mt-4 grid gap-4 md:grid-cols-2">
+        <ZenCard Title="Intents" TitleLevel="3">
+            <p class="mb-4 text-sm text-content-muted">
+                Errors are announced assertively and do <strong>not</strong> auto-dismiss: one that
+                disappears on a timer is one the user may never have seen.
+            </p>
+
+            <div class="flex flex-wrap gap-2">
+                <ZenButton Size="ZenSize.Small" Intent="ZenIntent.Success" OnClick="@(() => Toasts.Success("Order saved."))">Success</ZenButton>
+                <ZenButton Size="ZenSize.Small" Intent="ZenIntent.Info" OnClick="@(() => Toasts.Info("Sync finished."))">Info</ZenButton>
+                <ZenButton Size="ZenSize.Small" Intent="ZenIntent.Warning" OnClick="@(() => Toasts.Warning("Your session expires soon."))">Warning</ZenButton>
+                <ZenButton Size="ZenSize.Small" Intent="ZenIntent.Danger" OnClick="@(() => Toasts.Danger("Upload failed. Check your connection."))">Danger</ZenButton>
+            </div>
+        </ZenCard>
+
+        <ZenCard Title="Title, action and the cap" TitleLevel="3">
+            <div class="flex flex-wrap gap-2">
+                <ZenButton Size="ZenSize.Small" Variant="ZenVariant.Outline" OnClick="ShowUndoToast">With an action</ZenButton>
+                <ZenButton Size="ZenSize.Small" Variant="ZenVariant.Outline" OnClick="ShowStickyToast">Stays until dismissed</ZenButton>
+                <ZenButton Size="ZenSize.Small" Variant="ZenVariant.Outline" OnClick="FloodToasts">Raise eight</ZenButton>
+            </div>
+
+            <p class="mt-4 text-sm text-content-muted">
+                Eight at once shows the cap: the stack holds five and drops the oldest, because a
+                column tall enough to cover the page hides the UI needed to fix the problem.
+            </p>
+        </ZenCard>
+    </div>
+</section>
+
 @code {
     private ZenPlacement? _openPlacement;
     private bool _openClipped;
@@ -290,6 +330,33 @@
                 Size = ZenModalSize.Small,
                 CloseOnBackdropClick = true,
             });
+
+    private void ShowUndoToast() =>
+        Toasts.Show("Order #4021 deleted.", ZenIntent.Neutral, new ZenToastOptions
+        {
+            Title = "Deleted",
+            ActionText = "Undo",
+            OnAction = () =>
+            {
+                Toasts.Success("Order restored.");
+                return Task.CompletedTask;
+            },
+        });
+
+    private void ShowStickyToast() =>
+        Toasts.Warning("Two invoices need review before the period can close.", new ZenToastOptions
+        {
+            Title = "Needs attention",
+            Duration = TimeSpan.Zero,
+        });
+
+    private void FloodToasts()
+    {
+        for (var i = 1; i <= 8; i++)
+        {
+            Toasts.Info($"Processed record {i} of 8.");
+        }
+    }
 
     private Task ShowUndismissableAsync() =>
         Modals.ShowAsync<ZenConfirmDialog>(

@@ -61,3 +61,5 @@
 @source inline("zen-root");
 @source inline("zen-popover");
 @source inline("zen-modal");
+@source inline("zen-toast");
+@source inline("zen-toast-host");

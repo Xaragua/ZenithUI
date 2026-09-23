@@ -248,16 +248,26 @@
     /// Fires when the dialog closes by any route the component did not initiate.
     /// </summary>
     /// <remarks>
+    /// <para>
     /// The safety net for a form method="dialog" submit inside the body, which closes the element
     /// directly. Without this the DOM would be closed while C# still believed it open, and the
     /// next open would be a no-op because <c>showModal</c> short-circuits on an already-open
     /// dialog.
+    /// </para>
+    /// <para>
+    /// The teardown runs through <see cref="CloseNativeAsync"/> rather than just clearing
+    /// <c>_shown</c>. Clearing the flag first looks harmless and leaks: the close request sets
+    /// <see cref="Open"/> false, but the sync that follows tests <c>!Open &amp;&amp; _shown</c> and
+    /// finds the flag already down, so the scroll lock is never released and the page is left
+    /// <c>overflow: hidden</c> with compensating padding - a page that silently stops scrolling,
+    /// long after the dialog is gone.
+    /// </para>
     /// </remarks>
     private async Task HandleNativeCloseAsync()
     {
         if (_shown && Open)
         {
-            _shown = false;
+            await CloseNativeAsync();
             await RequestCloseAsync();
         }
     }

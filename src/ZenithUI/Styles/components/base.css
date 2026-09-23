@@ -520,3 +520,38 @@
     opacity: 1;
   }
 }
+
+@layer components {
+  /*
+   * ZenToast's entry animation.
+   *
+   * Transform and opacity only - both composited, so a stack of toasts animating while the page
+   * scrolls does not force layout on every frame.
+   *
+   * There is no exit animation. Blazor removes the element from the render tree when the toast is
+   * dismissed, so an exit keyframe would never get a chance to play; faking one would mean keeping
+   * dismissed toasts in the DOM and coordinating their removal with a transitionend, which is a
+   * lot of machinery for a 150ms fade.
+   */
+  .zen-toast {
+    animation: zen-toast-in 160ms cubic-bezier(0.2, 0.9, 0.3, 1);
+  }
+
+  @media (prefers-reduced-motion: reduce) {
+    .zen-toast {
+      animation: none;
+    }
+  }
+}
+
+@keyframes zen-toast-in {
+  from {
+    opacity: 0;
+    transform: translateY(0.5rem) scale(0.98);
+  }
+
+  to {
+    opacity: 1;
+    transform: none;
+  }
+}

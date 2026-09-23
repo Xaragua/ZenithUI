@@ -1,0 +1,165 @@
+@namespace ZenithUI
+@implements IDisposable
+
+@*
+    One toast. Rendered by ZenToastHost; not usually placed by hand.
+
+    The auto-dismiss timer pauses on hover AND on focus. Hover alone is the version most libraries
+    ship, and it fails the two users who need it most: someone reading with a screen reader, and
+    someone reaching the action button by keyboard. Both hold focus without a pointer ever being
+    over the toast, and both would watch it vanish mid-sentence.
+
+    The timer restarts rather than resumes. Tracking elapsed time across pauses buys a more
+    "accurate" countdown that nobody is measuring, at the cost of a user who glances away and comes
+    back to a toast with 300ms left. Restarting is the forgiving behaviour.
+*@
+
+<div id="@Instance.Id"
+     class="@ToastClass"
+     role="@Instance.Role"
+     aria-live="@Instance.Politeness"
+     aria-atomic="true"
+     @onmouseenter="Pause"
+     @onmouseleave="Resume"
+     @onfocusin="Pause"
+     @onfocusout="Resume">
+
+    <ZenIcon Path="@IconPath" Size="ZenSize.Small" class="@($"mt-0.5 shrink-0 {IconColour}")" />
+
+    <div class="min-w-0 flex-1">
+        @if (Instance.Options.Title is { } title)
+        {
+            <p class="text-sm font-semibold text-content">@title</p>
+        }
+
+        <p class="text-sm text-content-muted">@Instance.Message</p>
+
+        @if (Instance.Options.ActionText is { } actionText)
+        {
+            <div class="mt-2">
+                <ZenButton Size="ZenSize.Small"
+                           Variant="ZenVariant.Soft"
+                           Intent="@Instance.Intent"
+                           OnClick="InvokeActionAsync">
+                    @actionText
+                </ZenButton>
+            </div>
+        }
+    </div>
+
+    @if (Instance.Options.ShowCloseButton)
+    {
+        <button type="button"
+                class="zen-focus -m-1 grid shrink-0 place-items-center self-start rounded-zen-sm p-1 text-content-subtle transition-colors hover:bg-surface-sunken hover:text-content"
+                aria-label="@CloseLabel"
+                @onclick="Dismiss">
+            <ZenIcon Path="@ZenIcons.Close" Size="ZenSize.Small" />
+        </button>
+    }
+</div>
+
+@code {
+    private Timer? _timer;
+    private bool _disposed;
+
+    /// <summary>The toast to render.</summary>
+    [Parameter, EditorRequired]
+    public ZenToastInstance Instance { get; set; } = default!;
+
+    /// <summary>Accessible name for the dismiss button.</summary>
+    [Parameter]
+    public string CloseLabel { get; set; } = "Dismiss";
+
+    /// <inheritdoc />
+    protected override void OnInitialized() => StartTimer();
+
+    private void StartTimer()
+    {
+        if (_disposed || Instance.Options.Duration <= TimeSpan.Zero)
+        {
+            return;
+        }
+
+        _timer?.Dispose();
+
+        // The callback arrives on a thread-pool thread, so the dismissal is marshalled onto the
+        // renderer with InvokeAsync. Touching component state directly from the timer is the
+        // classic way to get a torn render or a cross-thread exception.
+        _timer = new Timer(
+            _ => _ = InvokeAsync(Dismiss),
+            null,
+            Instance.Options.Duration,
+            Timeout.InfiniteTimeSpan);
+    }
+
+    private void Pause()
+    {
+        _timer?.Dispose();
+        _timer = null;
+    }
+
+    private void Resume() => StartTimer();
+
+    private void Dismiss()
+    {
+        if (_disposed)
+        {
+            return;
+        }
+
+        Pause();
+
+        // The instance raises OnDismissed, not this component. A toast can be evicted by the
+        // visible cap before it ever renders, and a callback owned here would be lost in that case.
+        Instance.Dismiss();
+    }
+
+    private async Task InvokeActionAsync()
+    {
+        if (Instance.Options.OnAction is { } action)
+        {
+            await action();
+        }
+
+        // Dismissed after the action, always. A toast that stays put once its button is pressed
+        // reads as a click that did not register.
+        Dismiss();
+    }
+
+    /// <inheritdoc />
+    public void Dispose()
+    {
+        _disposed = true;
+        _timer?.Dispose();
+        _timer = null;
+    }
+
+    // ---- Styling -----------------------------------------------------------------------------
+
+    private string IconPath => Instance.Intent switch
+    {
+        ZenIntent.Success => ZenIcons.Success,
+        ZenIntent.Warning => ZenIcons.Warning,
+        ZenIntent.Danger => ZenIcons.Danger,
+        _ => ZenIcons.Info,
+    };
+
+    // -strong, never the fill token: this icon is a foreground on a surface, and `text-success`
+    // on a raised panel is about 2:1.
+    private string IconColour => Instance.Intent switch
+    {
+        ZenIntent.Success => "text-success-strong",
+        ZenIntent.Warning => "text-warning-strong",
+        ZenIntent.Danger => "text-danger-strong",
+        ZenIntent.Info => "text-info-strong",
+        ZenIntent.Primary => "text-primary-strong",
+        ZenIntent.Secondary => "text-secondary-strong",
+        ZenIntent.Accent => "text-accent-strong",
+        _ => "text-content-subtle",
+    };
+
+    private string ToastClass => CssBuilder
+        .Default("zen-toast pointer-events-auto flex w-full gap-3 rounded-zen-lg border border-border bg-surface-overlay p-3 shadow-zen-lg")
+        .AddClass(Instance.Options.Class)
+        .Build()!;
+}

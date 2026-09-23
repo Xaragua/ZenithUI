@@ -316,6 +316,30 @@ public class ZenModalTests : BunitContext
     }
 
     [Fact]
+    public void NativeClose_StillReleasesTheScrollLock()
+    {
+        // Regression. A <dialog> can close by a route the component did not initiate - a
+        // `form method="dialog"` submit in the body. That handler used to clear the _shown flag
+        // and then ask the owner to close; the sync that followed tested `!Open && _shown`, found
+        // the flag already down, and skipped teardown. The lock was taken and never released, so
+        // the page was left overflow:hidden with compensating padding - scrolling silently dead,
+        // long after the dialog was gone.
+        var open = true;
+
+        var cut = Render<ZenModal>(p => p
+            .Add(x => x.Open, true)
+            .Add(x => x.OpenChanged, v => open = v));
+
+        cut.Find("dialog").TriggerEvent("onclose", EventArgs.Empty);
+
+        var calls = JSInterop.Invocations.Select(i => i.Identifier).ToList();
+
+        calls.Count(c => c == "lockScroll").ShouldBe(calls.Count(c => c == "unlockScroll"));
+        calls.ShouldContain("unlockScroll");
+        open.ShouldBeFalse();
+    }
+
+    [Fact]
     public void Modal_LeaksNoRazorDirectivesIntoTheMarkup()
     {
         // Regression. The dialog carried `@oncancel:preventDefault="true"` to stop the browser

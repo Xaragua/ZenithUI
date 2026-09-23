@@ -237,3 +237,30 @@ public enum ZenModalSize
     /// <summary>The whole viewport. For an immersive editing surface on small screens.</summary>
     Full,
 }
+
+/// <summary>Which corner (or edge) toasts stack in.</summary>
+/// <remarks>
+/// Logical inline sides, so a right-to-left document moves the stack to the other side without the
+/// consumer changing anything. The block axis stays physical: top is top in every writing mode
+/// this library targets.
+/// </remarks>
+public enum ZenToastPosition
+{
+    /// <summary>Top, on the side text starts from.</summary>
+    TopStart,
+
+    /// <summary>Top, centred.</summary>
+    TopCenter,
+
+    /// <summary>Top, on the side text ends at. The common default for desktop.</summary>
+    TopEnd,
+
+    /// <summary>Bottom, on the side text starts from.</summary>
+    BottomStart,
+
+    /// <summary>Bottom, centred. Reads well on narrow screens, near the thumb.</summary>
+    BottomCenter,
+
+    /// <summary>Bottom, on the side text ends at.</summary>
+    BottomEnd,
+}

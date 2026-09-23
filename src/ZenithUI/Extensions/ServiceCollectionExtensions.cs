@@ -35,6 +35,7 @@ public static class ZenithUIServiceCollectionExtensions
 
         services.TryAddScoped<IZenThemeService, ZenThemeService>();
         services.TryAddScoped<IZenModalService, ZenModalService>();
+        services.TryAddScoped<IZenToastService, ZenToastService>();
 
         return services;
     }

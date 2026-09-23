@@ -65,6 +65,10 @@
        do not each have to remember to include one. *@
     <ZenModalHost @rendermode="InteractiveServer" />
 
+    @* Same rule as the modal host: exactly one per document, or every toast renders - and
+       announces - twice. *@
+    <ZenToastHost Position="ZenToastPosition.BottomEnd" @rendermode="InteractiveServer" />
+
     <footer class="border-t border-border">
         <div class="mx-auto flex max-w-6xl flex-col gap-1 px-4 py-6 text-sm text-content-muted sm:px-6">
             <p>ZenithUI &middot; milestone M1 &mdash; foundation, tokens, theming and primitives.</p>

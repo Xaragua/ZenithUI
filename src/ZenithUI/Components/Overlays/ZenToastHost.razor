@@ -1,0 +1,77 @@
+@namespace ZenithUI
+@implements IDisposable
+@inject IZenToastService Toasts
+
+@*
+    Renders whatever IZenToastService is showing. Place one in the layout, once:
+
+        <ZenToastHost Position="ZenToastPosition.BottomEnd" />
+
+    Two of them would render every toast twice, and both copies would announce.
+
+    The container is fixed and pointer-events-none; each toast re-enables pointer events for
+    itself. Without that, an invisible full-height column sits over the page swallowing clicks on
+    whatever is behind it - a bug that is invisible until someone reports that a button "sometimes"
+    does nothing.
+*@
+
+@if (Toasts.Toasts.Count > 0)
+{
+    <div class="@ContainerClass" style="@ContainerStyle">
+        @foreach (var toast in Toasts.Toasts)
+        {
+            @* Keyed by instance: without it Blazor diffs two toasts of the same shape
+               positionally and reuses the wrong one's timer state when the stack shifts. *@
+            <ZenToast @key="toast" Instance="toast" CloseLabel="@CloseLabel" />
+        }
+    </div>
+}
+
+@code {
+    /// <summary>Which corner the stack occupies.</summary>
+    [Parameter]
+    public ZenToastPosition Position { get; set; } = ZenToastPosition.BottomEnd;
+
+    /// <summary>Maximum width of a toast.</summary>
+    [Parameter]
+    public string MaxWidth { get; set; } = "24rem";
+
+    /// <summary>Accessible name for each toast's dismiss button.</summary>
+    [Parameter]
+    public string CloseLabel { get; set; } = "Dismiss";
+
+    /// <summary>Extra CSS classes for the stack container.</summary>
+    [Parameter]
+    public string? Class { get; set; }
+
+    /// <inheritdoc />
+    protected override void OnInitialized() => Toasts.Changed += OnToastsChanged;
+
+    private void OnToastsChanged() => InvokeAsync(StateHasChanged);
+
+    /// <inheritdoc />
+    public void Dispose() => Toasts.Changed -= OnToastsChanged;
+
+    // ---- Styling -----------------------------------------------------------------------------
+
+    private string ContainerClass => CssBuilder
+        .Default("zen-toast-host pointer-events-none fixed z-[60] flex w-[calc(100%-2rem)] flex-col gap-2 p-4")
+        .AddClass(Position switch
+        {
+            // Newest first at the top of the screen, newest last at the bottom - so in both cases
+            // the newest toast is the one nearest the screen edge, where the eye already is.
+            ZenToastPosition.TopStart => "top-0 start-0 flex-col-reverse",
+            ZenToastPosition.TopEnd => "top-0 end-0 flex-col-reverse items-end",
+            ZenToastPosition.BottomStart => "bottom-0 start-0",
+            // Centred by pinning both inline edges rather than `start-1/2` with a -50% translate:
+            // that translate is hard-coded to one direction and pushes the stack off-screen under
+            // `dir="rtl"`. Symmetric insets centre correctly in both.
+            ZenToastPosition.TopCenter => "top-0 start-0 end-0 mx-auto flex-col-reverse items-center",
+            ZenToastPosition.BottomCenter => "bottom-0 start-0 end-0 mx-auto items-center",
+            _ => "bottom-0 end-0 items-end",
+        })
+        .AddClass(Class)
+        .Build()!;
+
+    private string ContainerStyle => $"max-width:{MaxWidth}";
+}
