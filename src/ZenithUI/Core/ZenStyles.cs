@@ -187,6 +187,27 @@ public static class ZenStyles
         _ => "text-content",
     };
 
+    /// <summary>
+    /// The intent's solid fill alone, without a text colour - for a shape that carries no text of
+    /// its own: a timeline marker, a status dot, a chart swatch.
+    /// </summary>
+    /// <remarks>
+    /// Neutral falls back to <c>border-strong</c> rather than a surface token. A neutral dot has to
+    /// be visible ON a surface, and every surface token is by definition the same lightness as the
+    /// surface it would be drawn against.
+    /// </remarks>
+    public static string Fill(ZenIntent intent) => intent switch
+    {
+        ZenIntent.Primary => "bg-primary",
+        ZenIntent.Secondary => "bg-secondary",
+        ZenIntent.Accent => "bg-accent",
+        ZenIntent.Success => "bg-success",
+        ZenIntent.Warning => "bg-warning",
+        ZenIntent.Danger => "bg-danger",
+        ZenIntent.Info => "bg-info",
+        _ => "bg-border-strong",
+    };
+
     /// <summary>The intent's tinted background alone, without a text colour.</summary>
     public static string SoftSurface(ZenIntent intent) => intent switch
     {

@@ -63,4 +63,7 @@
 @source inline("zen-modal");
 @source inline("zen-toast");
 @source inline("zen-toast-host");
+@source inline("zen-timeline");
+@source inline("zen-timeline-line");
+@source inline("zen-timeline-body");
 @source inline("{bg,hover:bg}-surface-hover");

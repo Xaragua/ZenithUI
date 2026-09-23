@@ -1,0 +1,64 @@
+@namespace ZenithUI
+@inherits ZenComponentBase
+
+@*
+    A vertical sequence of events.
+
+    <ol> rather than <ul>, because a timeline is ordered by definition. That is not pedantry: a
+    screen reader announces "list item 3 of 7" for an ordered list, which is exactly the position
+    information a sighted user reads off the connecting line. An unordered list throws it away.
+
+    The container owns almost nothing. It draws no line and no markers - each item draws its own,
+    because only the item knows its intent and whether it is the current step. What lives here is
+    the density cascade and the two rules in components/base.css that need to reach the LAST item
+    specifically, which no item can know about itself.
+*@
+
+<ol class="@RootClass(ContainerClass)" style="@Style" @attributes="AttributesWithoutClass">
+    <CascadingValue Value="this" IsFixed="true">
+        @ChildContent
+    </CascadingValue>
+</ol>
+
+@code {
+    /// <summary>The <see cref="ZenTimelineItem"/> entries, in order.</summary>
+    [Parameter]
+    public RenderFragment? ChildContent { get; set; }
+
+    /// <summary>Row density, inherited by every item.</summary>
+    [Parameter]
+    public ZenSize Size { get; set; } = ZenSize.Medium;
+
+    /// <summary>Vertical gap between one item's marker and the next.</summary>
+    internal string GapClass => Size switch
+    {
+        ZenSize.Small => "pb-4",
+        ZenSize.Large => "pb-8",
+        _ => "pb-6",
+    };
+
+    /// <summary>Diameter of an item's marker, and of the icon inside it.</summary>
+    internal string MarkerSizeClass => Size switch
+    {
+        ZenSize.Small => "size-5",
+        ZenSize.Large => "size-8",
+        _ => "size-6",
+    };
+
+    /// <summary>Icon dimensions inside a marker.</summary>
+    internal string MarkerIconClass => Size switch
+    {
+        ZenSize.Small => "size-3",
+        ZenSize.Large => "size-4.5",
+        _ => "size-3.5",
+    };
+
+    /// <summary>Text size for an item's title.</summary>
+    internal string TitleTextClass => Size switch
+    {
+        ZenSize.Large => "text-base",
+        _ => "text-sm",
+    };
+
+    private string ContainerClass => "zen-timeline m-0 list-none p-0";
+}

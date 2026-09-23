@@ -1,0 +1,183 @@
+@namespace ZenithUI
+@inherits ZenComponentBase
+
+@*
+    One event on a ZenTimeline.
+
+    Two structural decisions the markup depends on:
+
+    - The connector line is drawn by the item ABOVE it, not the one below, and it lives in the
+      same flex column as the marker so `flex-1` stretches it to whatever height the body turns
+      out to be. A line whose length is a fixed value guesses at the content and is wrong the
+      first time an entry wraps to two lines.
+
+    - The vertical gap between entries is padding on the BODY, not on the <li>. A flex child
+      cannot grow into its parent's padding, so putting the gap on the <li> would stop every
+      connector short of the next marker and leave a dotted-looking ladder. Both the gap and the
+      trailing line are removed from the final item by rules in components/base.css keyed on
+      `:last-child` - the one fact an item cannot learn about itself.
+
+    The marker is aria-hidden throughout. It is the same rule ZenIndicator follows: a colour and a
+    glyph are not an accessible name, so anything the marker means has to also be in the text.
+*@
+
+<li class="@RootClass("relative flex gap-3")" style="@Style" aria-current="@(Current ? "step" : null)" @attributes="AttributesWithoutClass">
+    <div class="flex flex-col items-center">
+        <span class="@MarkerClass" aria-hidden="true">
+            @if (Icon is not null)
+            {
+                <ZenIcon Path="@Icon" class="@Timeline.MarkerIconClass" />
+            }
+            else
+            {
+                <span class="@DotClass"></span>
+            }
+        </span>
+
+        <span class="zen-timeline-line mt-1 w-px flex-1 bg-border" aria-hidden="true"></span>
+    </div>
+
+    <div class="@($"zen-timeline-body min-w-0 flex-1 {Timeline.GapClass}")">
+        <div class="flex flex-wrap items-baseline gap-x-2 gap-y-0.5">
+            @if (TitleTemplate is not null)
+            {
+                @TitleTemplate
+            }
+            else if (Title is not null)
+            {
+                <p class="@($"font-medium text-content {Timeline.TitleTextClass}")">@Title</p>
+            }
+
+            @if (TimestampMarkup is not null)
+            {
+                @TimestampMarkup
+            }
+        </div>
+
+        @if (ChildContent is not null)
+        {
+            <div class="mt-1 text-sm text-content-muted">
+                @ChildContent
+            </div>
+        }
+    </div>
+</li>
+
+@code {
+    /// <summary>The timeline this entry belongs to, supplying density.</summary>
+    /// <remarks>
+    /// Required rather than optional. A lone <c>&lt;li&gt;</c> outside a list is invalid markup,
+    /// so there is no standalone use to support - and a null-tolerant version would silently
+    /// render an item that no screen reader announces as part of anything.
+    /// </remarks>
+    [CascadingParameter]
+    public ZenTimeline Timeline { get; set; } = default!;
+
+    /// <summary>The event's headline.</summary>
+    [Parameter]
+    public string? Title { get; set; }
+
+    /// <summary>Custom markup for the headline, when a string is not enough.</summary>
+    [Parameter]
+    public RenderFragment? TitleTemplate { get; set; }
+
+    /// <summary>When the event happened.</summary>
+    [Parameter]
+    public DateTimeOffset? Timestamp { get; set; }
+
+    /// <summary>
+    /// Display text for the timestamp, overriding <see cref="TimestampFormat"/>. Use it for
+    /// relative phrasing - "3 days ago" - which no format string can produce.
+    /// </summary>
+    [Parameter]
+    public string? TimestampText { get; set; }
+
+    /// <summary>
+    /// Format string applied to <see cref="Timestamp"/> in the current culture. Defaults to the
+    /// culture's short date and time.
+    /// </summary>
+    [Parameter]
+    public string TimestampFormat { get; set; } = "g";
+
+    /// <summary>Colour of the marker.</summary>
+    [Parameter]
+    public ZenIntent Intent { get; set; } = ZenIntent.Neutral;
+
+    /// <summary>An SVG path for the marker, from <see cref="ZenIcons"/> or your own set.</summary>
+    [Parameter]
+    public string? Icon { get; set; }
+
+    /// <summary>Body content for the entry.</summary>
+    [Parameter]
+    public RenderFragment? ChildContent { get; set; }
+
+    /// <summary>
+    /// Marks this entry as where the process currently stands, emitting <c>aria-current="step"</c>
+    /// and giving the marker a tinted halo.
+    /// </summary>
+    [Parameter]
+    public bool Current { get; set; }
+
+    /// <summary>
+    /// The timestamp as a machine-readable <c>&lt;time&gt;</c> element, or null when there is
+    /// nothing to show.
+    /// </summary>
+    /// <remarks>
+    /// <c>datetime</c> carries the round-trip form while the text carries the formatted one, so
+    /// the value stays parseable however it is displayed. When only <see cref="TimestampText"/> is
+    /// given there is no instant to state, and a <c>&lt;time&gt;</c> without a valid
+    /// <c>datetime</c> is worse than a plain span - it claims machine readability it does not have.
+    /// </remarks>
+    private RenderFragment? TimestampMarkup
+    {
+        get
+        {
+            var text = TimestampText ?? Timestamp?.ToString(TimestampFormat, CultureInfo.CurrentCulture);
+
+            if (text is null)
+            {
+                return null;
+            }
+
+            var machine = Timestamp?.ToString("O", CultureInfo.InvariantCulture);
+
+            return builder =>
+            {
+                builder.OpenElement(0, machine is null ? "span" : "time");
+                builder.AddAttribute(1, "class", "text-xs text-content-subtle");
+
+                if (machine is not null)
+                {
+                    builder.AddAttribute(2, "datetime", machine);
+                }
+
+                builder.AddContent(3, text);
+                builder.CloseElement();
+            };
+        }
+    }
+
+    /// <summary>
+    /// The marker's own classes.
+    /// </summary>
+    /// <remarks>
+    /// An icon marker is a filled shape and needs a background. A dot marker is a small solid
+    /// circle floating in an empty box, so the box stays transparent and only the dot carries
+    /// colour - giving both a background would make two markers in the same column look like two
+    /// different sizes.
+    /// <para>
+    /// The current step is emphasised by moving one step up the same ladder rather than by adding
+    /// a ring: an icon marker goes from the soft tint to the solid fill, and a dot marker gains
+    /// the soft tint behind it as a halo. A ring would have needed its own colour decision for
+    /// every intent, and an outline in the ring colour says "focused", which this is not.
+    /// </para>
+    /// </remarks>
+    private string MarkerClass => CssBuilder
+        .Default($"z-10 grid shrink-0 place-items-center rounded-full {Timeline.MarkerSizeClass}")
+        .AddClass(ZenStyles.Soft(Intent), Icon is not null && !Current)
+        .AddClass(ZenStyles.Solid(Intent), Icon is not null && Current)
+        .AddClass(ZenStyles.SoftSurface(Intent), Icon is null && Current)
+        .Build()!;
+
+    private string DotClass => $"size-2.5 rounded-full {ZenStyles.Fill(Intent)}";
+}

@@ -555,3 +555,27 @@
     transform: none;
   }
 }
+
+@layer components {
+  /*
+   * ZenTimeline's last entry.
+   *
+   * Two things have to stop at the final marker, and neither can be decided by the item itself:
+   * an item has no way to know it is last, and the container has no way to count a RenderFragment
+   * of children. `:last-child` is the only party that knows.
+   *
+   *   - The connector line, which would otherwise run past the last marker and point at nothing.
+   *   - The gap below the body, which is there to make room for the next entry. With none
+   *     following, it is just an unexplained band of space before whatever comes after the list.
+   *
+   * Matching is scoped through `.zen-timeline >` so a nested timeline inside an entry's body
+   * cannot reach out and truncate its host.
+   */
+  .zen-timeline > li:last-child .zen-timeline-line {
+    display: none;
+  }
+
+  .zen-timeline > li:last-child > .zen-timeline-body {
+    padding-block-end: 0;
+  }
+}
