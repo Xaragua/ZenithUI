@@ -1,0 +1,353 @@
+@namespace ZenithUI
+@typeparam TItem
+@inherits ZenComponentBase
+
+@*
+    A vertical list of items, with optional selection.
+
+    The semantics change with the job, because one markup shape cannot serve both honestly:
+
+      - No selection: a plain <ul>/<li>. It is a list of things. Giving it listbox semantics
+        would promise a widget the user cannot operate.
+      - Selectable: role="listbox" with role="option" children, a roving tabindex, and full
+        arrow-key navigation. This is a real widget and has to behave like one.
+
+    Not a replacement for ZenSelect or ZenCombobox. Those are form controls that collapse to a
+    field; this is a list that stays on the page - a master pane, a picker inside a panel, a set
+    of choices in a settings page.
+
+    Empty, loading and error states are parameters rather than the caller's problem. A list that
+    renders nothing when it has nothing is the single most common way a loading bug looks like a
+    data bug.
+*@
+
+@if (Loading)
+{
+    <div class="@RootClass(ContainerClass)" style="@Style" aria-busy="true" aria-live="polite">
+        @if (LoadingTemplate is not null)
+        {
+            @LoadingTemplate
+        }
+        else
+        {
+            @* Skeleton rows rather than a spinner: the list keeps its shape, so the page does not
+               reflow when the data lands. *@
+            @for (var i = 0; i < LoadingRowCount; i++)
+            {
+                <div class="px-3 py-2">
+                    <ZenSkeleton Shape="ZenSkeletonShape.Text" />
+                </div>
+            }
+        }
+    </div>
+}
+else if (Items is null || !Items.Any())
+{
+    <div class="@RootClass(ContainerClass)" style="@Style">
+        @if (EmptyTemplate is not null)
+        {
+            @EmptyTemplate
+        }
+        else
+        {
+            <p class="px-3 py-6 text-center text-sm text-content-subtle">@EmptyText</p>
+        }
+    </div>
+}
+else if (Selectable)
+{
+    @* Focus stays on the listbox and aria-activedescendant names the current option. The
+       alternative - a roving tabindex that moves DOM focus onto each <li> - also works, but costs
+       a real focus call per arrow key and takes focus away from the element handling the keys.
+       Without the attribute the visual cursor moves and a screen reader announces nothing, which
+       is the worst of both.
+
+       This comment sits outside the tag deliberately: a Razor comment placed between attributes
+       silently swallows the attributes that follow it - @onkeydown included - and the component
+       renders looking correct while its keyboard handling is simply absent. *@
+    <ul id="@ListId"
+        class="@RootClass(ContainerClass)"
+        style="@Style"
+        role="listbox"
+        aria-label="@Label"
+        aria-labelledby="@LabelledBy"
+        aria-multiselectable="@(Multiple ? "true" : null)"
+        aria-activedescendant="@ActiveDescendantId"
+        tabindex="0"
+        @onkeydown="HandleKeyDownAsync"
+        @attributes="AttributesWithoutClass">
+        @foreach (var (item, index) in Items.Select((x, i) => (x, i)))
+        {
+            var selected = IsSelected(item);
+            var disabled = IsItemDisabled?.Invoke(item) ?? false;
+
+            @* aria-selected is stated on every option, not only the selected one. Omitting it on
+               the others leaves a screen reader to announce "selected" for one row and nothing at
+               all for the rest, which reads as "unknown" rather than "not selected". *@
+            <li id="@OptionId(index)"
+                class="@OptionClass(selected, disabled, index == _activeIndex)"
+                role="option"
+                aria-selected="@(selected ? "true" : "false")"
+                aria-disabled="@(disabled ? "true" : null)"
+                @onclick="@(() => SelectAsync(item, index))">
+                @if (ItemTemplate is not null)
+                {
+                    @ItemTemplate(item)
+                }
+                else
+                {
+                    @(ItemText?.Invoke(item) ?? item?.ToString())
+                }
+            </li>
+        }
+    </ul>
+}
+else
+{
+    <ul class="@RootClass(ContainerClass)" style="@Style" @attributes="AttributesWithoutClass">
+        @foreach (var item in Items)
+        {
+            <li class="@PlainItemClass">
+                @if (ItemTemplate is not null)
+                {
+                    @ItemTemplate(item)
+                }
+                else
+                {
+                    @(ItemText?.Invoke(item) ?? item?.ToString())
+                }
+            </li>
+        }
+    </ul>
+}
+
+@code {
+    private int _activeIndex;
+
+    /// <summary>The items to render.</summary>
+    [Parameter]
+    public IEnumerable<TItem>? Items { get; set; }
+
+    /// <summary>Custom markup for one item.</summary>
+    [Parameter]
+    public RenderFragment<TItem>? ItemTemplate { get; set; }
+
+    /// <summary>Text for one item, when a full template is overkill.</summary>
+    [Parameter]
+    public Func<TItem, string>? ItemText { get; set; }
+
+    /// <summary>Give the list listbox semantics and keyboard selection.</summary>
+    [Parameter]
+    public bool Selectable { get; set; }
+
+    /// <summary>Allow more than one selected item.</summary>
+    [Parameter]
+    public bool Multiple { get; set; }
+
+    /// <summary>The selected item, for single selection.</summary>
+    [Parameter]
+    public TItem? Value { get; set; }
+
+    /// <summary>Raised when the selected item changes.</summary>
+    [Parameter]
+    public EventCallback<TItem?> ValueChanged { get; set; }
+
+    /// <summary>The selected items, for multiple selection.</summary>
+    [Parameter]
+    public IReadOnlyCollection<TItem>? Values { get; set; }
+
+    /// <summary>Raised when the selected items change.</summary>
+    [Parameter]
+    public EventCallback<IReadOnlyCollection<TItem>> ValuesChanged { get; set; }
+
+    /// <summary>Marks individual items unselectable.</summary>
+    [Parameter]
+    public Func<TItem, bool>? IsItemDisabled { get; set; }
+
+    /// <summary>Show loading placeholders instead of items.</summary>
+    [Parameter]
+    public bool Loading { get; set; }
+
+    /// <summary>How many skeleton rows to show while loading.</summary>
+    [Parameter]
+    public int LoadingRowCount { get; set; } = 3;
+
+    /// <summary>Custom loading markup.</summary>
+    [Parameter]
+    public RenderFragment? LoadingTemplate { get; set; }
+
+    /// <summary>Custom empty-state markup.</summary>
+    [Parameter]
+    public RenderFragment? EmptyTemplate { get; set; }
+
+    /// <summary>Message shown when there is nothing to list.</summary>
+    [Parameter]
+    public string EmptyText { get; set; } = "Nothing to show.";
+
+    /// <summary>Accessible name for the listbox.</summary>
+    [Parameter]
+    public string? Label { get; set; }
+
+    /// <summary>Id of the element naming the listbox.</summary>
+    [Parameter]
+    public string? LabelledBy { get; set; }
+
+    /// <summary>Draw separators between items.</summary>
+    [Parameter]
+    public bool Divided { get; set; }
+
+    /// <summary>Surround the list with a border and a surface.</summary>
+    [Parameter]
+    public bool Bordered { get; set; } = true;
+
+    /// <summary>Row density.</summary>
+    [Parameter]
+    public ZenSize Size { get; set; } = ZenSize.Medium;
+
+    private string ListId => SubId("list");
+
+    private string OptionId(int index) => $"{Id}-option-{index}";
+
+    /// <summary>
+    /// The option the keyboard cursor is on, or <see langword="null"/> when there is none.
+    /// </summary>
+    /// <remarks>
+    /// Null rather than a stale id when the list is empty or the cursor is out of range. Pointing
+    /// aria-activedescendant at an element that does not exist makes a screen reader announce
+    /// nothing at all, which is harder to diagnose than announcing the wrong row.
+    /// </remarks>
+    private string? ActiveDescendantId =>
+        _activeIndex >= 0 && _activeIndex < Materialised.Count ? OptionId(_activeIndex) : null;
+
+    private IReadOnlyList<TItem> Materialised => Items as IReadOnlyList<TItem> ?? Items?.ToList() ?? [];
+
+    private bool IsSelected(TItem item) =>
+        Multiple
+            ? Values?.Contains(item) ?? false
+            : EqualityComparer<TItem>.Default.Equals(Value, item);
+
+    private async Task SelectAsync(TItem item, int index)
+    {
+        if (IsItemDisabled?.Invoke(item) ?? false)
+        {
+            return;
+        }
+
+        _activeIndex = index;
+
+        if (Multiple)
+        {
+            var next = new List<TItem>(Values ?? []);
+
+            if (!next.Remove(item))
+            {
+                next.Add(item);
+            }
+
+            await ValuesChanged.InvokeAsync(next);
+            return;
+        }
+
+        await ValueChanged.InvokeAsync(item);
+    }
+
+    /// <summary>
+    /// Arrow-key navigation over the options.
+    /// </summary>
+    /// <remarks>
+    /// The cursor moves without committing a selection, and Enter or Space commits. That is the
+    /// WAI-ARIA listbox pattern for a multi-select list, and it matters even for single select:
+    /// selecting on every arrow press fires a change event per keystroke, which in a bound form
+    /// means a save per keystroke.
+    /// </remarks>
+    private async Task HandleKeyDownAsync(KeyboardEventArgs args)
+    {
+        var items = Materialised;
+
+        if (items.Count == 0)
+        {
+            return;
+        }
+
+        switch (args.Key)
+        {
+            case "ArrowDown":
+                _activeIndex = NextSelectable(items, _activeIndex, 1);
+                break;
+
+            case "ArrowUp":
+                _activeIndex = NextSelectable(items, _activeIndex, -1);
+                break;
+
+            case "Home":
+                _activeIndex = NextSelectable(items, -1, 1);
+                break;
+
+            case "End":
+                _activeIndex = NextSelectable(items, items.Count, -1);
+                break;
+
+            case "Enter":
+            case " ":
+                if (_activeIndex >= 0 && _activeIndex < items.Count)
+                {
+                    await SelectAsync(items[_activeIndex], _activeIndex);
+                }
+
+                break;
+
+            default:
+                return;
+        }
+    }
+
+    /// <summary>
+    /// The next selectable index in a direction, skipping disabled items.
+    /// </summary>
+    /// <remarks>
+    /// Stops at the ends rather than wrapping. Wrapping a listbox is a reasonable choice, but it
+    /// makes "hold ArrowDown to reach the bottom" never terminate, and a user who cannot see the
+    /// list has no way to tell they have been round twice.
+    /// </remarks>
+    private int NextSelectable(IReadOnlyList<TItem> items, int from, int step)
+    {
+        for (var i = from + step; i >= 0 && i < items.Count; i += step)
+        {
+            if (!(IsItemDisabled?.Invoke(items[i]) ?? false))
+            {
+                return i;
+            }
+        }
+
+        return Math.Clamp(from, 0, items.Count - 1);
+    }
+
+    // ---- Styling -----------------------------------------------------------------------------
+
+    private string ContainerClass => CssBuilder
+        .Default("zen-focus m-0 list-none overflow-y-auto p-0")
+        .AddClass("rounded-zen-lg border border-border bg-surface-raised", Bordered)
+        .AddClass("divide-y divide-border", Divided)
+        .Build()!;
+
+    private string RowPadding => Size switch
+    {
+        ZenSize.Small => "px-2.5 py-1.5 text-sm",
+        ZenSize.Large => "px-4 py-3 text-base",
+        _ => "px-3 py-2 text-sm",
+    };
+
+    private string PlainItemClass => $"text-content {RowPadding}";
+
+    private string OptionClass(bool selected, bool disabled, bool active) => CssBuilder
+        .Default($"cursor-pointer transition-colors {RowPadding}")
+        .AddClass("text-content hover:bg-surface-sunken", !selected && !disabled)
+        // The selected row uses the soft tint with -strong text, never the solid fill: a list of
+        // solid-filled rows reads as a column of buttons rather than a set of choices.
+        .AddClass("bg-primary-soft font-medium text-primary-strong", selected)
+        .AddClass("cursor-not-allowed opacity-50", disabled)
+        // The keyboard cursor is shown even though the listbox itself holds focus - without it,
+        // arrowing through the list moves an indicator nobody can see.
+        .AddClass("zen-focus-always", active)
+        .Build()!;
+}
