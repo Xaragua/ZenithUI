@@ -6,9 +6,11 @@
     An anchored floating panel: a menu, a listbox, a date grid, a tooltip-sized card.
 
     Why the top layer. The obvious implementation - `position: absolute` inside a `relative`
-    wrapper, which ZenDatePicker still uses - has two failure modes that cannot be styled away. Any
-    ancestor with `overflow: hidden` clips the panel, and the panel cannot move when it runs out of
-    room at the bottom of the viewport. The HTML `popover` attribute puts the panel in the top
+    wrapper - has two failure modes that cannot be styled away. Any ancestor with
+    `overflow: hidden` clips the panel, and the panel cannot move when it runs out of room at the
+    bottom of the viewport. Both were shipped rather than hypothetical: ZenDatePicker was written
+    that way, and a date picker inside a ZenCard - which is `overflow-hidden` - lost the bottom of
+    its calendar until it moved here. The HTML `popover` attribute puts the panel in the top
     layer, where neither applies. CSS Anchor Positioning would remove the JavaScript too, but is
     not in Firefox yet, so the coordinates are still computed in zen-popover.js.
 

@@ -41,27 +41,34 @@ export function blurElement(id) {
 }
 
 /**
- * Whether the currently focused element is inside the given container.
+ * Whether the currently focused element is inside any of the given containers.
  *
  * Used by popup-style components to decide whether a `focusout` means the user really left. The
  * event's `relatedTarget` cannot answer this from .NET: Blazor marshals it as an opaque reference
  * with no way to test ancestry, so the containment check has to happen here.
  *
- * Returns true when the container is missing - a container that has already been removed is not
+ * Several ids, because a control and its popup are no longer one subtree. A panel in the top
+ * layer is a DOM sibling of the field that owns it, so a single-container check would report
+ * "focus left" the moment focus moved into the panel - closing it on the way in.
+ *
+ * Returns true when every container is missing - a container that has already been removed is not
  * evidence that the user navigated away, and closing on it would fight the component's own
  * teardown.
  *
- * @param {string} id Container element id.
+ * @param {...string} ids Container element ids.
  * @returns {boolean}
  */
-export function containsActiveElement(id) {
-    const container = document.getElementById(id);
+export function containsActiveElement(...ids) {
+    const containers = ids
+        .flat()
+        .map((id) => document.getElementById(id))
+        .filter(Boolean);
 
-    if (!container) {
+    if (containers.length === 0) {
         return true;
     }
 
-    return container.contains(document.activeElement);
+    return containers.some((container) => container.contains(document.activeElement));
 }
 
 /**

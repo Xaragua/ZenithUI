@@ -189,7 +189,38 @@
     public EventCallback OnClosed { get; set; }
 
     /// <summary>Move focus to the cursor cell after the next render.</summary>
+    /// <remarks>
+    /// For the calendar's own key handling, where a render is already on its way. A caller that is
+    /// <i>past</i> the render - a parent acting in its own <c>OnAfterRenderAsync</c> - wants
+    /// <see cref="FocusCursorAsync"/>, because setting a flag after the last render of the batch
+    /// schedules nothing and quietly does nothing.
+    /// </remarks>
     public void FocusCursor() => _focusCursorOnNextRender = true;
+
+    /// <summary>Moves focus to the cursor cell now.</summary>
+    public async Task FocusCursorAsync()
+    {
+        _focusCursorOnNextRender = false;
+
+        if (!RendererInfo.IsInteractive)
+        {
+            return;
+        }
+
+        try
+        {
+            _dom ??= await JS.InvokeAsync<IJSObjectReference>(
+                "import", "./_content/ZenithUI/js/zen-dom.js");
+
+            await _dom.InvokeVoidAsync("focusElement", DayId(_cursor));
+        }
+        catch (JSDisconnectedException)
+        {
+        }
+        catch (OperationCanceledException)
+        {
+        }
+    }
 
     private CultureInfo EffectiveCulture => Culture ?? CultureInfo.CurrentCulture;
 
@@ -215,26 +246,12 @@
 
     protected override async Task OnAfterRenderAsync(bool firstRender)
     {
-        if (!_focusCursorOnNextRender || !RendererInfo.IsInteractive)
+        if (!_focusCursorOnNextRender)
         {
             return;
         }
 
-        _focusCursorOnNextRender = false;
-
-        try
-        {
-            _dom ??= await JS.InvokeAsync<IJSObjectReference>(
-                "import", "./_content/ZenithUI/js/zen-dom.js");
-
-            await _dom.InvokeVoidAsync("focusElement", DayId(_cursor));
-        }
-        catch (JSDisconnectedException)
-        {
-        }
-        catch (OperationCanceledException)
-        {
-        }
+        await FocusCursorAsync();
     }
 
     /// <summary>

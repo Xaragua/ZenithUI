@@ -209,10 +209,53 @@ public class ZenCalendarTests : BunitContext
 
         trigger.GetAttribute("aria-expanded").ShouldBe("false");
         cut.FindAll("table[role='grid']").ShouldBeEmpty();
+        cut.FindAll("[popover]").ShouldBeEmpty();
 
         // Named by its ZenField label rather than by an aria-label, which is what makes clicking
         // the text focus the field as well as naming it.
         cut.Find("label").GetAttribute("for").ShouldBe(cut.Find("input").GetAttribute("id"));
         cut.Find("label").TextContent.ShouldContain("Delivery date");
     }
+
+    [Fact]
+    public void ThePanel_IsInTheTopLayer_NotAbsolutelyPositioned()
+    {
+        // The regression this guards is not subtle once seen and invisible until then: an
+        // absolutely positioned panel is clipped by any ancestor with overflow hidden, and
+        // ZenCard - where most date pickers live - is exactly that. No z-index fixes it, because
+        // clipping is not a stacking problem.
+        var cut = Picker();
+
+        cut.Find("button[aria-haspopup='dialog']").Click();
+
+        var panel = cut.Find($"#{cut.Find("button[aria-haspopup='dialog']").GetAttribute("aria-controls")}");
+
+        panel.GetAttribute("popover").ShouldNotBeNull(
+            "the calendar panel must be a popover, which is what puts it in the top layer.");
+        (panel.ClassName ?? string.Empty).ShouldNotContain("absolute");
+        panel.GetAttribute("role").ShouldBe("dialog");
+    }
+
+    [Fact]
+    public void Opening_MovesFocusIntoTheGrid()
+    {
+        // It did not, for four milestones: ToggleAsync reached for the calendar's @ref before the
+        // render that creates it, so the call landed on null and the user was left on the trigger
+        // with arrow keys that did nothing.
+        var module = JSInterop.SetupModule("./_content/ZenithUI/js/zen-dom.js");
+        module.SetupVoid("focusElement", _ => true).SetVoidResult();
+
+        var cut = Picker();
+        cut.Find("button[aria-haspopup='dialog']").Click();
+
+        var cursor = cut.Find("td[role='gridcell'] button[tabindex='0']").GetAttribute("id");
+
+        module.VerifyInvoke("focusElement").Arguments[0].ShouldBe(cursor);
+    }
+
+    private IRenderedComponent<ZenDatePicker<DateOnly?>> Picker() =>
+        Render<ZenDatePicker<DateOnly?>>(p => p
+            .Add(x => x.Label, "Delivery date")
+            .Add(x => x.Value, Selected)
+            .Add(x => x.Culture, CultureInfo.InvariantCulture));
 }

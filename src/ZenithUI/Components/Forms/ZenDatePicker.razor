@@ -15,9 +15,15 @@
     short date format, so a keyboard user never has to open the calendar. The panel is an
     enhancement, not the only way in.
 
-    Positioning is an absolutely-positioned panel inside a relative wrapper rather than the top
-    layer. That is honest about its limit: inside a scrolling container with overflow hidden, the
-    panel clips. ZenPopover (M3) will supersede this with proper anchored positioning.
+    The panel is a ZenPopover, which puts it in the top layer. It used to be an absolutely
+    positioned div inside a relative wrapper, and that clipped: ZenCard is `overflow-hidden`, so a
+    date picker in a card - which is where most of them live - lost the bottom of the calendar.
+    No z-index fixes that, because clipping is not a stacking problem.
+
+    The move costs one thing worth knowing about. The panel is now a DOM *sibling* of the field
+    rather than a descendant, so "has focus left this control?" spans two subtrees, and the
+    focusout check has to ask about both. A single-container check would report that focus had
+    left the moment it moved into the calendar, closing the panel on the way in.
 *@
 
 <ZenField Label="@Label"
@@ -29,49 +35,65 @@
           Size="Size"
           Class="@FieldClass">
     @*
-        focusout with a relatedTarget check, rather than a document click listener: it needs no
-        JavaScript, and it closes on Tab-away as well as on a click elsewhere - which a click
-        listener alone would miss.
+        Dismissal comes from two places, and both are needed. The popover closes on a click
+        outside itself; focusout closes on Tab-away, which no click listener ever sees.
     *@
-    <div id="@ShellId" class="@ShellClass" @onfocusout="HandleFocusOutAsync" @onkeydown="HandleShellKeyDownAsync">
-        <div class="@WrapperClass">
-            <input id="@context.InputId"
-                   type="text"
-                   class="@RootClass(ZenStyles.InputInnerBase)"
-                   style="@Style"
-                   value="@TextValue"
-                   placeholder="@(Placeholder ?? DateFormatHint)"
-                   disabled="@Disabled"
-                   readonly="@ReadOnly"
-                   autocomplete="off"
-                   aria-describedby="@context.DescribedBy"
-                   aria-invalid="@context.AriaInvalid"
-                   aria-required="@context.AriaRequired"
-                   @attributes="AttributesWithoutClass"
-                   @onchange="HandleTextChanged" />
+    <ZenPopover Open="_open"
+                OpenChanged="HandlePopoverOpenChangedAsync"
+                Placement="@(AlignEnd ? ZenPlacement.BottomEnd : ZenPlacement.BottomStart)"
+                PanelId="@PanelId"
+                Role="dialog"
+                Label="@(Label is null ? "Choose a date" : $"Choose {Label}")"
+                Bare="true"
+                CloseOnEscape="false">
+        @*
+            Bare, because ZenCalendar brings its own surface, border and elevation - it is also
+            usable inline, on a page, with no panel around it at all.
 
-            <button type="button"
-                    @ref="_trigger"
-                    class="@TriggerClass"
-                    aria-label="@(_open ? CloseCalendarLabel : OpenCalendarLabel)"
-                    aria-expanded="@(_open ? "true" : "false")"
-                    aria-haspopup="dialog"
-                    aria-controls="@PanelId"
-                    disabled="@(Disabled || ReadOnly)"
-                    @onclick="ToggleAsync">
-                <ZenIcon Path="@ZenIcons.Calendar" Size="ZenSize.Small" />
-            </button>
-        </div>
+            CloseOnEscape is off because ZenCalendar already handles Escape: it clears its own
+            keyboard cursor and raises OnClosed, which closes this panel *and* returns focus to
+            the trigger. Letting the popover close it too would drop focus at the top of the
+            document.
+        *@
+        <Anchor>
+            <div id="@ShellId" class="@ShellClass" @onfocusout="HandleFocusOutAsync" @onkeydown="HandleShellKeyDownAsync">
+                <div class="@WrapperClass">
+                    <input id="@context.InputId"
+                           type="text"
+                           class="@RootClass(ZenStyles.InputInnerBase)"
+                           style="@Style"
+                           value="@TextValue"
+                           placeholder="@(Placeholder ?? DateFormatHint)"
+                           disabled="@Disabled"
+                           readonly="@ReadOnly"
+                           autocomplete="off"
+                           aria-describedby="@context.DescribedBy"
+                           aria-invalid="@context.AriaInvalid"
+                           aria-required="@context.AriaRequired"
+                           @attributes="AttributesWithoutClass"
+                           @onchange="HandleTextChanged" />
 
-        @if (_open)
-        {
-            @* role="dialog" so assistive technology announces entering a panel, and labelled by
-               the field so it is clear which date is being picked. *@
-            <div id="@PanelId"
-                 class="absolute z-50 mt-1 @(AlignEnd ? "end-0" : "start-0")"
-                 role="dialog"
-                 aria-modal="false"
-                 aria-label="@(Label is null ? "Choose a date" : $"Choose {Label}")">
+                    <button type="button"
+                            @ref="_trigger"
+                            class="@TriggerClass"
+                            aria-label="@(_open ? CloseCalendarLabel : OpenCalendarLabel)"
+                            aria-expanded="@(_open ? "true" : "false")"
+                            aria-haspopup="dialog"
+                            aria-controls="@PanelId"
+                            disabled="@(Disabled || ReadOnly)"
+                            @onclick="ToggleAsync">
+                        <ZenIcon Path="@ZenIcons.Calendar" Size="ZenSize.Small" />
+                    </button>
+                </div>
+            </div>
+        </Anchor>
+
+        <ChildContent>
+            @*
+                The same two handlers as the field, because the panel is a sibling of it rather
+                than a child: an event inside the calendar no longer bubbles through the shell.
+            *@
+            <div @onfocusout="HandleFocusOutAsync" @onkeydown="HandleShellKeyDownAsync">
                 <ZenCalendar @ref="_calendar"
                              Value="@SelectedDate"
                              ValueChanged="HandleDateSelectedAsync"
@@ -82,14 +104,15 @@
                              AllowClear="@AllowClear"
                              OnClosed="CloseAndReturnFocusAsync" />
             </div>
-        }
-    </div>
+        </ChildContent>
+    </ZenPopover>
 </ZenField>
 
 @code {
     private bool _open;
     private bool _parseFailed;
     private ZenCalendar? _calendar;
+    private bool _focusCalendarOnNextRender;
     private ElementReference _trigger;
 
     /// <summary>Earliest selectable date.</summary>
@@ -212,19 +235,35 @@
 
     // ---- Open and close ----------------------------------------------------------------------
 
-    private async Task ToggleAsync()
+    private Task ToggleAsync()
     {
         _open = !_open;
 
-        if (_open)
+        // Focus moves into the grid so arrow keys work immediately - but not from here. The
+        // calendar does not exist yet: this runs before the render that creates it, so the @ref
+        // is still null and reaching for it silently does nothing, which is what it did for four
+        // milestones. The request is recorded and honoured in OnAfterRenderAsync, once there is
+        // something to focus.
+        _focusCalendarOnNextRender = _open;
+
+        return Task.CompletedTask;
+    }
+
+    protected override async Task OnAfterRenderAsync(bool firstRender)
+    {
+        await base.OnAfterRenderAsync(firstRender);
+
+        if (!_focusCalendarOnNextRender || _calendar is null)
         {
-            // Focus moves into the grid so arrow keys work immediately. Opening a calendar and
-            // leaving focus on the trigger means the first arrow press does nothing.
-            StateHasChanged();
-            _calendar?.FocusCursor();
+            return;
         }
 
-        await Task.CompletedTask;
+        _focusCalendarOnNextRender = false;
+
+        // FocusCursorAsync, not FocusCursor: the render this is running after is the last of the
+        // batch, so asking the calendar to act "on its next render" would wait for one that is
+        // not coming.
+        await _calendar.FocusCursorAsync();
     }
 
     private async Task CloseAndReturnFocusAsync()
@@ -259,6 +298,25 @@
         {
             await CloseAndReturnFocusAsync();
         }
+    }
+
+    /// <summary>
+    /// The popover asking to close — a click outside it, in practice.
+    /// </summary>
+    /// <remarks>
+    /// Focus is deliberately not moved. The user is already putting it somewhere else by clicking;
+    /// pulling it back to the trigger would fight that. Escape and choosing a date both go through
+    /// <see cref="CloseAndReturnFocusAsync"/> instead, where returning focus is the right thing.
+    /// </remarks>
+    private Task HandlePopoverOpenChangedAsync(bool open)
+    {
+        if (!open && _open)
+        {
+            _open = false;
+            StateHasChanged();
+        }
+
+        return Task.CompletedTask;
     }
 
     /// <summary>
@@ -307,7 +365,10 @@
             _dom ??= await JS.InvokeAsync<IJSObjectReference>(
                 "import", "./_content/ZenithUI/js/zen-dom.js");
 
-            return await _dom.InvokeAsync<bool>("containsActiveElement", ShellId);
+            // Both subtrees: the field, and the panel that is now a sibling of it in the top
+            // layer. Asking about the field alone would read "focus left" as focus moved into
+            // the calendar, which closes the panel on the way in.
+            return await _dom.InvokeAsync<bool>("containsActiveElement", ShellId, PanelId);
         }
         catch (JSDisconnectedException)
         {
@@ -348,10 +409,9 @@
 
     // ---- Styling -----------------------------------------------------------------------------
 
-    private string ShellClass => CssBuilder
-        .Default("relative")
-        .AddClass(FullWidth ? "w-full" : "w-auto")
-        .Build()!;
+    // No `relative`: the panel is in the top layer and positioned by zen-popover.js, so there is
+    // nothing left for a positioning context to do.
+    private string ShellClass => FullWidth ? "w-full" : "w-auto";
 
     private string WrapperClass => CssBuilder
         .Default(ZenStyles.InputWrapperBase)

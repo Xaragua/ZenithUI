@@ -10,6 +10,33 @@ Everything in the plan ships. The package is installed from a feed and verified 
 Web App and a standalone WebAssembly app; the API is frozen pending whatever a release candidate
 turns up.
 
+### Fixed — the date picker's panel
+
+**`ZenDatePicker` now opens its calendar in the top layer**, as a `ZenPopover`, instead of as an
+absolutely positioned div inside a relative wrapper. `ZenCard` is `overflow-hidden`, so a date
+picker in a card — which is where most of them live — lost the bottom of its calendar, Today and
+Clear included. No `z-index` addresses that: clipping is not a stacking problem. The panel also
+flips above the field now when there is no room below, which the old one could not do at all.
+`ZenPopover` had said "which ZenDatePicker still uses" in its own header since M3; it no longer
+does.
+
+Two consequences worth stating, because both were found by testing rather than by reading:
+
+- **Dismissal spans two subtrees now.** The panel is a DOM sibling of the field rather than a
+  descendant, so "has focus left this control?" cannot be asked about one container.
+  `containsActiveElement` takes several ids, and a single-container check would have closed the
+  panel at the moment focus entered the calendar.
+- **Focus never moved into the grid on open, and had not since M2.** `ToggleAsync` reached for the
+  calendar's `@ref` before the render that creates it, so the call landed on `null` and did
+  nothing: the user was left on the trigger with arrow keys that appeared dead. The request is now
+  recorded and honoured in `OnAfterRenderAsync`, and `ZenCalendar` gained `FocusCursorAsync` for
+  callers that are already past the render — setting a "do it next render" flag after the last
+  render of a batch schedules nothing.
+
+Verified in a browser with focus emulation and real input events, which is the only way to see any
+of this: headless Edge without it updates `document.activeElement` on a programmatic `focus()`
+without dispatching a single focus event, which made a working Tab-away dismissal look broken.
+
 ### Fixed — M6, the accessibility audit
 
 An axe-core sweep of the running demo — ten pages × two palettes, then nine states that only exist
