@@ -15,13 +15,24 @@
   <PropertyGroup>
     <IsPackable>false</IsPackable>
     <Version>1.0.0-rc.1</Version>
-    <Authors>ZenithUI</Authors>
-    <Company>ZenithUI</Company>
+    <Authors>Enmanuel Gomez</Authors>
+    <Company>Enmanuel Gomez</Company>
     <Product>ZenithUI</Product>
-    <Copyright>Copyright (c) ZenithUI contributors</Copyright>
+    <Copyright>Copyright (c) 2026 Enmanuel Gomez</Copyright>
     <PackageLicenseExpression>MIT</PackageLicenseExpression>
     <PackageReadmeFile>README.md</PackageReadmeFile>
     <PackageTags>blazor;components;tailwindcss;ui;razor;dark-mode;accessibility</PackageTags>
+
+    <!--
+      Both are needed and they are not the same thing: PackageProjectUrl is the "Project website"
+      link on the listing, RepositoryUrl is what Source Link stamps into the PDBs so a consumer can
+      step into this code from their debugger. PublishRepositoryUrl below fills RepositoryUrl from
+      the git remote at pack time; it is stated explicitly as well so a pack from a clone with a
+      different remote name still produces the right package.
+    -->
+    <PackageProjectUrl>https://github.com/Xaragua/ZenithUI</PackageProjectUrl>
+    <RepositoryUrl>https://github.com/Xaragua/ZenithUI</RepositoryUrl>
+    <PackageReleaseNotes>https://github.com/Xaragua/ZenithUI/blob/main/docs/CHANGELOG.md</PackageReleaseNotes>
     <RepositoryType>git</RepositoryType>
     <PublishRepositoryUrl>true</PublishRepositoryUrl>
     <EmbedUntrackedSources>true</EmbedUntrackedSources>

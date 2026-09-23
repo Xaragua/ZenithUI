@@ -24,7 +24,7 @@ custom properties, with first-class light and dark palettes.
 - **Accessibility is tested, not claimed.** Contrast ratios are audited in CI against both palettes,
   every component's ARIA contract has unit tests, and an axe-core sweep drives the running demo —
   every page in both palettes, plus the states that only exist after an interaction. See
-  [`docs/accessibility.md`](docs/accessibility.md), including what those checks cannot see.
+  [`docs/accessibility.md`](https://github.com/Xaragua/ZenithUI/blob/main/docs/accessibility.md), including what those checks cannot see.
 
 ## Getting started
 
@@ -85,7 +85,7 @@ path into your NuGet cache:
 
 That is what makes `bg-surface` compile for *your* markup — and it carries every class ZenithUI's
 own components use, so the two stylesheets cannot disagree about a shared utility. See
-[`docs/theming.md`](docs/theming.md) for why that second half matters;
+[`docs/theming.md`](https://github.com/Xaragua/ZenithUI/blob/main/docs/theming.md) for why that second half matters;
 `samples/ZenithUI.Demo/Styles/app.css` is a working example.
 
 **3. Add a theme switcher** wherever it belongs:
@@ -211,16 +211,16 @@ a palette fix is one edit rather than a guess-and-rerun loop:
 
 ## Documentation
 
-All project documentation lives in [`docs/`](docs/). This README is the only document at the
+All project documentation lives in [`docs/`](https://github.com/Xaragua/ZenithUI/tree/main/docs/). This README is the only document at the
 repository root, because it is the GitHub landing page.
 
 | Document | Contents |
 | --- | --- |
-| [`docs/getting-started.md`](docs/getting-started.md) | Install and wire-up for each hosting model, what works with no render mode, and the template defaults that fight the library |
-| [`docs/theming.md`](docs/theming.md) | The token surface, the three-state light/dark model, rebranding, and what an app running its own Tailwind has to do |
-| [`docs/plan.md`](docs/plan.md) | The implementation plan of record — architecture, component inventory, milestones, and the design decisions behind them |
-| [`docs/accessibility.md`](docs/accessibility.md) | What the library guarantees, the three layers that verify it, the M6 audit findings, and what automated checks cannot see |
-| [`docs/CHANGELOG.md`](docs/CHANGELOG.md) | What shipped, and what was fixed along the way |
+| [`docs/getting-started.md`](https://github.com/Xaragua/ZenithUI/blob/main/docs/getting-started.md) | Install and wire-up for each hosting model, what works with no render mode, and the template defaults that fight the library |
+| [`docs/theming.md`](https://github.com/Xaragua/ZenithUI/blob/main/docs/theming.md) | The token surface, the three-state light/dark model, rebranding, and what an app running its own Tailwind has to do |
+| [`docs/plan.md`](https://github.com/Xaragua/ZenithUI/blob/main/docs/plan.md) | The implementation plan of record — architecture, component inventory, milestones, and the design decisions behind them |
+| [`docs/accessibility.md`](https://github.com/Xaragua/ZenithUI/blob/main/docs/accessibility.md) | What the library guarantees, the three layers that verify it, the M6 audit findings, and what automated checks cannot see |
+| [`docs/CHANGELOG.md`](https://github.com/Xaragua/ZenithUI/blob/main/docs/CHANGELOG.md) | What shipped, and what was fixed along the way |
 
 ## License
 
