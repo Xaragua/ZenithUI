@@ -158,6 +158,45 @@ public class ZenToastTests : BunitContext
     }
 
     [Fact]
+    public void Soft_TintsTheSurfaceWithItsIntent()
+    {
+        var host = Render<ZenToastHost>();
+
+        _toasts.Success("Saved", new ZenToastOptions { Soft = true });
+        host.Render();
+
+        var classes = host.Find(".zen-toast").ClassList;
+
+        classes.ShouldContain("bg-success-soft");
+        classes.ShouldNotContain("bg-surface-overlay");
+    }
+
+    [Fact]
+    public void TheNeutralSurface_IsTheDefault()
+    {
+        var host = Render<ZenToastHost>();
+
+        _toasts.Success("Saved");
+        host.Render();
+
+        host.Find(".zen-toast").ClassList.ShouldContain("bg-surface-overlay");
+    }
+
+    [Fact]
+    public void ANeutralToast_StaysOnTheOverlaySurfaceEvenWhenSoft()
+    {
+        // ZenIntent.Neutral has no -soft token, so there is nothing to tint with. Falling through
+        // to ZenStyles.SoftSurface would hand back bg-surface-sunken - a *recessed* surface for a
+        // panel that floats above the page.
+        var host = Render<ZenToastHost>();
+
+        _toasts.Show("Plain", ZenIntent.Neutral, new ZenToastOptions { Soft = true });
+        host.Render();
+
+        host.Find(".zen-toast").ClassList.ShouldContain("bg-surface-overlay");
+    }
+
+    [Fact]
     public void CloseButton_DismissesTheToast()
     {
         var host = Render<ZenToastHost>();

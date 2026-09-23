@@ -61,6 +61,7 @@
                 }
 
                 <input id="@Id"
+                       @ref="_input"
                        type="text"
                        class="@ZenStyles.InputInnerBase"
                        style="@Style"
@@ -91,9 +92,27 @@
                     </button>
                 }
 
-                <ZenIcon Path="@ZenIcons.ChevronDown"
-                         Size="ZenSize.Small"
-                         class="pointer-events-none shrink-0 text-content-subtle" />
+                @*
+                    A real button, not a decorative icon. It was `pointer-events-none`, copied from
+                    ZenSelect where that is right because a native <select> fills the wrapper
+                    underneath and catches the click. Here the chevron sits beside the input in a
+                    flex row, so the click landed on the wrapper div and nothing happened - the
+                    affordance every user reaches for first was inert.
+
+                    tabindex="-1" keeps the field a single tab stop: the input already opens the
+                    list on focus and ArrowDown, so a second stop would only be something to tab
+                    past. Pointer users get the target; keyboard users already had one.
+                *@
+                <button type="button"
+                        class="zen-focus grid shrink-0 place-items-center rounded-zen-sm p-0.5 text-content-subtle transition-colors hover:text-content"
+                        tabindex="-1"
+                        aria-label="@(_open ? CollapseLabel : ExpandLabel)"
+                        disabled="@(Disabled || ReadOnly)"
+                        @onclick="ToggleOpenAsync">
+                    <ZenIcon Path="@ZenIcons.ChevronDown"
+                             Size="ZenSize.Small"
+                             class="@(_open ? "rotate-180 transition-transform" : "transition-transform")" />
+                </button>
             </div>
         </Anchor>
 
@@ -137,6 +156,7 @@
 
 @code {
     private ZenPopover? _popover;
+    private ElementReference _input;
     private IJSObjectReference? _focus;
     private CancellationTokenSource? _search;
     private List<TItem> _options = [];
@@ -200,6 +220,14 @@
     /// <summary>Accessible name for the clear button.</summary>
     [Parameter]
     public string ClearLabel { get; set; } = "Clear selection";
+
+    /// <summary>Accessible name for the chevron when the list is closed.</summary>
+    [Parameter]
+    public string ExpandLabel { get; set; } = "Show suggestions";
+
+    /// <summary>Accessible name for the chevron when the list is open.</summary>
+    [Parameter]
+    public string CollapseLabel { get; set; } = "Hide suggestions";
 
     /// <summary>Accessible name prefix for a chip's remove button.</summary>
     [Parameter]
@@ -333,6 +361,38 @@
         }
 
         await OpenAsync();
+    }
+
+    /// <summary>Opens or closes the list from the chevron button.</summary>
+    /// <remarks>
+    /// Focus is pushed back into the input on open. Without it the caret is left on a button the
+    /// user cannot tab to, so the very next keystroke goes nowhere - the list is open and typing
+    /// does not filter it.
+    /// </remarks>
+    private async Task ToggleOpenAsync()
+    {
+        if (_open)
+        {
+            await CloseAsync();
+            return;
+        }
+
+        await OpenAsync();
+
+        if (RendererInfo.IsInteractive)
+        {
+            try
+            {
+                await _input.FocusAsync();
+            }
+            catch (JSDisconnectedException)
+            {
+            }
+            catch (InvalidOperationException)
+            {
+                // The element is gone - the field was removed while the click was in flight.
+            }
+        }
     }
 
     private async Task OpenAsync()

@@ -99,6 +99,41 @@ public class ZenComboboxTests : BunitContext
         cut.Find("label").TextContent.ShouldContain("Fruit");
     }
 
+    [Fact]
+    public void TheChevron_OpensTheList()
+    {
+        // Regression. The chevron was a decorative icon with pointer-events-none, copied from
+        // ZenSelect - where that is right, because a native <select> fills the wrapper underneath
+        // and catches the click. Here it sits beside the input, so the click landed on the wrapper
+        // and nothing happened: the affordance every pointer user reaches for first was inert.
+        var cut = RenderBox();
+
+        cut.Find("button[aria-label='Show suggestions']").Click();
+
+        cut.Find("input").GetAttribute("aria-expanded").ShouldBe("true");
+        cut.FindAll("[role='option']").Count.ShouldBe(4);
+    }
+
+    [Fact]
+    public void TheChevron_ClosesAnOpenList()
+    {
+        var cut = RenderBox();
+
+        cut.Find("input").Focus();
+        cut.Find("button[aria-label='Hide suggestions']").Click();
+
+        cut.Find("input").GetAttribute("aria-expanded").ShouldBe("false");
+    }
+
+    [Fact]
+    public void TheChevron_IsNotATabStop()
+    {
+        // The input already opens the list on focus and on ArrowDown, so a second tab stop would
+        // only be something to tab past on the way out of the field.
+        RenderBox().Find("button[aria-label='Show suggestions']")
+            .GetAttribute("tabindex").ShouldBe("-1");
+    }
+
     // ---- Filtering ----------------------------------------------------------------------------
 
     [Fact]

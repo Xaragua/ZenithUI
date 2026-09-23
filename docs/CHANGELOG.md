@@ -57,6 +57,12 @@ site.
 - The stack is capped at five, dropping the oldest. A loop that fails once per item raises a toast
   per item, and a column tall enough to cover the page hides the UI needed to fix the problem.
 
+**`ZenToast` soft tints** — `new ZenToastOptions { Soft = true }` paints the toast with its
+intent's `-soft` background instead of the neutral overlay. Off by default: a stack of tinted
+toasts is louder than a stack of neutral ones, and the icon already carries the intent. The
+contrast audit gained a case for it — body text on a `-soft` tint was not a pairing it covered
+until this made it reachable.
+
 **`ZenCombobox<TItem>`** — the three things a native `<select>` cannot do: filter, load
 asynchronously, and show more than a line per option. Everything native *can* do is still left to
 `ZenSelect`.
@@ -111,6 +117,12 @@ report a pointer going down outside a subtree. Every decision stays in C#.
 - **`ZenList` drew a keyboard cursor on a list nobody had touched.** The cursor starts on the first
   row, so an untouched list sat there with a focus ring on it, which reads as a rendering bug. It
   is now gated on the listbox actually holding focus.
+- **The combobox chevron did nothing when clicked.** It was a decorative icon with
+  `pointer-events-none`, copied from `ZenSelect` — where that is right, because a native
+  `<select>` fills the wrapper underneath and catches the click. In the combobox the chevron sits
+  beside the input in a flex row, so the click landed on the wrapper and nothing happened: the
+  affordance every pointer user reaches for first was inert. It is now a real button, kept out of
+  the tab order since the input already opens the list on focus and `ArrowDown`.
 - **`ZenButton` never rendered its `id`.** `ZenComponentBase` gives every component an `Id`
   parameter with a generated fallback, but a component that does not emit it makes that parameter a
   silent no-op — on the one primitive most often referenced by id, for `aria-controls` from a

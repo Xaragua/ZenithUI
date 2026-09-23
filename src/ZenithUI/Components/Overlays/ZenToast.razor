@@ -158,8 +158,22 @@
         _ => "text-content-subtle",
     };
 
+    /// <summary>
+    /// The toast surface: the neutral overlay, or the intent's soft tint when asked for.
+    /// </summary>
+    /// <remarks>
+    /// The border stays neutral on a tinted toast. Colouring it with the intent's fill token would
+    /// put a saturated 1px line around a pale panel, which reads as an alert box rather than a
+    /// notification - and on the dark palette the fill is lighter than the tint, so the border
+    /// would glow.
+    /// </remarks>
+    private string SurfaceClass => Instance.Options.Soft && Instance.Intent != ZenIntent.Neutral
+        ? ZenStyles.SoftSurface(Instance.Intent)
+        : "bg-surface-overlay";
+
     private string ToastClass => CssBuilder
-        .Default("zen-toast pointer-events-auto flex w-full gap-3 rounded-zen-lg border border-border bg-surface-overlay p-3 shadow-zen-lg")
+        .Default("zen-toast pointer-events-auto flex w-full gap-3 rounded-zen-lg border border-border p-3 shadow-zen-lg")
+        .AddClass(SurfaceClass)
         .AddClass(Instance.Options.Class)
         .Build()!;
 }

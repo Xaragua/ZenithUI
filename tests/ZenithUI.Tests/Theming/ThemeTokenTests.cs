@@ -322,6 +322,38 @@ public class ThemeTokenTests
     [Theory]
     [InlineData("light")]
     [InlineData("dark")]
+    public void BodyText_MeetsAaOnEverySoftTint(string paletteName)
+    {
+        // A soft tint is a background for *content*, not only for its own -strong foreground:
+        // a soft-tinted toast or callout carries an ordinary title and message on it. That pairing
+        // was not covered until ZenToast's Soft option made it reachable, and it is the kind of
+        // thing that regresses silently the next time a -soft lightness is nudged.
+        var palette = Palette(paletteName);
+        var problems = new List<string>();
+
+        foreach (var intent in Intents)
+        {
+            var soft = palette.ResolveColor($"zen-{intent}-soft")!.Value;
+
+            foreach (var contentName in new[] { "zen-content", "zen-content-muted" })
+            {
+                var ratio = OklchColor.ContrastRatio(palette.ResolveColor(contentName)!.Value, soft);
+
+                if (ratio < AaNormalText)
+                {
+                    problems.Add($"--{contentName} on --zen-{intent}-soft: {ratio:F2}:1 (need {AaNormalText})");
+                }
+            }
+        }
+
+        problems.ShouldBeEmpty(Report(
+            $"[{paletteName}] text on a soft-tinted panel would be unreadable",
+            problems));
+    }
+
+    [Theory]
+    [InlineData("light")]
+    [InlineData("dark")]
     public void IntentStrong_MeetsAaOnEverySurface(string paletteName)
     {
         // The whole reason -strong exists: coloured text and icons sitting directly on a page

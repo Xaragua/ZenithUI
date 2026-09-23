@@ -33,6 +33,24 @@ public sealed class ZenToastOptions
     /// <summary>Invoked when the toast leaves the screen, however it goes.</summary>
     public Func<Task>? OnDismissed { get; set; }
 
+    /// <summary>
+    /// Tint the toast with its intent's <c>-soft</c> background instead of the neutral overlay
+    /// surface.
+    /// </summary>
+    /// <remarks>
+    /// <para>
+    /// Off by default, and that default is a judgement rather than an accident. A stack of tinted
+    /// toasts is louder than a stack of neutral ones, and the icon already carries the intent; the
+    /// tint is a second signal for cases where it earns its place - a single error on a busy page,
+    /// or a design that leans on colour.
+    /// </para>
+    /// <para>
+    /// <see cref="ZenIntent.Neutral"/> has no <c>-soft</c> token, so it keeps the overlay surface
+    /// either way.
+    /// </para>
+    /// </remarks>
+    public bool Soft { get; set; }
+
     /// <summary>Extra CSS classes for the toast surface.</summary>
     public string? Class { get; set; }
 }

@@ -309,6 +309,18 @@
             </div>
 
             <p class="mt-4 text-sm text-content-muted">
+                <code>Soft = true</code> tints the surface with the intent instead of the neutral
+                overlay. Off by default: a stack of tinted toasts is louder than a stack of neutral
+                ones, and the icon already carries the intent.
+            </p>
+
+            <div class="mt-2 flex flex-wrap gap-2">
+                <ZenButton Size="ZenSize.Small" Intent="ZenIntent.Success" Variant="ZenVariant.Soft" OnClick="@(() => Toasts.Success("Order saved.", new ZenToastOptions { Soft = true }))">Soft success</ZenButton>
+                <ZenButton Size="ZenSize.Small" Intent="ZenIntent.Warning" Variant="ZenVariant.Soft" OnClick="@(() => Toasts.Warning("Your session expires soon.", new ZenToastOptions { Soft = true }))">Soft warning</ZenButton>
+                <ZenButton Size="ZenSize.Small" Intent="ZenIntent.Danger" Variant="ZenVariant.Soft" OnClick="@(() => Toasts.Danger("Upload failed.", new ZenToastOptions { Soft = true, Duration = TimeSpan.Zero }))">Soft danger</ZenButton>
+            </div>
+
+            <p class="mt-4 text-sm text-content-muted">
                 Eight at once shows the cap: the stack holds five and drops the oldest, because a
                 column tall enough to cover the page hides the UI needed to fix the problem.
             </p>
