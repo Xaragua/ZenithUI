@@ -43,6 +43,31 @@ files behind them change it serves **empty responses** — the page loads with t
 applied but none of the app's own CSS, which looks exactly like a catastrophic styling bug and is
 not one. If the demo suddenly renders in Times New Roman with underlined links, this is why.
 
+**The sibling failure: a stale gzip of the library stylesheet.** Restarting is not always enough.
+The static-asset pipeline caches pre-compressed copies under
+`obj/Debug/net10.0/compressed/`, and that cache can go stale against a regenerated
+`zenith.nopreflight.css` — leaving an **empty** gzip behind a healthy-looking 200.
+
+It is nastier than the manifest trap because every obvious check passes. `curl` sends no
+`Accept-Encoding`, so it gets the real 47 KB file; the browser sends one, gets
+`Content-Encoding: gzip` over an empty body, and parses **zero rules**. The page is then styled
+entirely by the demo's own `app.css` — which carries the `--zen-*` tokens and every class the demo's
+own markup uses, so the theme still looks right — while anything used *only* inside a library
+component silently vanishes: `appearance-none`, `size-4`, the `relative` on a select shell. The
+symptom is a native select arrow, an enormous unsized icon and collapsed spacing, which reads as a
+component bug and is not one.
+
+Confirm it in one command, and treat a decoded length of 0 as proof:
+
+```bash
+curl -s -H "Accept-Encoding: gzip" <url> --compressed | wc -c
+```
+
+The fix is to delete the `compressed` directories and rebuild. **Verify CSS in a real browser**, not
+with `curl`: headless Edge renders and screenshots a page, and
+`[...document.styleSheets].map(s => s.cssRules.length)` dumped via `--dump-dom` is what actually
+proves a stylesheet applied.
+
 ## Focus treatment
 
 Two indicators, chosen by control type:
