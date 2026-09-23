@@ -1,0 +1,20 @@
+[
+  { "name": "modal (declarative)", "path": "/overlays",
+    "drive": "(()=>{const b=[...document.querySelectorAll('button')].find(x=>/open dialog/i.test(x.textContent));if(!b)return 'no trigger';b.click();return 'opened';})()" },
+  { "name": "toasts", "path": "/overlays",
+    "drive": "(()=>{const names=['Success','Info','Warning','Danger','With an action','Stays until dismissed'];const hit=[];for(const n of names){const b=[...document.querySelectorAll('button')].find(x=>x.textContent.trim()===n);if(b){b.click();hit.push(n);}}return hit.join(',');})()" },
+  { "name": "combobox listbox open", "path": "/overlays",
+    "drive": "(()=>{const i=document.querySelector('input[role=combobox]');if(!i)return 'no combobox';i.focus();i.dispatchEvent(new KeyboardEvent('keydown',{key:'ArrowDown',bubbles:true}));return 'opened';})()" },
+  { "name": "popover open", "path": "/overlays",
+    "drive": "(()=>{const b=[...document.querySelectorAll('button')].find(x=>/^BottomStart$/.test(x.textContent.trim()));if(!b)return 'no trigger';b.click();return 'opened';})()" },
+  { "name": "drawer open at 390px", "path": "/shell", "width": 390, "height": 780,
+    "drive": "(()=>{const b=document.querySelector('[popovertarget]');if(!b)return 'no toggle';b.click();return 'drawer:'+(document.querySelector('.zen-sidenav')?.matches(':popover-open')??'unknown');})()" },
+  { "name": "table sorted, detail row open", "path": "/data",
+    "drive": "(()=>{const h=document.querySelector('th button');if(h)h.click();const d=[...document.querySelectorAll('button[aria-expanded=false]')][0];if(d)d.click();return 'sorted+expanded';})()" },
+  { "name": "tree expanded", "path": "/data",
+    "drive": "(()=>{const t=[...document.querySelectorAll('[role=treeitem][aria-expanded=false]')];t.slice(0,3).forEach(x=>(x.querySelector('button')||x).click());return 'expanded '+t.length;})()" },
+  { "name": "form submitted invalid", "path": "/forms",
+    "drive": "(()=>{const b=[...document.querySelectorAll('button')].find(x=>/submit/i.test(x.textContent));if(!b)return 'no submit';b.click();return 'submitted';})()" },
+  { "name": "date picker calendar open", "path": "/forms",
+    "drive": "(()=>{const b=document.querySelector('button[aria-haspopup=dialog]');if(!b)return 'no trigger';b.click();return 'opened';})()" }
+]

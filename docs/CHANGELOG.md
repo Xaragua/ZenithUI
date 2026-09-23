@@ -4,7 +4,46 @@ All notable changes to ZenithUI are documented here. The format follows
 [Keep a Changelog](https://keepachangelog.com/en/1.1.0/) and the project adheres to
 [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
-## [Unreleased]
+## [1.0.0-rc.1] — 2026-09-23
+
+Everything in the plan ships. The package is installed from a feed and verified in both a Blazor
+Web App and a standalone WebAssembly app; the API is frozen pending whatever a release candidate
+turns up.
+
+### Fixed — M6, the accessibility audit
+
+An axe-core sweep of the running demo — ten pages × two palettes, then nine states that only exist
+after an interaction. It is a browser sweep rather than a CI step because it needs a real rendering
+engine, and it is [a script in the repository](../tools/accessibility) rather than a procedure, so
+the next milestone runs exactly what this one ran. Findings, all fixed:
+
+- **`aria-selected` on a role that does not support it.** `ZenCalendar` put it on the day
+  `<button>`; the attribute is defined for `gridcell` and not for `button`, so it was invalid ARIA
+  an assistive technology is free to ignore — leaving the selected day reading exactly like every
+  other day. It now sits on the `<td role="gridcell">`.
+- **A wrapper between the combobox listbox and its options.** `ZenCombobox` rendered
+  `role="listbox"` on the popover panel and a scrolling `<div>` inside it. Three things were wrong
+  at once, and every id still resolved to *something*, which is why no test caught it:
+  `aria-controls` named an element with no role, the options were not owned by the listbox claiming
+  them, and `scrollItemIntoView` addressed a node the accessibility tree does not contain. The panel
+  is now the listbox — one element with the role, the id, the scrolling and the options. axe's
+  `scrollable-region-focusable` finding disappeared with it, which is how you tell a structural
+  problem from a checker quirk. `ZenPopover` gained a `PanelId` parameter to make it expressible: a
+  parent cannot read its child's generated id in the render pass that creates it.
+- **`ZenCalendar` and `ZenDatePicker` had no tests at all** — they shipped in M2 and the suite never
+  rendered them, which is how the invalid attribute survived four milestones. Seventeen now cover
+  the grid structure, the single tab stop, the arrow-key arithmetic, month paging and its live
+  region, bounds and per-day predicates, and the picker's static-SSR prerender.
+- **Three heading-level jumps and one contrast failure, in the demo.** A card at `h3` under an `h1`,
+  a detail panel at `h4` under an `h2`, and a token swatch that faded its `-content` label with
+  `opacity-90` — dropping three of the seven intent pairs below 4.5:1, on the page whose subject is
+  that the pairs are calculated. Nothing to fix in the library, and worth recording: `ZenCard`
+  already took `TitleLevel`, and dimming a token is a rebrand.
+
+Result: zero violations across all twenty page/palette combinations and all nine interactive states.
+[`docs/accessibility.md`](accessibility.md) records what the sweep covers and, at greater length,
+what it cannot see — no screen reader has been run against this library, and "passes axe" is
+routinely read as more than it is.
 
 ### Changed — M6, one namespace
 

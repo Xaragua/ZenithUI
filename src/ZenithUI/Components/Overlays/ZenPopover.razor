@@ -51,7 +51,7 @@
         longer affects painting, and keeping it a sibling means an `overflow: hidden` anchor
         cannot clip it even on the no-JavaScript path.
     *@
-    <div id="@PanelId"
+    <div id="@PanelElementId"
          popover="@PopoverMode"
          class="@PanelClass"
          style="@Style"
@@ -139,8 +139,20 @@
     [Parameter]
     public bool Bare { get; set; }
 
+    /// <summary>
+    /// An explicit id for the panel element. Defaults to one derived from this component's.
+    /// </summary>
+    /// <remarks>
+    /// Worth setting when something outside the popover has to name the panel in the same render
+    /// pass that creates it — <c>aria-controls</c> on a combobox input, which cannot read
+    /// <see cref="PanelElementId"/> because the <c>@ref</c> to this component is not assigned
+    /// until after that markup has been written.
+    /// </remarks>
+    [Parameter]
+    public string? PanelId { get; set; }
+
     /// <summary>The panel element's id, for the anchor's <c>aria-controls</c>.</summary>
-    public string PanelId => SubId("panel");
+    public string PanelElementId => PanelId ?? SubId("panel");
 
     /// <summary>
     /// The <c>popover</c> attribute value, or <see langword="null"/> before the renderer is
@@ -173,7 +185,7 @@
     }
 
     /// <summary>Re-measures an open panel. For content that changed without a resize.</summary>
-    public ValueTask RepositionAsync() => InvokeModuleVoidAsync("reposition", PanelId);
+    public ValueTask RepositionAsync() => InvokeModuleVoidAsync("reposition", PanelElementId);
 
     private async Task SyncAsync()
     {
@@ -194,13 +206,13 @@
             // The reference is passed only when the caller wants outside-click dismissal, so the
             // module can skip installing a document-level listener no one is listening to.
             await InvokeModuleVoidAsync(
-                "open", AnchorId, PanelId, options, CloseOnOutsideClick ? _self : null);
+                "open", AnchorId, PanelElementId, options, CloseOnOutsideClick ? _self : null);
 
             _attached = true;
         }
         else if (_attached)
         {
-            await InvokeModuleVoidAsync("close", PanelId);
+            await InvokeModuleVoidAsync("close", PanelElementId);
             _attached = false;
         }
     }
@@ -231,7 +243,7 @@
         // leaves a pointerdown handler on the document holding a reference to a dead component.
         if (_attached)
         {
-            await InvokeModuleVoidAsync("close", PanelId);
+            await InvokeModuleVoidAsync("close", PanelElementId);
             _attached = false;
         }
 

@@ -1,0 +1,13 @@
+{
+  "name": "zenithui-accessibility-sweep",
+  "version": "1.0.0",
+  "private": true,
+  "type": "module",
+  "description": "Drives the running ZenithUI demo through headless Edge and runs axe-core over every page, in both palettes, plus the states that only exist after interaction.",
+  "scripts": {
+    "sweep": "node sweep.mjs"
+  },
+  "devDependencies": {
+    "axe-core": "^4.10.0"
+  }
+}

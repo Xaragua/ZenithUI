@@ -25,6 +25,9 @@ src/ZenithUI/wwwroot/zenith.nopreflight.css
 src/ZenithUI/wwwroot/*.css.map
 src/ZenithUI/tailwind/
 
+# Accessibility sweep output (tools/accessibility)
+tools/accessibility/report.json
+
 # Test results
 TestResults/
 coverage/

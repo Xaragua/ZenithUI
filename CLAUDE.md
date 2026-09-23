@@ -34,6 +34,12 @@ See [`docs/plan.md`](docs/plan.md) for the reasoning behind each of these.
 `dotnet build` regenerates the Tailwind stylesheets. `dotnet test` includes the contrast audit,
 which fails on any WCAG or sRGB-gamut regression in either palette.
 
+For anything touching ARIA, roles or markup structure, run the accessibility sweep as well — with
+the demo running, `cd tools/accessibility && npm run sweep`. It drives every page in both palettes
+plus the states that only exist after an interaction, and it is what found the M6 bugs the unit
+tests could not: an attribute on a role that does not support it, and a wrapper element that broke
+three id references at once.
+
 Run the demo before calling a component done — the M0 and M1 bugs listed in `docs/CHANGELOG.md`
 were all invisible to the test suite and obvious in the browser.
 

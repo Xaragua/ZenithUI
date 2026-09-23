@@ -3,10 +3,12 @@
 A TailwindCSS component library for Blazor. Render-mode agnostic, themed entirely through CSS
 custom properties, with first-class light and dark palettes.
 
-> **Status: M5 — chrome and layout.** Tokens, theming, core base types, primitives, the full form
-> control set, the overlay family (modal + toast services, popover, combobox, list), the data
-> components (table, tree, timeline) and the application shell (app bar, side nav, nav menu,
-> footer) are in place. Packaging and the docs pass land in M6.
+> **Status: M6 — `1.0.0-rc.1`.** Every component in the plan ships: tokens and theming, primitives,
+> the full form control set, the overlay family (modal + toast services, popover, combobox, list),
+> the data components (table, tree, timeline) and the application shell. The package is consumed
+> and verified from a feed by both a Blazor Web App and a standalone WebAssembly app, the
+> accessibility sweep is clean, and the API is frozen pending whatever a release candidate turns
+> up.
 
 ## Why another Blazor component library
 
@@ -20,7 +22,9 @@ custom properties, with first-class light and dark palettes.
   works under static SSR, Interactive Server and WebAssembly, and degrades honestly when there is
   no JavaScript runtime attached.
 - **Accessibility is tested, not claimed.** Contrast ratios are audited in CI against both palettes,
-  and every component's ARIA contract has unit tests.
+  every component's ARIA contract has unit tests, and an axe-core sweep drives the running demo —
+  every page in both palettes, plus the states that only exist after an interaction. See
+  [`docs/accessibility.md`](docs/accessibility.md), including what those checks cannot see.
 
 ## Getting started
 
@@ -168,6 +172,16 @@ automatically the first time. To iterate on CSS alone:
 cd src/ZenithUI && npm run css:watch
 ```
 
+### The accessibility sweep
+
+Not a CI step, because it needs the demo running and a real rendering engine — which is exactly why
+it catches what the unit tests cannot:
+
+```bash
+cd samples/ZenithUI.Demo && dotnet run            # one terminal
+cd tools/accessibility && npm install && npm run sweep
+```
+
 ### The contrast audit
 
 `ThemeTokenTests` parses `tokens/base.css` and `tokens/dark.css`, converts every OKLCH value to
@@ -192,7 +206,7 @@ a palette fix is one edit rather than a guess-and-rerun loop:
 | **M3** ✅ | `ZenModal` + modal service, `ZenToast` + toast service, `ZenPopover`, `ZenCombobox`, `ZenList` |
 | **M4** ✅ | `ZenTable` + `ZenColumn` (sorting, paging, selection, hierarchy, detail rows, responsive collapse), `ZenEmptyState`, `ZenTree`, `ZenTimeline` |
 | **M5** ✅ | `ZenAppBar`, `ZenNavMenu` + `ZenNavLink` + `ZenNavGroup` (collapsible sections), `ZenSideNav` (off-canvas drawer needing no render mode), `ZenFooter`, `ZenAppShell` |
-| **M6** | Docs, accessibility audit, NuGet publish, v1.0.0 |
+| **M6** ✅ | The consumer `@theme` artifact, one public namespace, the getting-started / theming / accessibility docs, the axe sweep, and `1.0.0-rc.1` verified from a feed by a Blazor Web App and a standalone WebAssembly app |
 
 ## Documentation
 
@@ -204,6 +218,7 @@ repository root, because it is the GitHub landing page.
 | [`docs/getting-started.md`](docs/getting-started.md) | Install and wire-up for each hosting model, what works with no render mode, and the template defaults that fight the library |
 | [`docs/theming.md`](docs/theming.md) | The token surface, the three-state light/dark model, rebranding, and what an app running its own Tailwind has to do |
 | [`docs/plan.md`](docs/plan.md) | The implementation plan of record — architecture, component inventory, milestones, and the design decisions behind them |
+| [`docs/accessibility.md`](docs/accessibility.md) | What the library guarantees, the three layers that verify it, the M6 audit findings, and what automated checks cannot see |
 | [`docs/CHANGELOG.md`](docs/CHANGELOG.md) | What shipped, and what was fixed along the way |
 
 ## License

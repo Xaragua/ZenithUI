@@ -37,7 +37,8 @@
                 MatchWidth="true"
                 Role="listbox"
                 Label="@(Label ?? "Suggestions")"
-                Bare="true"
+                PanelId="@ListboxId"
+                Class="max-h-64 overflow-y-auto"
                 CloseOnEscape="false">
         <Anchor>
             <div class="@WrapperClass">
@@ -117,50 +118,55 @@
         </Anchor>
 
         <ChildContent>
-            <div id="@ListboxId"
-                 class="max-h-64 overflow-y-auto rounded-zen-lg border border-border bg-surface-overlay p-1 shadow-zen-lg">
-                @if (_loading)
+            @*
+                No wrapper element here. The popover panel IS the listbox: it carries
+                role="listbox", the id the input names in aria-controls, and the scrolling.
+                A div in between made three things wrong at once - aria-controls pointed at an
+                element with no role, the options were no longer owned by the listbox that
+                claims them, and scrollItemIntoView addressed a node the accessibility tree
+                does not contain.
+            *@
+            @if (_loading)
+            {
+                <p class="px-3 py-2 text-sm text-content-subtle" role="status">@LoadingText</p>
+            }
+            else if (_options.Count == 0)
+            {
+                @* A live region, so a screen reader hears that filtering produced nothing.
+                   Silence is indistinguishable from "still loading". *@
+                <p class="px-3 py-2 text-sm text-content-subtle" role="status">@NoResultsText</p>
+            }
+            else
+            {
+                @foreach (var (item, index) in _options.Select((x, i) => (x, i)))
                 {
-                    <p class="px-3 py-2 text-sm text-content-subtle" role="status">@LoadingText</p>
-                }
-                else if (_options.Count == 0)
-                {
-                    @* A live region, so a screen reader hears that filtering produced nothing.
-                       Silence is indistinguishable from "still loading". *@
-                    <p class="px-3 py-2 text-sm text-content-subtle" role="status">@NoResultsText</p>
-                }
-                else
-                {
-                    @foreach (var (item, index) in _options.Select((x, i) => (x, i)))
-                    {
-                        @*
-                            Hovering moves the keyboard cursor onto the row under the pointer.
-                            Without it the cursor sits where the keyboard left it - usually the
-                            first option - while the pointer highlights another, so two rows look
-                            current and Enter commits the one the user is not pointing at.
+                    @*
+                        Hovering moves the keyboard cursor onto the row under the pointer.
+                        Without it the cursor sits where the keyboard left it - usually the
+                        first option - while the pointer highlights another, so two rows look
+                        current and Enter commits the one the user is not pointing at.
 
-                            The CSS `hover:` above is what makes this feel instant: the highlight
-                            paints immediately, and this event only has to arrive in time for
-                            aria-activedescendant and Enter to agree with it.
-                        *@
-                        <div id="@OptionId(index)"
-                             class="@OptionClass(IsSelected(item), index == _activeIndex)"
-                             role="option"
-                             aria-selected="@(IsSelected(item) ? "true" : "false")"
-                             @onmouseenter="@(() => _activeIndex = index)"
-                             @onclick="@(() => ToggleAsync(item))">
-                            @if (ItemTemplate is not null)
-                            {
-                                @ItemTemplate(item)
-                            }
-                            else
-                            {
-                                @DisplayFor(item)
-                            }
-                        </div>
-                    }
+                        The CSS `hover:` above is what makes this feel instant: the highlight
+                        paints immediately, and this event only has to arrive in time for
+                        aria-activedescendant and Enter to agree with it.
+                    *@
+                    <div id="@OptionId(index)"
+                         class="@OptionClass(IsSelected(item), index == _activeIndex)"
+                         role="option"
+                         aria-selected="@(IsSelected(item) ? "true" : "false")"
+                         @onmouseenter="@(() => _activeIndex = index)"
+                         @onclick="@(() => ToggleAsync(item))">
+                        @if (ItemTemplate is not null)
+                        {
+                            @ItemTemplate(item)
+                        }
+                        else
+                        {
+                            @DisplayFor(item)
+                        }
+                    </div>
                 }
-            </div>
+            }
         </ChildContent>
     </ZenPopover>
 </ZenField>

@@ -1,7 +1,9 @@
 # ZenithUI — implementation plan
 
-> **Status:** M0 through M5 complete (2026-09-23). M6 next: docs, the accessibility audit,
-> packaging and v1.0.0 — including closing the consumer-`@theme` gap.
+> **Status:** M0 through M6 complete (2026-09-23), shipping as `1.0.0-rc.1`. The consumer-`@theme`
+> gap is closed, the package is verified from a feed by both a Blazor Web App and a standalone
+> WebAssembly app, and the accessibility sweep is clean across every page, both palettes and nine
+> interactive states. `1.0.0` follows whatever the release candidate turns up.
 > This is the plan of record. It is kept current: where implementation contradicted the original
 > plan, the plan was corrected and the change noted under [Deviations](#deviations-from-the-original-plan).
 
@@ -111,8 +113,15 @@ c:\code\2026\ZenithUI\
 
 ### Namespace convention
 
-Every component `.razor` file opens with `@namespace ZenithUI`, which flattens all components into
-one namespace so consumers need exactly one `@using` and folders stay free to move.
+**Every public type is in `ZenithUI`** — components, the parameter enums, the base classes and the
+service interfaces alike — so a consumer needs exactly one `@using` and folders stay free to move.
+Each component `.razor` file opens with `@namespace ZenithUI`; the types under `Core/`, `Services/`
+and `Extensions/` declare it too, rather than mirroring their folder.
+
+That last part was a correction made in M6, from a scratch app rather than from review: the enums
+sat in `ZenithUI.Core` and the services in `ZenithUI.Services`, so `Intent="ZenIntent.Primary"`
+failed to build until the consumer had found a second `@using`, with nothing but the source tree to
+explain why.
 
 The directive goes in each **file**, not in a folder-level `_Imports.razor`. Razor generates a class
 per `_Imports.razor`, so two folders both declaring `@namespace ZenithUI` produce two
@@ -473,7 +482,7 @@ component's bUnit test asserts its required ARIA attributes.
 | **M3** ✅ | `ZenModal` + `IZenModalService`, `ZenToast` + `IZenToastService`, `ZenPopover`, `ZenCombobox<TItem>`, `ZenList<TItem>` | A dialog can be raised and awaited from a service with no markup on the page; focus returns to the opener on close; combobox passes keyboard + ARIA tests and prerenders as a closed labelled field with JS disabled | ✅ |
 | **M4** ✅ | `ZenTable<TItem>` + `ZenColumn<TItem>` (sort/page/select/hierarchy/detail rows/responsive collapse), `ZenEmptyState`, `ZenTree<TItem>`, `ZenTimeline` + `ZenTimelineItem` | Demo renders a 3-level hierarchical table and a lazy-loading tree | ✅ |
 | **M5** ✅ | `ZenAppBar`, `ZenNavMenu` + `ZenNavLink` + `ZenNavGroup`, `ZenSideNav`, `ZenFooter`, `ZenAppShell` | Shell demo usable at 360 / 768 / 1440 px; drawer traps focus and restores it on close | ✅ |
-| **M6** | Docs, a11y audit, `dotnet pack`, NuGet metadata, v1.0.0, **close the consumer-`@theme` gap** | `.nupkg` consumed successfully by a scratch Blazor Server app **and** a Blazor WASM app | |
+| **M6** ✅ | Docs, a11y audit, `dotnet pack`, NuGet metadata, **close the consumer-`@theme` gap**, one public namespace | `.nupkg` consumed successfully by a scratch Blazor Server app **and** a Blazor WASM app | ✅ `1.0.0-rc.1` |
 
 ---
 
@@ -496,6 +505,12 @@ component's bUnit test asserts its required ARIA attributes.
    asserts WCAG 2.2 ratios plus sRGB gamut containment. Reports **every** violation per run with the
    max in-gamut chroma for each offender, so a palette fix is one edit rather than a
    guess-and-rerun loop.
+7. **Accessibility sweep** (`tools/accessibility`, added in M6) — axe-core over every demo page in
+   both palettes, plus the states that only exist after an interaction: an open modal, a raised
+   toast, an open combobox listbox and popover, the drawer at 390 px, a sorted table with an
+   expanded detail row, an expanded tree, an invalid submitted form, an open calendar. A state it
+   cannot reach counts as a failure, because a passing audit of a modal that never opened is worse
+   than no audit. See [`accessibility.md`](accessibility.md).
 
 ---
 
@@ -525,6 +540,10 @@ Recorded because each changed the design rather than merely the code.
 | Three elements in the chrome carry **no `display` utility at all** | A consumer running their own Tailwind emits `.flex` and almost certainly not `.lg\:hidden`, and their sheet loads last into the same `utilities` layer. See the note below — this was a real, shipped-looking bug. |
 | `ZenSideNav`'s explicit `Id` outranks the shell cascade | The only way to wire a nav the cascade cannot reach: one the consumer made an interactive island under a static shell. |
 | The consumer `@theme` ships as a **generated, flattened file plus an MSBuild copy**, not an npm package | The plan offered a companion npm package or a `$(NuGetPackageRoot)` import. The first splits one version across two registries; the second hardcodes a machine path and a version number in a checked-in stylesheet. A targets file in the package puts the file at a stable relative path inside the consumer's own project, which is neither. |
+| Every public type moved into `ZenithUI`, not only the components | The plan said "root namespace `ZenithUI`" and the implementation read that as the components only. Consuming the package from a scratch app showed what that costs: three `@using` lines for one library, and a build error for the most obvious line of markup anyone writes. |
+| A second copy of the anti-flash script, as `zen-theme-init.js` | `ZenThemeScript` cannot render into a standalone WebAssembly app's static `index.html`, so the one hosting model that could not use it got the flash the component exists to prevent. A test asserts the two copies are the same program. |
+| `aria-selected` moved from the calendar's day button to its `gridcell` | The attribute is undefined for `role="button"`. Found by the M6 audit, in markup that had no tests at all — which is also why `ZenCalendar` and `ZenDatePicker` now have seventeen. |
+| The combobox popover panel **is** the listbox | A scrolling wrapper between the panel and the options made `aria-controls` name a roleless element, detached the options from the listbox claiming them, and pointed `scrollItemIntoView` at a node the accessibility tree does not contain. `ZenPopover` gained a `PanelId` parameter because a parent cannot read a child's generated id in the pass that creates it. |
 | That file carries the library's **whole candidate list**, not just `@theme` | `@theme` alone fixes only half the problem. The other half is cascade order, and the only way two stylesheets can stop disagreeing about `lg:hidden` is for both to emit it. The list comes from `@tailwindcss/oxide` — Tailwind's own scanner — so it cannot drift from what the library was built with. |
 
 ### The cascade-order trap a precompiled component library walks into

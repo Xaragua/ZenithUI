@@ -36,6 +36,29 @@ public class ZenComboboxTests : BunitContext
     }
 
     [Fact]
+    public void AriaControls_NamesTheListbox_AndTheOptionsAreInsideIt()
+    {
+        // The id resolving to *something* is not the contract. It has to resolve to the element
+        // carrying role="listbox", and the options have to be within it - an accessibility audit
+        // of the running demo found a wrapper div in between, which left aria-controls pointing
+        // at a node with no role and the options owned by nothing that claims them.
+        var cut = RenderBox();
+        cut.Find("input").Focus();
+
+        var controls = cut.Find("input").GetAttribute("aria-controls");
+        var listbox = cut.Find($"#{controls}");
+
+        listbox.GetAttribute("role").ShouldBe("listbox");
+        listbox.QuerySelectorAll("[role='option']").Length.ShouldBe(Fruit.Length);
+
+        // The active option must be a descendant of the element aria-activedescendant is
+        // interpreted against, which is the same listbox.
+        cut.Find("input").KeyDown(new KeyboardEventArgs { Key = "ArrowDown" });
+        var active = cut.Find("input").GetAttribute("aria-activedescendant");
+        listbox.QuerySelector($"#{active}").ShouldNotBeNull();
+    }
+
+    [Fact]
     public void TheField_ReportsWhenTheListOpens()
     {
         var cut = RenderBox();

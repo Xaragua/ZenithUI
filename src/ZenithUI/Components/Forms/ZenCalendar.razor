@@ -70,7 +70,18 @@
                     {
                         var state = StateOf(date);
 
-                        <td class="p-0.5 text-center">
+                        @*
+                            aria-selected belongs to the cell, not to the button inside it. The
+                            attribute is only defined for a handful of roles - gridcell among
+                            them, button not - so on the button it was invalid ARIA that a
+                            screen reader is free to ignore, and an audit flags outright.
+                            role="gridcell" is stated rather than left implicit: a <td> only
+                            takes it from the table's role="grid", which is exactly the kind of
+                            inference to make explicit where a state depends on it.
+                        *@
+                        <td class="p-0.5 text-center"
+                            role="gridcell"
+                            aria-selected="@(state.IsSelected ? "true" : "false")">
                             @*
                                 Focus is moved by id rather than an ElementReference: @ref only
                                 accepts a plain field, so capturing "whichever cell is the cursor"
@@ -81,7 +92,6 @@
                                     class="@DayClass(state)"
                                     tabindex="@(state.IsCursor ? 0 : -1)"
                                     disabled="@state.IsDisabled"
-                                    aria-selected="@(state.IsSelected ? "true" : "false")"
                                     aria-current="@(state.IsToday ? "date" : null)"
                                     aria-label="@date.ToString("D", EffectiveCulture)"
                                     @onclick="@(() => SelectAsync(date))">

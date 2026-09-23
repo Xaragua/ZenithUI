@@ -63,7 +63,11 @@
             <div class="overflow-hidden rounded-zen-lg border border-border bg-surface-raised">
                 <div class="@($"bg-{intent} p-4 text-{intent}-content")">
                     <p class="text-sm font-semibold">@intent</p>
-                    <p class="text-xs opacity-90">--zen-@intent</p>
+                    @* No opacity here. The contrast audit proves --zen-{intent}-content against
+                       its fill at full strength; fading it to 90% dropped three of the seven
+                       below 4.5:1, on the page whose whole subject is that the pairs are
+                       calculated. Dimming a token is a rebrand, and an untested one. *@
+                    <p class="text-xs">--zen-@intent</p>
                 </div>
                 <div class="@($"bg-{intent}-soft px-4 py-3 text-{intent}-strong")">
                     <p class="text-xs font-medium">-strong on -soft</p>
