@@ -579,3 +579,67 @@
     padding-block-end: 0;
   }
 }
+
+/*
+ * ZenTable's stacked layout on a narrow screen.
+ *
+ * Below the `md` breakpoint each row becomes a card and each cell becomes a labelled line. The
+ * alternative is a horizontal scrollbar, which on a phone hides whichever column the user came
+ * for and gives no sign that it exists.
+ *
+ * The label is drawn from `data-label`, which the table copies from the column's title. It is an
+ * attribute rather than a duplicated element so the text exists exactly once in the DOM: the
+ * header cells are still there, still associated, and a screen reader would otherwise announce
+ * every value twice. `content: attr()` text is not exposed to the accessibility tree, which is
+ * usually a drawback and is precisely what is wanted here.
+ *
+ * `td[data-label]::before` rather than `td::before`: the checkbox and expander columns have no
+ * title, and a bare `attr()` on them would still reserve the label column and leave a gap.
+ *
+ * The header is hidden with `display: none` rather than moved off screen. Its cells no longer
+ * label anything visually, and every value already carries its own label - so keeping it in the
+ * accessibility tree would mean announcing a row of headings that correspond to nothing on
+ * screen.
+ */
+@media (width < 48rem) {
+  @layer components {
+    .zen-table-stack,
+    .zen-table-stack tbody,
+    .zen-table-stack tr,
+    .zen-table-stack td {
+      display: block;
+      width: auto;
+    }
+
+    .zen-table-stack thead {
+      display: none;
+    }
+
+    .zen-table-stack tr {
+      padding-block: 0.25rem;
+    }
+
+    .zen-table-stack td {
+      display: flex;
+      align-items: baseline;
+      justify-content: space-between;
+      gap: 1rem;
+      text-align: start;
+    }
+
+    .zen-table-stack td[data-label]::before {
+      content: attr(data-label);
+      flex: none;
+      font-weight: 500;
+      color: var(--zen-content-muted);
+    }
+
+    /*
+     * The empty-state and skeleton cells span the table, so they have no label and no partner to
+     * sit opposite. Centring them again keeps them looking deliberate rather than left over.
+     */
+    .zen-table-stack td[colspan] {
+      justify-content: center;
+    }
+  }
+}

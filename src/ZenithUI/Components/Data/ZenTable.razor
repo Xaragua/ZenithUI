@@ -1,0 +1,954 @@
+@namespace ZenithUI
+@typeparam TItem where TItem : notnull
+@inherits ZenJsComponentBase
+
+@*
+    A data table: sortable, pageable, selectable, optionally hierarchical, and collapsing to a
+    stacked card list on a narrow screen.
+
+    Columns are child components. The table's markup therefore depends on what its own children
+    report, which a single render pass cannot normally deliver - a parent builds its whole render
+    tree before any child exists. ZenDefer solves it by ordering rather than by rendering twice;
+    the reasoning is in Core/ZenDefer.cs, and it is what lets a server-rendered table arrive with
+    its body intact.
+
+    WHAT ROLE THE TABLE CLAIMS
+
+    A flat table stays a plain <table>. It is not given role="grid", even when rows are
+    selectable, because a grid owes the user arrow-key navigation between cells and this component
+    does not provide it - the same reason ZenList refuses to call a non-interactive list a
+    listbox. Selection is expressed with real checkboxes instead, which are announced correctly,
+    operable from the keyboard, and submit with a form. Nothing has to be promised to get them.
+
+    A hierarchical table has no such option. HTML has no way to say "this row is a child of that
+    one", so the nesting has to come from ARIA: role="treegrid", with aria-level and aria-expanded
+    on the rows. Making that claim brings the keyboard contract with it, so the hierarchical table
+    takes a roving tabindex over its rows and implements the arrow keys. ZenTree gets level and
+    position free from its nested <ul>s and therefore states none of them; a table has no
+    structure to lean on and has to state all of them. The two components differ because their
+    markup differs, not because they disagree.
+
+    WHAT THE TABLE KNOWS
+
+    Sorting, paging and select-all operate on the items handed to this component. A table given
+    one page of a server-side query cannot sort the other pages and does not pretend to: set
+    PageSize to 0 and drive paging from outside when the data is remote.
+*@
+
+@{
+    // Bumped before the cascade renders, so the first column to register knows the list it is
+    // joining belongs to a previous pass and clears it.
+    _generation++;
+}
+
+<CascadingValue Value="this" IsFixed="true">
+    @Columns
+</CascadingValue>
+
+<ZenDefer>
+    @{
+        _rows = VisibleRows();
+    }
+
+    <div class="@RootClass(WrapperClass)" style="@Style" @attributes="AttributesWithoutClass">
+        <table id="@Id"
+               class="@TableClass"
+               role="@(Hierarchical ? "treegrid" : null)"
+               aria-label="@Label"
+               aria-labelledby="@LabelledBy"
+               aria-busy="@(Loading ? "true" : null)"
+               @onfocusin="@(() => _hasFocus = true)"
+               @onfocusout="@(() => _hasFocus = false)"
+               @onkeydown="HandleKeyDownAsync">
+            @if (Caption is not null)
+            {
+                @* A <caption> rather than a heading above the table: it is the table's accessible
+                   name for free, and a screen reader announces it on entry. *@
+                <caption class="px-3 py-2 text-start text-sm text-content-muted">@Caption</caption>
+            }
+
+            <thead class="@HeadClass">
+                <tr>
+                    @if (Selectable)
+                    {
+                        <th scope="col" class="@($"{HeaderCellClass} w-px")">
+                            <ZenCheckbox Value="@AllOnPageSelected"
+                                         ValueChanged="ToggleAllAsync"
+                                         Indeterminate="@(SomeOnPageSelected && !AllOnPageSelected)"
+                                         aria-label="Select all rows on this page" />
+                        </th>
+                    }
+
+                    @foreach (var column in _columns)
+                    {
+                        @* aria-sort is stated on every sortable column, "none" included. A column
+                           that says nothing gives no hint it can be sorted, and the user has to
+                           discover it by clicking. It is omitted entirely on columns that cannot
+                           sort, where "none" would be the same false promise. *@
+                        <th scope="col"
+                            class="@HeaderClassFor(column)"
+                            style="@WidthStyle(column)"
+                            aria-sort="@AriaSortFor(column)">
+                            @if (column.CanSort)
+                            {
+                                <button type="button" class="@SortButtonClass" @onclick="@(() => ToggleSortAsync(column))">
+                                    @HeaderContent(column)
+
+                                    @* The indicator is present on every sortable column and only
+                                       carries a direction on the sorted one, so the header does
+                                       not change width when the sort moves - which otherwise
+                                       reflows the whole table under the pointer mid-click. *@
+                                    <ZenIcon Path="@SortIconFor(column)" class="@SortIconClass(column)" />
+                                </button>
+                            }
+                            else
+                            {
+                                @HeaderContent(column)
+                            }
+                        </th>
+                    }
+                </tr>
+            </thead>
+
+            <tbody class="divide-y divide-border">
+                @if (Loading)
+                {
+                    @* Skeleton rows keep the table's real shape, so the page does not jump when
+                       the data lands. A spinner in place of the body collapses the table to
+                       nothing and then pushes everything below it back down. *@
+                    @for (var i = 0; i < LoadingRowCount; i++)
+                    {
+                        <tr>
+                            @for (var c = 0; c < ColumnCount; c++)
+                            {
+                                <td class="@BodyCellClass">
+                                    <ZenSkeleton Shape="ZenSkeletonShape.Text" />
+                                </td>
+                            }
+                        </tr>
+                    }
+                }
+                else if (_rows.Count == 0)
+                {
+                    <tr>
+                        <td colspan="@ColumnCount" class="px-3 py-10 text-center text-sm text-content-subtle">
+                            @if (EmptyTemplate is not null)
+                            {
+                                @EmptyTemplate
+                            }
+                            else
+                            {
+                                @EmptyText
+                            }
+                        </td>
+                    </tr>
+                }
+                else
+                {
+                    @for (var rowIndex = 0; rowIndex < _rows.Count; rowIndex++)
+                    {
+                        var row = _rows[rowIndex];
+
+                        <tr id="@RowId(rowIndex)"
+                            class="@RowClassFor(row)"
+                            aria-level="@(Hierarchical ? row.Depth + 1 : null)"
+                            aria-expanded="@AriaExpandedFor(row)"
+                            aria-selected="@(Hierarchical && Selectable ? (IsSelected(row.Item) ? "true" : "false") : null)"
+                            tabindex="@(Hierarchical ? (IsActive(row.Item) ? 0 : -1) : null)"
+                            @onclick="@(() => RowClickedAsync(row))">
+                            @if (Selectable)
+                            {
+                                @* Kept in the tab order even inside the treegrid, where the
+                                   pattern would have every cell control at tabindex -1. Losing
+                                   keyboard access to selection is a worse failure than an extra
+                                   tab stop per row, and there is no arrow key left to reach it
+                                   with - Left and Right are spoken for by the hierarchy. *@
+                                <td class="@($"{BodyCellClass} w-px")" @onclick:stopPropagation="true">
+                                    <ZenCheckbox Value="@IsSelected(row.Item)"
+                                                 ValueChanged="@(_ => ToggleSelectionAsync(row.Item))"
+                                                 aria-label="@($"Select {RowLabel(row)}")" />
+                                </td>
+                            }
+
+                            @foreach (var (column, index) in _columns.Select((c, i) => (c, i)))
+                            {
+                                @* data-label is what the stacked mobile layout prints in front of
+                                   each value, because the header row is off screen there. It is a
+                                   plain attribute rather than a duplicated <span>, so the label
+                                   exists exactly once in the DOM and a screen reader - which
+                                   still has the real header association - never hears it twice. *@
+                                <td class="@BodyCellClassFor(column)"
+                                    data-label="@column.Title"
+                                    style="@(index == 0 && Hierarchical ? $"--zen-depth: {row.Depth}" : null)">
+                                    @if (index == 0 && Hierarchical)
+                                    {
+                                        <div class="zen-indent flex items-center gap-1.5">
+                                            @if (row.HasChildren)
+                                            {
+                                                <button type="button"
+                                                        class="grid size-5 shrink-0 place-items-center rounded-zen-sm text-content-subtle"
+                                                        tabindex="-1"
+                                                        aria-hidden="true"
+                                                        @onclick="@(() => ToggleExpanded(row.Item))"
+                                                        @onclick:stopPropagation="true">
+                                                    <ZenIcon Path="@ZenIcons.ChevronRight"
+                                                             class="@($"size-4 transition-transform {(row.IsExpanded ? "rotate-90" : null)}")" />
+                                                </button>
+                                            }
+                                            else
+                                            {
+                                                <span class="size-5 shrink-0" aria-hidden="true"></span>
+                                            }
+
+                                            <span class="min-w-0">@CellContent(column, row.Item)</span>
+                                        </div>
+                                    }
+                                    else
+                                    {
+                                        @CellContent(column, row.Item)
+                                    }
+                                </td>
+                            }
+                        </tr>
+                    }
+                }
+            </tbody>
+        </table>
+    </div>
+
+    @if (PageCount > 1)
+    {
+        <nav class="mt-3 flex items-center justify-between gap-3" aria-label="Pagination">
+            @* aria-live, because the rows change without anything moving focus - a screen reader
+               user pressing Next would otherwise get no confirmation that anything happened. *@
+            <p class="text-sm text-content-muted" aria-live="polite">@PageSummary</p>
+
+            <div class="flex items-center gap-2">
+                <ZenButton Variant="ZenVariant.Outline"
+                           Size="ZenSize.Small"
+                           Icon="@ZenIcons.ChevronLeft"
+                           Disabled="@(CurrentPage <= 1)"
+                           OnClick="@(() => GoToPageAsync(CurrentPage - 1))">
+                    Previous
+                </ZenButton>
+
+                <ZenButton Variant="ZenVariant.Outline"
+                           Size="ZenSize.Small"
+                           TrailingIcon="@ZenIcons.ChevronRight"
+                           Disabled="@(CurrentPage >= PageCount)"
+                           OnClick="@(() => GoToPageAsync(CurrentPage + 1))">
+                    Next
+                </ZenButton>
+            </div>
+        </nav>
+    }
+</ZenDefer>
+
+@code {
+    /// <summary>One row as the table currently sees it.</summary>
+    private sealed record Row(TItem Item, int Depth, bool HasChildren, bool IsExpanded);
+
+    private readonly List<ZenColumn<TItem>> _columns = [];
+    private readonly HashSet<TItem> _expanded = [];
+
+    /// <summary>The rows built by the current render pass, reused by everything that needs them.</summary>
+    /// <remarks>
+    /// Built once per pass rather than recomputed per call. Row styling asks which row is active,
+    /// so a property that re-flattened the data each time would make rendering quadratic in the
+    /// row count - and the keyboard would be navigating a list built from slightly different state
+    /// than the one on screen.
+    /// </remarks>
+    private List<Row> _rows = [];
+
+    private int _generation;
+    private int _collectedGeneration = -1;
+
+    private bool _seeded;
+    private bool _hasFocus;
+    private string? _focusedId;
+
+    private ZenColumn<TItem>? _sortColumn;
+    private bool _sortDescending;
+    private int _page = 1;
+    private TItem? _active;
+
+    /// <inheritdoc />
+    /// <remarks>
+    /// Null for a flat table, which needs no JavaScript at all: it is a plain <c>&lt;table&gt;</c>
+    /// and the browser already does everything. Only the treegrid loads a module, and only for
+    /// <c>focusElement</c> - a roving tabindex that moves the attribute without moving DOM focus
+    /// leaves the screen reader on the row the user has left.
+    /// </remarks>
+    protected override string? ModulePath =>
+        Hierarchical ? "./_content/ZenithUI/js/zen-dom.js" : null;
+
+    // ---- Data ---------------------------------------------------------------------------------
+
+    /// <summary>The rows to render.</summary>
+    [Parameter]
+    public IEnumerable<TItem>? Items { get; set; }
+
+    /// <summary>The <see cref="ZenColumn{TItem}"/> declarations.</summary>
+    [Parameter]
+    public RenderFragment? Columns { get; set; }
+
+    /// <summary>
+    /// A row's children, which turns the table into a <c>treegrid</c>.
+    /// </summary>
+    /// <remarks>
+    /// Return <see langword="null"/> or an empty sequence for a leaf. Supplying this parameter at
+    /// all is what switches on the hierarchy, the indentation and the ARIA that goes with them.
+    /// </remarks>
+    [Parameter]
+    public Func<TItem, IEnumerable<TItem>?>? ChildrenProvider { get; set; }
+
+    /// <summary>Rows to open on first render.</summary>
+    [Parameter]
+    public Func<TItem, bool>? IsInitiallyExpanded { get; set; }
+
+    // ---- State --------------------------------------------------------------------------------
+
+    /// <summary>Show skeleton rows instead of data.</summary>
+    [Parameter]
+    public bool Loading { get; set; }
+
+    /// <summary>How many skeleton rows to show while loading.</summary>
+    [Parameter]
+    public int LoadingRowCount { get; set; } = 5;
+
+    /// <summary>Message shown when there are no rows.</summary>
+    [Parameter]
+    public string EmptyText { get; set; } = "No rows to show.";
+
+    /// <summary>Custom empty-state markup.</summary>
+    [Parameter]
+    public RenderFragment? EmptyTemplate { get; set; }
+
+    /// <summary>Give each row a selection checkbox.</summary>
+    [Parameter]
+    public bool Selectable { get; set; }
+
+    /// <summary>The selected rows.</summary>
+    [Parameter]
+    public IReadOnlyCollection<TItem>? SelectedItems { get; set; }
+
+    /// <summary>Raised when the selection changes.</summary>
+    [Parameter]
+    public EventCallback<IReadOnlyCollection<TItem>> SelectedItemsChanged { get; set; }
+
+    /// <summary>Text naming a row, used for its checkbox's accessible name.</summary>
+    /// <remarks>
+    /// Worth supplying whenever rows are selectable. Without it every checkbox is announced as
+    /// "Select row", and a screen reader user hears the same phrase for each of them with nothing
+    /// to tell them apart.
+    /// </remarks>
+    [Parameter]
+    public Func<TItem, string>? RowText { get; set; }
+
+    /// <summary>Raised when a row is clicked.</summary>
+    [Parameter]
+    public EventCallback<TItem> OnRowClick { get; set; }
+
+    /// <summary>Extra classes for a row, by item - for status tinting.</summary>
+    [Parameter]
+    public Func<TItem, string?>? RowClass { get; set; }
+
+    // ---- Paging -------------------------------------------------------------------------------
+
+    /// <summary>Rows per page. Zero renders everything and hides the pager.</summary>
+    [Parameter]
+    public int PageSize { get; set; }
+
+    /// <summary>The current page, one-based.</summary>
+    [Parameter]
+    public int Page { get; set; }
+
+    /// <summary>Raised when the page changes.</summary>
+    [Parameter]
+    public EventCallback<int> PageChanged { get; set; }
+
+    // ---- Appearance ---------------------------------------------------------------------------
+
+    /// <summary>Accessible name for the table.</summary>
+    [Parameter]
+    public string? Label { get; set; }
+
+    /// <summary>Id of the element naming the table.</summary>
+    [Parameter]
+    public string? LabelledBy { get; set; }
+
+    /// <summary>A visible caption, which also names the table.</summary>
+    [Parameter]
+    public string? Caption { get; set; }
+
+    /// <summary>Row density.</summary>
+    [Parameter]
+    public ZenSize Size { get; set; } = ZenSize.Medium;
+
+    /// <summary>Tint alternate rows.</summary>
+    [Parameter]
+    public bool Striped { get; set; }
+
+    /// <summary>Tint the row under the pointer.</summary>
+    [Parameter]
+    public bool Hoverable { get; set; } = true;
+
+    /// <summary>Surround the table with a border and a raised surface.</summary>
+    [Parameter]
+    public bool Bordered { get; set; } = true;
+
+    /// <summary>
+    /// Keep the header visible while the body scrolls.
+    /// </summary>
+    /// <remarks>
+    /// It sticks to the nearest scrolling ancestor, which is the page unless the table is inside
+    /// a scroll container of its own.
+    /// </remarks>
+    [Parameter]
+    public bool StickyHeader { get; set; }
+
+    /// <summary>
+    /// Collapse each row into a stacked card below the <c>md</c> breakpoint.
+    /// </summary>
+    /// <remarks>
+    /// On by default, because the alternative on a phone is a horizontal scrollbar that hides
+    /// whichever column the user needs. Turn it off for a table that is genuinely a grid of
+    /// numbers, where the column relationships are the point and stacking destroys them.
+    /// </remarks>
+    [Parameter]
+    public bool ResponsiveCollapse { get; set; } = true;
+
+    // ---- Column registration ------------------------------------------------------------------
+
+    /// <summary>
+    /// Called by a <see cref="ZenColumn{TItem}"/> as it receives its parameters.
+    /// </summary>
+    /// <remarks>
+    /// The list is rebuilt per render pass rather than appended to for the life of the component,
+    /// so a column added or removed by an <c>@@if</c> lands in document order rather than at the
+    /// end. It is cleared by the first column of a new generation rather than before the cascade
+    /// renders: if a pass somehow registers nothing, the table keeps the previous columns instead
+    /// of rendering a header with none.
+    /// </remarks>
+    internal void Register(ZenColumn<TItem> column)
+    {
+        if (_collectedGeneration != _generation)
+        {
+            _collectedGeneration = _generation;
+            _columns.Clear();
+        }
+
+        _columns.Add(column);
+    }
+
+    // ---- Rows ---------------------------------------------------------------------------------
+
+    private bool Hierarchical => ChildrenProvider is not null;
+
+    private int ColumnCount => _columns.Count + (Selectable ? 1 : 0);
+
+    private IReadOnlyList<TItem> Source => Items as IReadOnlyList<TItem> ?? Items?.ToList() ?? [];
+
+    private int CurrentPage => Page > 0 ? Page : _page;
+
+    private int PageCount => PageSize <= 0 ? 1 : Math.Max(1, (Source.Count + PageSize - 1) / PageSize);
+
+    /// <summary>
+    /// The rows on screen: sorted, paged, then flattened through whatever is expanded.
+    /// </summary>
+    /// <remarks>
+    /// That order matters. Paging after flattening would let one expanded row push its siblings
+    /// onto the next page, so opening a row would appear to delete the ones below it. Pages are
+    /// counted in top-level rows, and a subtree travels with its parent.
+    /// </remarks>
+    private List<Row> VisibleRows()
+    {
+        SeedInitialExpansion();
+
+        var roots = Sorted(Source);
+
+        if (PageSize > 0)
+        {
+            roots = roots.Skip((Math.Clamp(CurrentPage, 1, PageCount) - 1) * PageSize)
+                .Take(PageSize)
+                .ToList();
+        }
+
+        var rows = new List<Row>(roots.Count);
+        Flatten(roots, 0, rows);
+
+        return rows;
+    }
+
+    private void Flatten(IReadOnlyList<TItem> items, int depth, List<Row> into)
+    {
+        foreach (var item in items)
+        {
+            var children = ChildrenProvider?.Invoke(item);
+            var childList = children is null ? [] : Sorted(children);
+            var expanded = _expanded.Contains(item);
+
+            into.Add(new Row(item, depth, childList.Count > 0, expanded));
+
+            if (expanded && childList.Count > 0)
+            {
+                Flatten(childList, depth + 1, into);
+            }
+        }
+    }
+
+    /// <summary>
+    /// Applies the current sort, at every level of the hierarchy.
+    /// </summary>
+    /// <remarks>
+    /// Sorting only the roots would leave children in their original order under sorted parents,
+    /// which reads as the sort having partly failed.
+    /// </remarks>
+    private List<TItem> Sorted(IEnumerable<TItem> items)
+    {
+        if (_sortColumn?.SortKey is not { } key)
+        {
+            return items.ToList();
+        }
+
+        var comparer = Comparer<object?>.Create(CompareValues);
+
+        return _sortDescending
+            ? items.OrderByDescending(key, comparer).ToList()
+            : items.OrderBy(key, comparer).ToList();
+    }
+
+    /// <summary>
+    /// Orders two cell values, putting nulls first.
+    /// </summary>
+    /// <remarks>
+    /// Nulls sort to one end rather than being treated as equal to everything, which would make
+    /// the sort unstable in a way that looks random. First rather than last because a null is
+    /// usually "not filled in yet", and the rows that need attention are the ones worth surfacing.
+    /// </remarks>
+    private static int CompareValues(object? left, object? right) => (left, right) switch
+    {
+        (null, null) => 0,
+        (null, _) => -1,
+        (_, null) => 1,
+        _ => Comparer<object>.Default.Compare(left, right),
+    };
+
+    private void SeedInitialExpansion()
+    {
+        if (_seeded || IsInitiallyExpanded is null || ChildrenProvider is null || Items is null)
+        {
+            return;
+        }
+
+        _seeded = true;
+        Seed(Items);
+
+        void Seed(IEnumerable<TItem> items)
+        {
+            foreach (var item in items)
+            {
+                if (!IsInitiallyExpanded(item))
+                {
+                    continue;
+                }
+
+                _expanded.Add(item);
+
+                if (ChildrenProvider(item) is { } children)
+                {
+                    Seed(children);
+                }
+            }
+        }
+    }
+
+    // ---- Interaction --------------------------------------------------------------------------
+
+    /// <summary>
+    /// Cycles a column through ascending, descending and unsorted.
+    /// </summary>
+    /// <remarks>
+    /// The third state is not decoration. The order the data arrived in carries information -
+    /// it is very often "newest first" from the server - and a table that can only toggle between
+    /// two sorts gives the user no way back to it short of reloading the page.
+    /// </remarks>
+    private async Task ToggleSortAsync(ZenColumn<TItem> column)
+    {
+        if (_sortColumn != column)
+        {
+            _sortColumn = column;
+            _sortDescending = false;
+        }
+        else if (!_sortDescending)
+        {
+            _sortDescending = true;
+        }
+        else
+        {
+            _sortColumn = null;
+            _sortDescending = false;
+        }
+
+        // Re-sorting reshuffles which rows fall on which page, and the row the user was looking at
+        // is no longer where they left it. Returning to the first page is the only position that
+        // means the same thing before and after.
+        await GoToPageAsync(1);
+    }
+
+    private async Task GoToPageAsync(int page)
+    {
+        var target = Math.Clamp(page, 1, PageCount);
+
+        if (target == CurrentPage)
+        {
+            return;
+        }
+
+        _page = target;
+        await PageChanged.InvokeAsync(target);
+    }
+
+    private void ToggleExpanded(TItem item)
+    {
+        _active = item;
+
+        if (!_expanded.Remove(item))
+        {
+            _expanded.Add(item);
+        }
+    }
+
+    private bool IsSelected(TItem item) => SelectedItems?.Contains(item) ?? false;
+
+    private async Task ToggleSelectionAsync(TItem item)
+    {
+        var next = new List<TItem>(SelectedItems ?? []);
+
+        if (!next.Remove(item))
+        {
+            next.Add(item);
+        }
+
+        await SelectedItemsChanged.InvokeAsync(next);
+    }
+
+    /// <summary>The rows the select-all box governs: the ones currently on screen.</summary>
+    /// <remarks>
+    /// The page, not the dataset. A table only knows the items it was handed, and a box that
+    /// silently selects rows the user has never seen is how a bulk delete takes out more than it
+    /// was meant to.
+    /// </remarks>
+    private List<TItem> PageItems => _rows.ConvertAll(r => r.Item);
+
+    private bool AllOnPageSelected
+    {
+        get
+        {
+            var page = PageItems;
+            return page.Count > 0 && page.TrueForAll(IsSelected);
+        }
+    }
+
+    private bool SomeOnPageSelected => PageItems.Exists(IsSelected);
+
+    private async Task ToggleAllAsync(bool selected)
+    {
+        var page = PageItems;
+        var next = new List<TItem>(SelectedItems ?? []);
+
+        foreach (var item in page)
+        {
+            next.Remove(item);
+        }
+
+        if (selected)
+        {
+            next.AddRange(page);
+        }
+
+        await SelectedItemsChanged.InvokeAsync(next);
+    }
+
+    private async Task RowClickedAsync(Row row)
+    {
+        _active = row.Item;
+
+        if (OnRowClick.HasDelegate)
+        {
+            await OnRowClick.InvokeAsync(row.Item);
+        }
+    }
+
+    private bool IsActive(TItem item)
+    {
+        if (_active is not null)
+        {
+            return EqualityComparer<TItem>.Default.Equals(_active, item);
+        }
+
+        return _rows.Count > 0 && EqualityComparer<TItem>.Default.Equals(_rows[0].Item, item);
+    }
+
+    /// <summary>
+    /// The treegrid's keyboard contract.
+    /// </summary>
+    /// <remarks>
+    /// Rows are the unit of navigation. Cells are not navigable with the arrow keys, because Left
+    /// and Right are what expand and collapse the hierarchy - the behaviour a treegrid exists for.
+    /// Interactive cell content stays reachable with Tab.
+    /// <para>
+    /// A flat table handles no keys at all. It is a plain table, the browser already lets a screen
+    /// reader walk it, and intercepting arrow keys there would break that.
+    /// </para>
+    /// </remarks>
+    private async Task HandleKeyDownAsync(KeyboardEventArgs args)
+    {
+        if (!Hierarchical)
+        {
+            return;
+        }
+
+        var rows = _rows;
+
+        if (rows.Count == 0)
+        {
+            return;
+        }
+
+        var index = Math.Max(0, rows.FindIndex(r => EqualityComparer<TItem>.Default.Equals(r.Item, _active)));
+        var current = rows[index];
+
+        switch (args.Key)
+        {
+            case "ArrowDown":
+                _active = rows[Math.Min(index + 1, rows.Count - 1)].Item;
+                break;
+
+            case "ArrowUp":
+                _active = rows[Math.Max(index - 1, 0)].Item;
+                break;
+
+            case "ArrowRight":
+                if (current.HasChildren && !current.IsExpanded)
+                {
+                    ToggleExpanded(current.Item);
+                }
+                else if (current.IsExpanded && index + 1 < rows.Count)
+                {
+                    _active = rows[index + 1].Item;
+                }
+
+                break;
+
+            case "ArrowLeft":
+                if (current.IsExpanded)
+                {
+                    ToggleExpanded(current.Item);
+                }
+                else
+                {
+                    // Climbing by depth rather than by a stored parent reference: the first row
+                    // above this one that is shallower is its parent, by construction of the
+                    // flattening.
+                    for (var i = index - 1; i >= 0; i--)
+                    {
+                        if (rows[i].Depth < current.Depth)
+                        {
+                            _active = rows[i].Item;
+                            break;
+                        }
+                    }
+                }
+
+                break;
+
+            case "Home":
+                _active = rows[0].Item;
+                break;
+
+            case "End":
+                _active = rows[^1].Item;
+                break;
+
+            case " ":
+                if (Selectable)
+                {
+                    await ToggleSelectionAsync(current.Item);
+                }
+
+                break;
+
+            default:
+                return;
+        }
+    }
+
+    /// <inheritdoc />
+    /// <remarks>
+    /// Moving focus after the render rather than in the key handler, for the same reason ZenTree
+    /// does: ArrowRight expands a row and descends into a child that did not exist in the DOM when
+    /// the key arrived. Gated on the table already holding focus, so a page containing a treegrid
+    /// does not steal focus on its first render.
+    /// </remarks>
+    protected override async Task OnAfterRenderAsync(bool firstRender)
+    {
+        await base.OnAfterRenderAsync(firstRender);
+
+        if (!Hierarchical || !_hasFocus || _active is null || !IsJsReady)
+        {
+            return;
+        }
+
+        var index = _rows.FindIndex(r => EqualityComparer<TItem>.Default.Equals(r.Item, _active));
+
+        if (index < 0)
+        {
+            return;
+        }
+
+        var rowId = RowId(index);
+
+        if (rowId == _focusedId)
+        {
+            return;
+        }
+
+        _focusedId = rowId;
+        await InvokeModuleVoidAsync("focusElement", rowId);
+    }
+
+    // ---- Cell content -------------------------------------------------------------------------
+
+    private RenderFragment HeaderContent(ZenColumn<TItem> column) => builder =>
+    {
+        if (column.HeaderTemplate is not null)
+        {
+            builder.AddContent(0, column.HeaderTemplate);
+        }
+        else
+        {
+            builder.AddContent(1, column.Title);
+        }
+    };
+
+    private RenderFragment CellContent(ZenColumn<TItem> column, TItem item) => builder =>
+    {
+        if (column.CellTemplate is not null)
+        {
+            builder.AddContent(0, column.CellTemplate(item));
+        }
+        else
+        {
+            builder.AddContent(1, column.TextFor(item));
+        }
+    };
+
+    /// <summary>The element id of a row, by its position among the rows on screen.</summary>
+    /// <remarks>
+    /// Position rather than the item's identity, because an item has no id the table can borrow -
+    /// <c>TItem</c> is whatever the consumer handed over. Expanding a row renumbers everything
+    /// below it, but the id is only ever used to move focus immediately after the render that
+    /// produced these rows, so it is current by construction.
+    /// </remarks>
+    private string RowId(int index) => $"{Id}-row-{index}";
+
+    private string RowLabel(Row row) => RowText?.Invoke(row.Item) ?? row.Item.ToString() ?? "row";
+
+    // ---- ARIA ---------------------------------------------------------------------------------
+
+    private string? AriaSortFor(ZenColumn<TItem> column) => column.CanSort
+        ? _sortColumn == column ? (_sortDescending ? "descending" : "ascending") : "none"
+        : null;
+
+    private string? AriaExpandedFor(Row row) =>
+        Hierarchical && row.HasChildren ? (row.IsExpanded ? "true" : "false") : null;
+
+    private string PageSummary
+    {
+        get
+        {
+            var first = ((Math.Clamp(CurrentPage, 1, PageCount) - 1) * PageSize) + 1;
+            var last = Math.Min(first + PageSize - 1, Source.Count);
+
+            return $"{first}–{last} of {Source.Count}";
+        }
+    }
+
+    // ---- Styling ------------------------------------------------------------------------------
+
+    private string WrapperClass => CssBuilder
+        .Default("w-full")
+        // Horizontal scrolling only above the breakpoint where the table is still a table. Below
+        // it the rows are stacked cards and there is nothing to scroll sideways.
+        .AddClass(ResponsiveCollapse ? "md:overflow-x-auto" : "overflow-x-auto")
+        .AddClass("rounded-zen-lg border border-border bg-surface-raised", Bordered)
+        .Build()!;
+
+    private string TableClass => CssBuilder
+        .Default("w-full border-collapse text-start")
+        .AddClass("zen-table-stack", ResponsiveCollapse)
+        .Build()!;
+
+    private string HeadClass => CssBuilder
+        .Default("border-b border-border")
+        .AddClass("sticky top-0 z-10 bg-surface-raised", StickyHeader)
+        .Build()!;
+
+    private string HeaderCellClass =>
+        $"text-start align-middle font-medium text-content-muted {CellPadding}";
+
+    private string HeaderClassFor(ZenColumn<TItem> column) => CssBuilder
+        .Default(HeaderCellClass)
+        .AddClass(AlignClass(column.Align))
+        .AddClass(column.HeaderClass)
+        .Build()!;
+
+    private string BodyCellClass => $"align-middle text-content {CellPadding}";
+
+    private string BodyCellClassFor(ZenColumn<TItem> column) => CssBuilder
+        .Default(BodyCellClass)
+        .AddClass(AlignClass(column.Align))
+        .AddClass(column.CellClass)
+        .Build()!;
+
+    private string RowClassFor(Row row) => CssBuilder
+        .Default("transition-colors")
+        .AddClass("odd:bg-surface-sunken", Striped)
+        .AddClass("hover:bg-surface-hover", Hoverable)
+        .AddClass("cursor-pointer", OnRowClick.HasDelegate)
+        .AddClass("bg-primary-soft", Selectable && IsSelected(row.Item))
+        .AddClass("outline-none", Hierarchical)
+        .AddClass("zen-focus-always", Hierarchical && IsActive(row.Item))
+        .AddClass(RowClass?.Invoke(row.Item))
+        .Build()!;
+
+    private static string AlignClass(ZenAlign align) => align switch
+    {
+        ZenAlign.Center => "text-center",
+        ZenAlign.End => "text-end",
+        _ => "text-start",
+    };
+
+    private string CellPadding => Size switch
+    {
+        ZenSize.Small => "px-2.5 py-1.5 text-sm",
+        ZenSize.Large => "px-4 py-3 text-base",
+        _ => "px-3 py-2 text-sm",
+    };
+
+    private const string SortButtonClass =
+        "zen-focus group -mx-1 inline-flex items-center gap-1 rounded-zen-sm px-1 py-0.5 " +
+        "font-medium transition-colors hover:text-content";
+
+    private string SortIconFor(ZenColumn<TItem> column) =>
+        _sortColumn == column && _sortDescending ? ZenIcons.ChevronDown : ZenIcons.ChevronUp;
+
+    private string SortIconClass(ZenColumn<TItem> column) => CssBuilder
+        .Default("size-3.5 shrink-0 transition-opacity")
+        .AddClass(_sortColumn == column ? "opacity-100" : "opacity-0 group-hover:opacity-40")
+        .Build()!;
+
+    private static string? WidthStyle(ZenColumn<TItem> column) =>
+        column.Width is null ? null : $"width: {column.Width}";
+}

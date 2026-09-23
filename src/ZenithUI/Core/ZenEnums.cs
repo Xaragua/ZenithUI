@@ -264,3 +264,23 @@ public enum ZenToastPosition
     /// <summary>Bottom, on the side text ends at.</summary>
     BottomEnd,
 }
+
+/// <summary>
+/// Horizontal alignment of a table column's contents.
+/// </summary>
+/// <remarks>
+/// Logical rather than physical, so a right-to-left document does not need every numeric column
+/// re-specified. <see cref="End"/> is the correct choice for numbers in both directions: digits
+/// line up by place value only when they share a trailing edge.
+/// </remarks>
+public enum ZenAlign
+{
+    /// <summary>The side text starts from. The default, and right for text.</summary>
+    Start,
+
+    /// <summary>Centred. For short status values and icons.</summary>
+    Center,
+
+    /// <summary>The side text ends at. For numbers, amounts and dates.</summary>
+    End,
+}

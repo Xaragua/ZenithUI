@@ -1,0 +1,98 @@
+@namespace ZenithUI
+@typeparam TItem where TItem : notnull
+@inherits ComponentBase
+
+@*
+    One column of a ZenTable. Renders nothing itself - it is a declaration that the table reads.
+
+    A child component rather than an item in a list parameter, because a column's most useful
+    parts are markup: a CellTemplate is a RenderFragment, and a RenderFragment written inside a
+    C# collection initialiser is a builder lambda nobody wants to write or read.
+
+    Not a ZenComponentBase. That base exists to give a component a root element with merged
+    classes and a stable id, and this component has no element at all. Its Class equivalents are
+    CellClass and HeaderClass, which are two different places and therefore cannot be one Class.
+*@
+
+@code {
+    /// <summary>The table this column belongs to.</summary>
+    /// <remarks>
+    /// The cascade is how the column reaches its table without the caller threading a reference
+    /// through every declaration. Registration happens in <c>OnParametersSet</c>, which the
+    /// renderer runs while the cascade's frame is being diffed - before the table's deferred
+    /// markup renders. See <c>ZenDefer</c> for why that ordering is the whole mechanism.
+    /// </remarks>
+    [CascadingParameter]
+    public ZenTable<TItem> Table { get; set; } = default!;
+
+    /// <summary>Header text, and the label each cell carries in the stacked mobile layout.</summary>
+    [Parameter]
+    public string? Title { get; set; }
+
+    /// <summary>The value shown in the cell, and the default sort key.</summary>
+    [Parameter]
+    public Func<TItem, object?>? Field { get; set; }
+
+    /// <summary>A format string applied to an <see cref="IFormattable"/> value, in the current culture.</summary>
+    [Parameter]
+    public string? Format { get; set; }
+
+    /// <summary>Custom markup for a cell.</summary>
+    [Parameter]
+    public RenderFragment<TItem>? CellTemplate { get; set; }
+
+    /// <summary>Custom markup for the header, inside the sort button when the column sorts.</summary>
+    [Parameter]
+    public RenderFragment? HeaderTemplate { get; set; }
+
+    /// <summary>
+    /// Whether the column can be sorted. Defaults to true once there is something to sort by.
+    /// </summary>
+    [Parameter]
+    public bool? Sortable { get; set; }
+
+    /// <summary>
+    /// The sort key, when it differs from what is displayed - sorting a formatted date by its
+    /// instant rather than its text, or a status chip by severity rather than by name.
+    /// </summary>
+    [Parameter]
+    public Func<TItem, object?>? SortBy { get; set; }
+
+    /// <summary>Horizontal alignment of the header and cells.</summary>
+    [Parameter]
+    public ZenAlign Align { get; set; } = ZenAlign.Start;
+
+    /// <summary>A CSS width for the column, for example <c>"8rem"</c> or <c>"20%"</c>.</summary>
+    [Parameter]
+    public string? Width { get; set; }
+
+    /// <summary>Extra classes for every cell in the column.</summary>
+    [Parameter]
+    public string? CellClass { get; set; }
+
+    /// <summary>Extra classes for the header cell.</summary>
+    [Parameter]
+    public string? HeaderClass { get; set; }
+
+    /// <summary>
+    /// Whether this column is sortable in practice: asked for, and with a key to sort by.
+    /// </summary>
+    internal bool CanSort => (Sortable ?? true) && (SortBy ?? Field) is not null;
+
+    /// <summary>The key this column sorts on.</summary>
+    internal Func<TItem, object?>? SortKey => SortBy ?? Field;
+
+    /// <summary>
+    /// The cell's text for an item, with <see cref="Format"/> applied where the value supports it.
+    /// </summary>
+    internal string? TextFor(TItem item) => Field?.Invoke(item) switch
+    {
+        null => null,
+        IFormattable formattable when Format is not null =>
+            formattable.ToString(Format, CultureInfo.CurrentCulture),
+        var value => value.ToString(),
+    };
+
+    /// <inheritdoc />
+    protected override void OnParametersSet() => Table.Register(this);
+}
