@@ -69,6 +69,17 @@
 
             <thead class="@HeadClass">
                 <tr>
+                    @if (HasDetails)
+                    {
+                        @* The toggle column needs a header for the column count to line up, and a
+                           name for the row-header association a screen reader builds from it. The
+                           name is visually hidden: a visible "Details" above a column of chevrons
+                           is a word doing no work. *@
+                        <th scope="col" class="@($"{HeaderCellClass} w-px")">
+                            <span class="zen-sr-only">Details</span>
+                        </th>
+                    }
+
                     @if (Selectable)
                     {
                         <th scope="col" class="@($"{HeaderCellClass} w-px")">
@@ -131,14 +142,20 @@
                 else if (_rows.Count == 0)
                 {
                     <tr>
-                        <td colspan="@ColumnCount" class="px-3 py-10 text-center text-sm text-content-subtle">
+                        @* zen-table-empty rather than a [colspan] selector, so the stacked mobile
+                           layout can tell this cell from a detail cell - both span the table, and
+                           only one of them should be centred. *@
+                        <td colspan="@ColumnCount" class="zen-table-empty p-0">
                             @if (EmptyTemplate is not null)
                             {
                                 @EmptyTemplate
                             }
                             else
                             {
-                                @EmptyText
+                                <ZenEmptyState Title="@EmptyText"
+                                               Description="@EmptyDescription"
+                                               Icon="@EmptyIcon"
+                                               Actions="EmptyActions" />
                             }
                         </td>
                     </tr>
@@ -156,6 +173,31 @@
                             aria-selected="@(Hierarchical && Selectable ? (IsSelected(row.Item) ? "true" : "false") : null)"
                             tabindex="@(Hierarchical ? (IsActive(row.Item) ? 0 : -1) : null)"
                             @onclick="@(() => RowClickedAsync(row))">
+                            @if (HasDetails)
+                            {
+                                <td class="@($"{BodyCellClass} w-px")" @onclick:stopPropagation="true">
+                                    @if (HasDetailFor(row.Item))
+                                    {
+                                        @* A disclosure button, which is why this stays a plain
+                                           table: aria-expanded on a button is valid markup
+                                           anywhere, so opening a detail row costs no role claim.
+
+                                           Kept in the tab order even inside a treegrid, on the
+                                           same reasoning as the selection checkbox - Left and
+                                           Right already belong to the hierarchy, so there is no
+                                           arrow key left to reach this with. *@
+                                        <button type="button"
+                                                class="@DetailToggleClass"
+                                                aria-expanded="@(IsDetailOpen(row.Item) ? "true" : "false")"
+                                                aria-controls="@(IsDetailOpen(row.Item) ? DetailRowId(rowIndex) : null)"
+                                                aria-label="@($"Details for {RowLabel(row)}")"
+                                                @onclick="@(() => ToggleDetailAsync(row.Item))">
+                                            <ZenIcon Path="@ZenIcons.ChevronRight" class="@DetailChevronClass(row.Item)" />
+                                        </button>
+                                    }
+                                </td>
+                            }
+
                             @if (Selectable)
                             {
                                 @* Kept in the tab order even inside the treegrid, where the
@@ -210,36 +252,111 @@
                                 </td>
                             }
                         </tr>
+
+                        @if (HasDetails && IsDetailOpen(row.Item))
+                        {
+                            @* A sibling row rather than content nested inside the data row. A
+                               <tr> cannot contain another <tr>, and a detail panel placed inside
+                               a <td> would be constrained by that column's width - which is the
+                               one thing a panel meant to hold a whole table must not be.
+
+                               It is rendered only while open, so a hundred-row table does not
+                               build a hundred hidden panels, and a detail that fetches its own
+                               data does not fetch it a hundred times. *@
+                            <tr id="@DetailRowId(rowIndex)" class="@DetailRowClass">
+                                <td colspan="@ColumnCount" class="zen-table-detail px-4 py-4">
+                                    @RowDetailTemplate!(row.Item)
+                                </td>
+                            </tr>
+                        }
                     }
                 }
             </tbody>
         </table>
     </div>
 
-    @if (PageCount > 1)
+    @* The footer appears whenever paging is on at all, not only when there is more than one page.
+       The page-size control is the reason: a table that fits on one page at 50 rows may not at
+       10, and hiding the only way to find that out behind "there is already more than one page"
+       is a chicken-and-egg. The page BUTTONS still only appear when there is somewhere to go. *@
+    @if (EffectivePageSize > 0 && !Loading)
     {
-        <nav class="mt-3 flex items-center justify-between gap-3" aria-label="Pagination">
-            @* aria-live, because the rows change without anything moving focus - a screen reader
-               user pressing Next would otherwise get no confirmation that anything happened. *@
-            <p class="text-sm text-content-muted" aria-live="polite">@PageSummary</p>
+        <nav class="mt-3 flex flex-wrap items-center justify-between gap-x-4 gap-y-3" aria-label="Pagination">
+            <div class="flex flex-wrap items-center gap-x-4 gap-y-2">
+                @* aria-live, because the rows change without anything moving focus - a screen
+                   reader user pressing Next would otherwise get no confirmation that anything
+                   happened. The range and the total are both here, so it also answers "how far
+                   through am I" without counting page buttons. *@
+                <p class="text-sm text-content-muted" aria-live="polite">@PageSummary</p>
 
-            <div class="flex items-center gap-2">
-                <ZenButton Variant="ZenVariant.Outline"
-                           Size="ZenSize.Small"
-                           Icon="@ZenIcons.ChevronLeft"
-                           Disabled="@(CurrentPage <= 1)"
-                           OnClick="@(() => GoToPageAsync(CurrentPage - 1))">
-                    Previous
-                </ZenButton>
+                @if (ShowPageSizeSelector && PageSizeChoices.Count > 0)
+                {
+                    @* A bare <select> rather than ZenSelect. ZenSelect is a form control: it
+                       derives from ZenInputBase, picks up any cascading EditContext and registers
+                       a field in it. A table dropped inside an EditForm would then have its page
+                       size participate in that form's validation and dirty tracking, which is a
+                       bug nobody would think to look for. This control edits the table's view,
+                       not the user's data. *@
+                    <label class="flex items-center gap-2 text-sm text-content-muted">
+                        <span>Rows per page</span>
 
-                <ZenButton Variant="ZenVariant.Outline"
-                           Size="ZenSize.Small"
-                           TrailingIcon="@ZenIcons.ChevronRight"
-                           Disabled="@(CurrentPage >= PageCount)"
-                           OnClick="@(() => GoToPageAsync(CurrentPage + 1))">
-                    Next
-                </ZenButton>
+                        <select class="@PageSizeSelectClass"
+                                value="@EffectivePageSize"
+                                @onchange="HandlePageSizeChangedAsync">
+                            @foreach (var size in PageSizeChoices)
+                            {
+                                <option value="@size" selected="@(size == EffectivePageSize)">@size</option>
+                            }
+                        </select>
+                    </label>
+                }
             </div>
+
+            @if (PageCount > 1)
+            {
+                <div class="flex items-center gap-1">
+                    <ZenButton Variant="ZenVariant.Ghost"
+                               Size="ZenSize.Small"
+                               Icon="@ZenIcons.ChevronLeft"
+                               IconOnly="true"
+                               AriaLabel="Previous page"
+                               Disabled="@(CurrentPage <= 1)"
+                               OnClick="@(() => GoToPageAsync(CurrentPage - 1))" />
+
+                    @foreach (var (link, index) in PageLinks().Select((l, i) => (l, i)))
+                    {
+                        @if (link is { } pageNumber)
+                        {
+                            @* aria-current="page" is what tells a screen reader which button is
+                               the one they are on. The colour alone says it to everyone else. *@
+                            <ZenButton Variant="@(pageNumber == CurrentPage ? ZenVariant.Solid : ZenVariant.Ghost)"
+                                       Intent="@(pageNumber == CurrentPage ? ZenIntent.Primary : ZenIntent.Neutral)"
+                                       Size="ZenSize.Small"
+                                       class="min-w-8 px-2 tabular-nums"
+                                       aria-current="@(pageNumber == CurrentPage ? "page" : null)"
+                                       aria-label="@($"Page {pageNumber}")"
+                                       OnClick="@(() => GoToPageAsync(pageNumber))">
+                                @pageNumber
+                            </ZenButton>
+                        }
+                        else
+                        {
+                            @* Hidden from assistive technology: it is a gap, not a destination,
+                               and "horizontal ellipsis" between two page numbers tells a screen
+                               reader user nothing the summary has not already said. *@
+                            <span class="px-1 text-sm text-content-subtle" aria-hidden="true">&hellip;</span>
+                        }
+                    }
+
+                    <ZenButton Variant="ZenVariant.Ghost"
+                               Size="ZenSize.Small"
+                               Icon="@ZenIcons.ChevronRight"
+                               IconOnly="true"
+                               AriaLabel="Next page"
+                               Disabled="@(CurrentPage >= PageCount)"
+                               OnClick="@(() => GoToPageAsync(CurrentPage + 1))" />
+                </div>
+            }
         </nav>
     }
 </ZenDefer>
@@ -250,6 +367,9 @@
 
     private readonly List<ZenColumn<TItem>> _columns = [];
     private readonly HashSet<TItem> _expanded = [];
+    private readonly HashSet<TItem> _detailsOpen = [];
+
+    private static readonly int[] DefaultPageSizeOptions = [10, 25, 50, 100];
 
     /// <summary>The rows built by the current render pass, reused by everything that needs them.</summary>
     /// <remarks>
@@ -270,6 +390,8 @@
     private ZenColumn<TItem>? _sortColumn;
     private bool _sortDescending;
     private int _page = 1;
+    private int? _chosenPageSize;
+    private int _lastPageSizeParameter;
     private TItem? _active;
 
     /// <inheritdoc />
@@ -316,11 +438,30 @@
     [Parameter]
     public int LoadingRowCount { get; set; } = 5;
 
-    /// <summary>Message shown when there are no rows.</summary>
+    /// <summary>Headline for the empty state.</summary>
     [Parameter]
-    public string EmptyText { get; set; } = "No rows to show.";
+    public string EmptyText { get; set; } = "No data";
 
-    /// <summary>Custom empty-state markup.</summary>
+    /// <summary>
+    /// A sentence below the headline explaining why the table is empty, or what to do next.
+    /// </summary>
+    /// <remarks>
+    /// Worth filling in whenever the table can be empty for more than one reason. "No data" alone
+    /// leaves a user who has just typed a filter unable to tell "nothing matched" from "nothing
+    /// exists", and the two call for opposite actions.
+    /// </remarks>
+    [Parameter]
+    public string? EmptyDescription { get; set; }
+
+    /// <summary>An SVG path for the empty state's illustration. Null renders text only.</summary>
+    [Parameter]
+    public string? EmptyIcon { get; set; } = ZenIcons.Inbox;
+
+    /// <summary>Buttons offering the way out of the empty state.</summary>
+    [Parameter]
+    public RenderFragment? EmptyActions { get; set; }
+
+    /// <summary>Custom empty-state markup, replacing the whole default visual.</summary>
     [Parameter]
     public RenderFragment? EmptyTemplate { get; set; }
 
@@ -349,15 +490,69 @@
     [Parameter]
     public EventCallback<TItem> OnRowClick { get; set; }
 
+    // ---- Detail rows --------------------------------------------------------------------------
+
+    /// <summary>
+    /// Expandable content for a row, rendered in its own row spanning every column.
+    /// </summary>
+    /// <remarks>
+    /// Setting this adds a leading column of disclosure buttons. The content is arbitrary - a
+    /// summary, a form, a chart, another <see cref="ZenTable{TItem}"/> - because it is given the
+    /// full width of the table rather than a cell's.
+    /// <para>
+    /// It is rendered only while open. A hundred-row table therefore does not build a hundred
+    /// hidden panels, and a detail that loads its own data does not load it a hundred times on
+    /// first paint.
+    /// </para>
+    /// </remarks>
+    [Parameter]
+    public RenderFragment<TItem>? RowDetailTemplate { get; set; }
+
+    /// <summary>
+    /// Whether a particular row has detail worth opening. Defaults to all of them.
+    /// </summary>
+    /// <remarks>
+    /// Rows that answer <see langword="false"/> get no button rather than a button that opens an
+    /// empty panel - which is the more annoying of the two, because it costs a click to find out.
+    /// </remarks>
+    [Parameter]
+    public Func<TItem, bool>? HasRowDetail { get; set; }
+
+    /// <summary>Rows whose detail starts open.</summary>
+    [Parameter]
+    public Func<TItem, bool>? IsDetailInitiallyOpen { get; set; }
+
+    /// <summary>Raised when a row's detail is opened or closed.</summary>
+    [Parameter]
+    public EventCallback<TItem> RowDetailToggled { get; set; }
+
     /// <summary>Extra classes for a row, by item - for status tinting.</summary>
     [Parameter]
     public Func<TItem, string?>? RowClass { get; set; }
 
     // ---- Paging -------------------------------------------------------------------------------
 
-    /// <summary>Rows per page. Zero renders everything and hides the pager.</summary>
+    /// <summary>Rows per page. Zero renders everything and hides the pager entirely.</summary>
+    /// <remarks>
+    /// The initial value. Once the user picks a size from the selector, their choice holds until
+    /// this parameter is given a different value - at which point the parameter wins again. That
+    /// is what lets the table be used without binding anything while still letting a consumer who
+    /// does bind reset the view.
+    /// </remarks>
     [Parameter]
     public int PageSize { get; set; }
+
+    /// <summary>Raised when the user picks a different page size.</summary>
+    [Parameter]
+    public EventCallback<int> PageSizeChanged { get; set; }
+
+    /// <summary>The sizes offered by the selector.</summary>
+    [Parameter]
+    public IReadOnlyList<int>? PageSizeOptions { get; set; }
+
+    /// <summary>Show the rows-per-page selector.</summary>
+    [Parameter]
+    public bool ShowPageSizeSelector { get; set; } = true;
 
     /// <summary>The current page, one-based.</summary>
     [Parameter]
@@ -366,6 +561,16 @@
     /// <summary>Raised when the page changes.</summary>
     [Parameter]
     public EventCallback<int> PageChanged { get; set; }
+
+    /// <summary>
+    /// How many page numbers to show either side of the current one.
+    /// </summary>
+    /// <remarks>
+    /// The first and last pages are always shown regardless, because "go back to the start" and
+    /// "jump to the end" are the two destinations people actually reach for.
+    /// </remarks>
+    [Parameter]
+    public int PageLinkSiblings { get; set; } = 1;
 
     // ---- Appearance ---------------------------------------------------------------------------
 
@@ -445,13 +650,87 @@
 
     private bool Hierarchical => ChildrenProvider is not null;
 
-    private int ColumnCount => _columns.Count + (Selectable ? 1 : 0);
+    private int ColumnCount => _columns.Count + (Selectable ? 1 : 0) + (HasDetails ? 1 : 0);
 
     private IReadOnlyList<TItem> Source => Items as IReadOnlyList<TItem> ?? Items?.ToList() ?? [];
 
     private int CurrentPage => Page > 0 ? Page : _page;
 
-    private int PageCount => PageSize <= 0 ? 1 : Math.Max(1, (Source.Count + PageSize - 1) / PageSize);
+    /// <summary>The page size in force: the user's choice if they have made one, else the parameter.</summary>
+    private int EffectivePageSize => _chosenPageSize ?? PageSize;
+
+    /// <summary>
+    /// The sizes offered by the selector, with the size actually in force guaranteed to be among
+    /// them.
+    /// </summary>
+    /// <remarks>
+    /// A consumer who sets <c>PageSize="15"</c> and leaves the options alone would otherwise get a
+    /// select whose value matches none of its options, which browsers resolve by showing the first
+    /// one - so the control would claim a page size the table is not using.
+    /// </remarks>
+    private IReadOnlyList<int> PageSizeChoices
+    {
+        get
+        {
+            var options = PageSizeOptions ?? DefaultPageSizeOptions;
+
+            return options.Contains(EffectivePageSize)
+                ? options
+                : [.. options.Append(EffectivePageSize).Order()];
+        }
+    }
+
+    private int PageCount => EffectivePageSize <= 0
+        ? 1
+        : Math.Max(1, (Source.Count + EffectivePageSize - 1) / EffectivePageSize);
+
+    /// <summary>
+    /// The page numbers to draw, with <see langword="null"/> standing for a gap.
+    /// </summary>
+    /// <remarks>
+    /// A gap of exactly one page is filled in rather than elided. An ellipsis hiding a single
+    /// number is strictly worse than the number: it costs the same width, and it turns a
+    /// one-click jump into a guess.
+    /// </remarks>
+    private IReadOnlyList<int?> PageLinks()
+    {
+        var total = PageCount;
+        var current = Math.Clamp(CurrentPage, 1, total);
+        var siblings = Math.Max(0, PageLinkSiblings);
+
+        var wanted = new SortedSet<int> { 1, total };
+
+        for (var page = current - siblings; page <= current + siblings; page++)
+        {
+            if (page >= 1 && page <= total)
+            {
+                wanted.Add(page);
+            }
+        }
+
+        var links = new List<int?>(wanted.Count);
+        var previous = 0;
+
+        foreach (var page in wanted)
+        {
+            if (previous > 0 && page - previous > 1)
+            {
+                if (page - previous == 2)
+                {
+                    links.Add(previous + 1);
+                }
+                else
+                {
+                    links.Add(null);
+                }
+            }
+
+            links.Add(page);
+            previous = page;
+        }
+
+        return links;
+    }
 
     /// <summary>
     /// The rows on screen: sorted, paged, then flattened through whatever is expanded.
@@ -467,10 +746,10 @@
 
         var roots = Sorted(Source);
 
-        if (PageSize > 0)
+        if (EffectivePageSize > 0)
         {
-            roots = roots.Skip((Math.Clamp(CurrentPage, 1, PageCount) - 1) * PageSize)
-                .Take(PageSize)
+            roots = roots.Skip((Math.Clamp(CurrentPage, 1, PageCount) - 1) * EffectivePageSize)
+                .Take(EffectivePageSize)
                 .ToList();
         }
 
@@ -536,8 +815,24 @@
 
     private void SeedInitialExpansion()
     {
-        if (_seeded || IsInitiallyExpanded is null || ChildrenProvider is null || Items is null)
+        if (_seeded || Items is null)
         {
+            return;
+        }
+
+        if (IsDetailInitiallyOpen is not null)
+        {
+            foreach (var item in Items.Where(IsDetailInitiallyOpen))
+            {
+                _detailsOpen.Add(item);
+            }
+        }
+
+        if (IsInitiallyExpanded is null || ChildrenProvider is null)
+        {
+            // Nothing more to seed, but the pass still counts: re-running it later would reopen
+            // whatever the user has since closed.
+            _seeded = true;
             return;
         }
 
@@ -608,6 +903,70 @@
         _page = target;
         await PageChanged.InvokeAsync(target);
     }
+
+    /// <inheritdoc />
+    /// <remarks>
+    /// The user's page-size choice is dropped whenever the <see cref="PageSize"/> parameter is
+    /// given a new value, so a consumer that binds it can reset the view - while a consumer that
+    /// sets it once and never touches it does not have their user's choice overwritten on every
+    /// re-render.
+    /// </remarks>
+    protected override void OnParametersSet()
+    {
+        if (PageSize != _lastPageSizeParameter)
+        {
+            _lastPageSizeParameter = PageSize;
+            _chosenPageSize = null;
+        }
+    }
+
+    /// <summary>
+    /// Applies a new page size, keeping the row currently at the top of the page in view.
+    /// </summary>
+    /// <remarks>
+    /// Jumping back to page 1 is the usual implementation and it is quietly hostile: someone who
+    /// has paged to row 400 and then asks for more rows per page is asking to see more of where
+    /// they are, not to be sent back to the beginning. The first visible row is the anchor, so
+    /// the view widens around it.
+    /// </remarks>
+    private async Task HandlePageSizeChangedAsync(ChangeEventArgs args)
+    {
+        if (!int.TryParse(args.Value?.ToString(), NumberStyles.Integer, CultureInfo.InvariantCulture, out var size)
+            || size <= 0)
+        {
+            return;
+        }
+
+        var firstRowIndex = (Math.Clamp(CurrentPage, 1, PageCount) - 1) * EffectivePageSize;
+
+        _chosenPageSize = size;
+
+        await PageSizeChanged.InvokeAsync(size);
+        await GoToPageAsync((firstRowIndex / size) + 1);
+    }
+
+    // ---- Detail rows --------------------------------------------------------------------------
+
+    private bool HasDetails => RowDetailTemplate is not null;
+
+    private bool HasDetailFor(TItem item) => HasRowDetail?.Invoke(item) ?? true;
+
+    private bool IsDetailOpen(TItem item) => _detailsOpen.Contains(item);
+
+    private async Task ToggleDetailAsync(TItem item)
+    {
+        _active = item;
+
+        if (!_detailsOpen.Remove(item))
+        {
+            _detailsOpen.Add(item);
+        }
+
+        await RowDetailToggled.InvokeAsync(item);
+    }
+
+    /// <summary>The element id of a row's detail panel, so its button can point at it.</summary>
+    private string DetailRowId(int index) => $"{Id}-detail-{index}";
 
     private void ToggleExpanded(TItem item)
     {
@@ -868,8 +1227,13 @@
     {
         get
         {
-            var first = ((Math.Clamp(CurrentPage, 1, PageCount) - 1) * PageSize) + 1;
-            var last = Math.Min(first + PageSize - 1, Source.Count);
+            if (Source.Count == 0)
+            {
+                return "No rows";
+            }
+
+            var first = ((Math.Clamp(CurrentPage, 1, PageCount) - 1) * EffectivePageSize) + 1;
+            var last = Math.Min(first + EffectivePageSize - 1, Source.Count);
 
             return $"{first}–{last} of {Source.Count}";
         }
@@ -922,6 +1286,26 @@
         .AddClass("zen-focus-always", Hierarchical && IsActive(row.Item))
         .AddClass(RowClass?.Invoke(row.Item))
         .Build()!;
+
+    private const string DetailToggleClass =
+        "zen-focus grid size-6 shrink-0 place-items-center rounded-zen-sm text-content-subtle " +
+        "transition-colors hover:bg-surface-hover hover:text-content";
+
+    private string DetailChevronClass(TItem item) => CssBuilder
+        .Default("size-4 transition-transform")
+        .AddClass("rotate-90", IsDetailOpen(item))
+        .Build()!;
+
+    // Sunken rather than raised: the panel belongs to the row above it, and a surface that sits
+    // forward of the table would read as a separate card that had landed on top of the rows.
+    private const string DetailRowClass = "bg-surface-sunken";
+
+    // The library's own input treatment, minus everything that belongs to a form control: no
+    // full width, no validation hooks, no field wrapper. See the comment at the call site for why
+    // this is not a ZenSelect.
+    private const string PageSizeSelectClass =
+        "zen-focus-border h-8 rounded-zen-sm border border-border bg-surface py-0 ps-2 pe-7 " +
+        "text-sm text-content transition-colors";
 
     private static string AlignClass(ZenAlign align) => align switch
     {

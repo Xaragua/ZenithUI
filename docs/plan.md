@@ -260,8 +260,8 @@ masking, which sidesteps caret-position bugs), `ZenSearchInput`, `ZenCheckbox`,
 `ZenCombobox<TItem>` (typeahead, async `ItemsProvider`, single/multi, full WAI-ARIA combobox
 pattern).
 
-**Data display** — `ZenList<TItem>`, `ZenTable<TItem>`, `ZenTree<TItem>`, `ZenTimeline` +
-`ZenTimelineItem`, `ZenStatCard`.
+**Data display** — `ZenList<TItem>`, `ZenTable<TItem>` + `ZenColumn<TItem>`, `ZenTree<TItem>`,
+`ZenTimeline` + `ZenTimelineItem`, `ZenStatCard`, `ZenEmptyState`.
 
 **Containers** — `ZenCard` (`Header` / `Body` / `Footer` / `Actions` slots), `ZenForm`.
 
@@ -280,6 +280,14 @@ pattern).
   when hierarchical.
 - **Responsive default:** below `md`, collapse to a stacked card list driven by `data-label`
   attributes from column titles — pure CSS, no JS, no media-query service.
+- **Detail rows:** `RowDetailTemplate` opens a sibling `<tr>` spanning every column, holding
+  arbitrary content including another `ZenTable`. A `<tr>` cannot contain another `<tr>`, and a
+  panel constrained to one column's width defeats the purpose, so it cannot be nested inside a
+  cell. Rendered only while open. The disclosure is a plain `<button aria-expanded>` — valid
+  anywhere, so detail rows cost the table no role claim.
+- **Pager:** numbered pages with elision, a rows-per-page selector, and `aria-current="page"`. A
+  gap of exactly one page is filled rather than elided. Changing the page size keeps the first
+  visible row in view instead of jumping to page one.
 
 #### Collecting the columns: `ZenDefer`
 
@@ -435,7 +443,7 @@ component's bUnit test asserts its required ARIA attributes.
 | **M1** | `ZenIcon`, `ZenButton`, `ZenBadge`, `ZenSpinner`, `ZenSkeleton`, `ZenCard`, `ZenStatCard`, `ZenField`, `ZenInputBase<T>` | A demo page per primitive, verified in both palettes | ✅ |
 | **M2** ✅ | Text, textarea, number, currency, date, search, checkbox (+group), radio group, native select, `ZenToggle`, `ZenRangeSlider`, `ZenForm`, plus the feedback primitives `ZenProgress` and `ZenIndicator` | A demo form binds an `EditForm` + `DataAnnotationsValidator` and shows per-field errors; the same inputs also work **without** an `EditForm` | ✅ |
 | **M3** ✅ | `ZenModal` + `IZenModalService`, `ZenToast` + `IZenToastService`, `ZenPopover`, `ZenCombobox<TItem>`, `ZenList<TItem>` | A dialog can be raised and awaited from a service with no markup on the page; focus returns to the opener on close; combobox passes keyboard + ARIA tests and prerenders as a closed labelled field with JS disabled | ✅ |
-| **M4** ✅ | `ZenTable<TItem>` + `ZenColumn<TItem>` (sort/page/select/hierarchy/responsive collapse), `ZenTree<TItem>`, `ZenTimeline` + `ZenTimelineItem` | Demo renders a 3-level hierarchical table and a lazy-loading tree | ✅ |
+| **M4** ✅ | `ZenTable<TItem>` + `ZenColumn<TItem>` (sort/page/select/hierarchy/detail rows/responsive collapse), `ZenEmptyState`, `ZenTree<TItem>`, `ZenTimeline` + `ZenTimelineItem` | Demo renders a 3-level hierarchical table and a lazy-loading tree | ✅ |
 | **M5** | `ZenAppBar`, `ZenNavMenu`, `ZenSideNav`, `ZenFooter`, `ZenAppShell` | Shell demo usable at 360 / 768 / 1440 px; drawer traps focus and restores it on close | |
 | **M6** | Docs, a11y audit, `dotnet pack`, NuGet metadata, v1.0.0, **close the consumer-`@theme` gap** | `.nupkg` consumed successfully by a scratch Blazor Server app **and** a Blazor WASM app | |
 
@@ -478,6 +486,8 @@ Recorded because each changed the design rather than merely the code.
 | A fourth JS module, `zen-dom.js` | `indeterminate` is a DOM property with no attribute, and `focus()` has no declarative form. Neither is behaviour, which is why neither was foreseen. |
 | `ZenDefer`, and it is public | A parent renders before its children exist, so a column-collecting table needs ordering rather than a second pass — and static SSR has no second pass to give. Public only because Razor resolves markup elements to public component types. |
 | A selectable flat table is **not** `role="grid"` | The plan implied a grid role followed from selection. A grid owes arrow-key cell navigation; checkboxes deliver accessible selection while promising nothing. |
+| `ZenEmptyState`, not in the original inventory | A blank panel cannot be told apart from a loading one or a broken one. Every collection component needs the distinction, so it is a component rather than a string parameter on each. |
+| The table's page-size control is a bare `<select>` | `ZenSelect` is a form control and registers a field in any cascading `EditContext`. A table inside an `EditForm` would have its page size join that form's validation. |
 | `ZenTable` sorting is tri-state | The order data arrived in carries information — usually "newest first" from the server — and a two-state toggle leaves no way back to it. |
 | `TItem` constrained to `notnull` on `ZenTree` and `ZenTable` | Expansion, lazy-load caching and selection are all keyed by the item. A null node has no identity to key on. |
 

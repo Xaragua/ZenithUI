@@ -235,9 +235,121 @@ public class ZenTableTests : BunitContext
     }
 
     [Fact]
-    public void NoPager_WhenEverythingFitsOnOnePage()
+    public void OnOnePage_TheSizeSelectorStays_ButThePageButtonsGo()
     {
-        Table(p => p.Add(x => x.PageSize, 10)).FindAll("nav").ShouldBeEmpty();
+        // The footer is not hidden just because there is one page: the page-size control is the
+        // only way to discover that 10 rows fit where 50 did not, and gating it on "more than one
+        // page already" is a chicken-and-egg. Buttons to nowhere are a different matter.
+        var cut = Table(p => p.Add(x => x.PageSize, 10));
+
+        cut.FindAll("nav").Count.ShouldBe(1);
+        cut.FindAll("nav select").Count.ShouldBe(1);
+        cut.FindAll("nav [aria-label^='Page ']").ShouldBeEmpty();
+    }
+
+    [Fact]
+    public void NoPagerAtAll_WhenPagingIsOff()
+    {
+        Table(p => p.Add(x => x.PageSize, 0)).FindAll("nav").ShouldBeEmpty();
+    }
+
+    // ---- Numbered pages -----------------------------------------------------------------------
+
+    [Fact]
+    public void ThePages_AreNumbered_AndTheCurrentOneSaysSo()
+    {
+        // aria-current is what tells a screen reader which of eight identical-looking buttons is
+        // the page they are on. Colour says it to everyone else.
+        var cut = Table(p => p.Add(x => x.PageSize, 1));
+
+        cut.FindAll("nav [aria-label^='Page ']").Count.ShouldBe(3);
+
+        cut.FindAll("nav [aria-current='page']").Count.ShouldBe(1);
+        cut.Find("nav [aria-current='page']").TextContent.Trim().ShouldBe("1");
+
+        cut.Find("nav [aria-label='Page 3']").Click();
+
+        cut.Find("nav [aria-current='page']").TextContent.Trim().ShouldBe("3");
+        cut.Find("tbody tr td:first-child").TextContent.Trim().ShouldBe("A-2");
+    }
+
+    [Fact]
+    public void ALongPageRange_IsElided_ButNeverToHideASinglePage()
+    {
+        // An ellipsis standing in for one page is strictly worse than the page: same width, and it
+        // turns a one-click jump into a guess.
+        var many = Enumerable.Range(1, 40).Select(i => new Order($"A-{i}", "Customer", i)).ToArray();
+
+        var cut = Render<ZenTable<Order>>(p => p
+            .Add(x => x.Items, many)
+            .Add(x => x.Columns, TwoColumns)
+            .Add(x => x.PageSize, 1));
+
+        static string[] Links(IRenderedComponent<ZenTable<Order>> c) =>
+            c.Find("nav div:last-child").Children
+                .Where(e => e.TextContent.Trim().Length > 0 && !e.HasAttribute("aria-label")
+                    || e.GetAttribute("aria-label")?.StartsWith("Page ", StringComparison.Ordinal) == true)
+                .Select(e => e.TextContent.Trim())
+                .ToArray();
+
+        // Page 1 of 40: 1, 2, gap, 40.
+        Links(cut).ShouldBe(["1", "2", "…", "40"]);
+
+        // Page 3 of 40: the gap between 1 and 2 would be a single page, so 2 is drawn instead.
+        cut.Find("nav [aria-label='Page 2']").Click();
+        cut.Find("nav [aria-label='Page 3']").Click();
+        Links(cut).ShouldBe(["1", "2", "3", "4", "…", "40"]);
+    }
+
+    // ---- Page size ----------------------------------------------------------------------------
+
+    [Fact]
+    public void ChangingThePageSize_KeepsTheFirstVisibleRowInView()
+    {
+        // Jumping back to page 1 is the usual implementation and it is quietly hostile: someone at
+        // row 5 who asks for more rows per page wants to see more of where they are, not to be
+        // sent back to the start.
+        var many = Enumerable.Range(1, 40).Select(i => new Order($"A-{i}", "Customer", i)).ToArray();
+
+        var cut = Render<ZenTable<Order>>(p => p
+            .Add(x => x.Items, many)
+            .Add(x => x.Columns, TwoColumns)
+            .Add(x => x.PageSize, 10));
+
+        // Page 3 at 10 per page starts at row 21.
+        cut.Find("nav [aria-label='Page 3']").Click();
+        cut.Find("tbody tr td:first-child").TextContent.Trim().ShouldBe("A-21");
+
+        cut.Find("nav select").Change("25");
+
+        // Row 21 lives on page 1 at 25 per page, and that page is where we land.
+        cut.Find("nav [aria-current='page']").TextContent.Trim().ShouldBe("1");
+        cut.FindAll("tbody tr").Count.ShouldBe(25);
+    }
+
+    [Fact]
+    public void ThePageSizeInForce_IsAlwaysOneOfTheOptions()
+    {
+        // A select whose value matches no option shows the first one instead, so the control would
+        // claim a page size the table is not using.
+        var cut = Table(p => p.Add(x => x.PageSize, 15));
+
+        cut.FindAll("nav option").Select(o => o.TextContent.Trim())
+            .ShouldBe(["10", "15", "25", "50", "100"]);
+
+        cut.Find("nav option[selected]").TextContent.Trim().ShouldBe("15");
+    }
+
+    [Fact]
+    public void TheSizeSelector_IsNotAFormControl()
+    {
+        // Deliberately a bare <select> rather than ZenSelect. ZenSelect derives from ZenInputBase
+        // and registers a field in any cascading EditContext, so a table inside an EditForm would
+        // have its page size join that form's validation and dirty tracking.
+        var cut = Table(p => p.Add(x => x.PageSize, 2));
+
+        cut.Find("nav select").HasAttribute("aria-invalid").ShouldBeFalse();
+        cut.FindAll("nav [role='alert']").ShouldBeEmpty();
     }
 
     // ---- Selection ----------------------------------------------------------------------------
@@ -297,7 +409,146 @@ public class ZenTableTests : BunitContext
             .Add(x => x.Columns, TwoColumns));
 
         cut.Find("tbody td").GetAttribute("colspan").ShouldBe("2");
-        cut.Find("tbody td").TextContent.Trim().ShouldBe("No rows to show.");
+        cut.Find("tbody td").TextContent.ShouldContain("No data");
+    }
+
+    [Fact]
+    public void TheEmptyState_CanExplainItselfAndOfferAWayOut()
+    {
+        // "No data" alone leaves someone who has just typed a filter unable to tell "nothing
+        // matched" from "nothing exists", and the two call for opposite actions.
+        var cut = Render<ZenTable<Order>>(p => p
+            .Add(x => x.Items, Array.Empty<Order>())
+            .Add(x => x.Columns, TwoColumns)
+            .Add(x => x.EmptyText, "No orders match")
+            .Add(x => x.EmptyDescription, "Try widening the date range.")
+            .Add(x => x.EmptyActions, (RenderFragment)(b =>
+            {
+                b.OpenComponent<ZenButton>(0);
+                b.AddComponentParameter(1, nameof(ZenButton.ChildContent),
+                    (RenderFragment)(c => c.AddContent(0, "Clear filters")));
+                b.CloseComponent();
+            })));
+
+        cut.Markup.ShouldContain("No orders match");
+        cut.Markup.ShouldContain("Try widening the date range.");
+        cut.Find("tbody button").TextContent.Trim().ShouldBe("Clear filters");
+    }
+
+    [Fact]
+    public void TheEmptyStatesIllustration_IsDecorative()
+    {
+        // It carries nothing the text does not. A screen reader announcing "image, inbox" before
+        // the sentence that actually explains the state is noise.
+        var cut = Render<ZenTable<Order>>(p => p
+            .Add(x => x.Items, Array.Empty<Order>())
+            .Add(x => x.Columns, TwoColumns));
+
+        cut.Find("tbody td span[aria-hidden='true']").ShouldNotBeNull();
+    }
+
+    // ---- Detail rows --------------------------------------------------------------------------
+
+    [Fact]
+    public void WithoutADetailTemplate_ThereIsNoDetailColumn()
+    {
+        Table().FindAll("thead th").Count.ShouldBe(2);
+    }
+
+    [Fact]
+    public void ADetailRow_OpensBeneathItsRowAndSpansEveryColumn()
+    {
+        // A sibling <tr>, not content nested in a <td>: a detail panel constrained to one column's
+        // width is the one thing a panel meant to hold a whole table must not be.
+        var cut = Table(p => p.Add(x => x.RowDetailTemplate,
+            (RenderFragment<Order>)(o => b => b.AddMarkupContent(0, $"<p>Detail for {o.Id}</p>"))));
+
+        cut.FindAll("thead th").Count.ShouldBe(3);
+        cut.Markup.ShouldNotContain("Detail for");
+
+        var toggle = cut.FindAll("tbody button")[0];
+        toggle.GetAttribute("aria-expanded").ShouldBe("false");
+        toggle.Click();
+
+        cut.Markup.ShouldContain("Detail for A-3");
+        cut.Find("td.zen-table-detail").GetAttribute("colspan").ShouldBe("3");
+        cut.FindAll("tbody button")[0].GetAttribute("aria-expanded").ShouldBe("true");
+    }
+
+    [Fact]
+    public void ADetailToggle_PointsAtWhatItOpens_OnlyWhileItExists()
+    {
+        // aria-controls naming an element that is not in the document is worse than saying
+        // nothing: a screen reader asked to follow it finds nothing at all.
+        var cut = Table(p => p.Add(x => x.RowDetailTemplate,
+            (RenderFragment<Order>)(_ => b => b.AddMarkupContent(0, "<p>Detail</p>"))));
+
+        cut.FindAll("tbody button")[0].HasAttribute("aria-controls").ShouldBeFalse();
+
+        cut.FindAll("tbody button")[0].Click();
+
+        var controls = cut.FindAll("tbody button")[0].GetAttribute("aria-controls");
+        controls.ShouldNotBeNullOrEmpty();
+        cut.Find($"#{controls}").ShouldNotBeNull();
+    }
+
+    [Fact]
+    public void ARowWithNoDetail_GetsNoToggle()
+    {
+        // A button that opens an empty panel is more annoying than no button, because it costs a
+        // click to find out.
+        var cut = Table(p => p
+            .Add(x => x.RowDetailTemplate, (RenderFragment<Order>)(_ => b => b.AddMarkupContent(0, "<p>Detail</p>")))
+            .Add(x => x.HasRowDetail, o => o.Id == "A-1"));
+
+        cut.FindAll("tbody button").Count.ShouldBe(1);
+    }
+
+    [Fact]
+    public void ADetailRow_CanHostAnotherTable()
+    {
+        // The case the feature exists for. The inner table collects its own columns through its
+        // own cascade; the two must not see each other's.
+        var cut = Table(p => p.Add(x => x.RowDetailTemplate, (RenderFragment<Order>)(o => b =>
+        {
+            b.OpenComponent<ZenTable<Order>>(0);
+            b.AddComponentParameter(1, nameof(ZenTable<Order>.Items), (IEnumerable<Order>)Orders);
+            b.AddComponentParameter(2, nameof(ZenTable<Order>.Columns), TwoColumns);
+            b.AddComponentParameter(3, nameof(ZenTable<Order>.Label), $"Lines for {o.Id}");
+            b.CloseComponent();
+        })));
+
+        cut.FindAll("tbody button")[0].Click();
+
+        var inner = cut.Find("td.zen-table-detail table");
+
+        inner.GetAttribute("aria-label").ShouldBe("Lines for A-3");
+        inner.QuerySelectorAll("thead th").Length.ShouldBe(2);
+
+        // Counted through the inner tbody's own children rather than with a "tbody tr" selector.
+        // A descendant combinator is not scoped to the element it is queried from, so inside a
+        // nested table "tbody tr" also matches the inner table's HEADER row - which is a
+        // descendant of the OUTER tbody. The count comes out one too high and the table looks
+        // like it grew a row.
+        inner.QuerySelector("tbody")!.Children.Length.ShouldBe(3);
+    }
+
+    [Fact]
+    public void DetailsAndHierarchy_CoexistWithoutFightingOverTheChevron()
+    {
+        // The hierarchy chevron lives inline in the first data cell; the detail disclosure has a
+        // column of its own. One expander doing both jobs could not express "expanded children,
+        // closed detail".
+        var cut = HierarchyTable(p => p.Add(x => x.RowDetailTemplate,
+            (RenderFragment<Order>)(_ => b => b.AddMarkupContent(0, "<p>Detail</p>"))));
+
+        cut.Find("table").GetAttribute("role").ShouldBe("treegrid");
+        cut.FindAll("thead th").Count.ShouldBe(3);
+
+        var firstRow = cut.FindAll("tbody tr")[0];
+
+        firstRow.GetAttribute("aria-expanded").ShouldBe("true");
+        firstRow.QuerySelector("td button")!.GetAttribute("aria-expanded").ShouldBe("false");
     }
 
     // ---- Responsive ---------------------------------------------------------------------------

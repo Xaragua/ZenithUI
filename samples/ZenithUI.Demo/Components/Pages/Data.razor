@@ -30,9 +30,11 @@
     <p class="mt-2 max-w-3xl text-sm text-content-muted">
         Sortable, pageable and selectable. Click a header three times: ascending, descending, then
         back to the order the data arrived in &mdash; which is information too, and usually means
-        &ldquo;newest first&rdquo;. <strong>Narrow the window below 768px</strong> and each row
-        becomes a labelled card; the labels come from the column titles through
-        <code>data-label</code>, with no JavaScript and no media-query service.
+        &ldquo;newest first&rdquo;. <strong>Open a row's chevron</strong> for its detail panel: it
+        is a sibling row spanning every column, so it can hold anything &mdash; here, another
+        <code>ZenTable</code>. <strong>Narrow the window below 768px</strong> and each row becomes
+        a labelled card; the labels come from the column titles through <code>data-label</code>,
+        with no JavaScript and no media-query service.
     </p>
 
     <div class="mt-4">
@@ -44,7 +46,44 @@
                   SelectedItems="_selectedOrders"
                   SelectedItemsChanged="@(s => _selectedOrders = s)"
                   PageSize="5"
-                  Striped="true">
+                  PageSizeOptions="_pageSizes"
+                  Striped="true"
+                  HasRowDetail="@(o => o.Lines.Count > 0)"
+                  IsDetailInitiallyOpen="@(o => o.Reference == "A-1043")">
+            <RowDetailTemplate>
+                @* Arbitrary content, including a whole table. The panel gets the full width of the
+                   outer table rather than one column's, which is the only reason this works. *@
+                <div class="flex flex-col gap-3">
+                    <div class="flex flex-wrap items-baseline justify-between gap-2">
+                        <h4 class="text-sm font-semibold text-content">Line items for @context.Reference</h4>
+                        <p class="text-sm text-content-muted">
+                            @context.Lines.Count items &middot;
+                            <span class="font-medium text-content">@context.Amount.ToString("C")</span>
+                        </p>
+                    </div>
+
+                    <ZenTable Items="context.Lines"
+                              TItem="OrderLine"
+                              Label="@($"Line items for {context.Reference}")"
+                              Size="ZenSize.Small"
+                              Hoverable="false">
+                        <Columns>
+                            <ZenColumn TItem="OrderLine" Title="SKU" Field="@(l => l.Sku)" Width="8rem" />
+                            <ZenColumn TItem="OrderLine" Title="Description" Field="@(l => l.Description)" />
+                            <ZenColumn TItem="OrderLine" Title="Qty" Field="@(l => l.Quantity)" Align="ZenAlign.End" Width="5rem" />
+                            <ZenColumn TItem="OrderLine" Title="Unit" Field="@(l => l.UnitPrice)" Format="C" Align="ZenAlign.End" Width="7rem" />
+                        </Columns>
+                    </ZenTable>
+
+                    <div class="flex flex-wrap gap-2">
+                        <ZenButton Variant="ZenVariant.Outline" Size="ZenSize.Small" Icon="@ZenIcons.Check">
+                            Mark fulfilled
+                        </ZenButton>
+                        <ZenButton Variant="ZenVariant.Ghost" Size="ZenSize.Small">View invoice</ZenButton>
+                    </div>
+                </div>
+            </RowDetailTemplate>
+
             <Columns>
                 <ZenColumn TItem="Order" Title="Reference" Field="@(o => o.Reference)" Width="9rem" />
                 <ZenColumn TItem="Order" Title="Customer" Field="@(o => o.Customer)" />
@@ -71,6 +110,60 @@
         {
             <span>@_selectedOrders.Count selected: @string.Join(", ", _selectedOrders.Select(o => o.Reference))</span>
         }
+    </p>
+
+    <p class="mt-1 text-sm text-content-subtle">
+        The pager keeps the first visible row in view when you change the page size &mdash; paging
+        to row 21 and then asking for 25 per page is a request to see more of where you are, not to
+        be sent back to page one.
+    </p>
+</section>
+
+<!-- ------------------------------------------------------------- Empty state -->
+<section class="mt-12">
+    <h2 class="text-lg font-semibold">Nothing to show</h2>
+    <p class="mt-2 max-w-3xl text-sm text-content-muted">
+        An empty collection is the state a user is most likely to misread as a failure. A blank
+        panel gives them no way to tell &ldquo;nothing matched&rdquo; from &ldquo;still
+        loading&rdquo; from &ldquo;something broke&rdquo;, so they wait, or reload, or file a bug.
+        <code>ZenEmptyState</code> is the default whenever a <code>ZenTable</code> has no rows, and
+        stands alone anywhere else.
+    </p>
+
+    <div class="mt-4 grid gap-4 lg:grid-cols-2">
+        <ZenCard Title="The default" TitleLevel="3">
+            <ZenTable Items="_noOrders" TItem="Order" Label="No orders" Size="ZenSize.Small">
+                <Columns>
+                    <ZenColumn TItem="Order" Title="Reference" Field="@(o => o.Reference)" />
+                    <ZenColumn TItem="Order" Title="Customer" Field="@(o => o.Customer)" />
+                </Columns>
+            </ZenTable>
+        </ZenCard>
+
+        <ZenCard Title="Saying which kind of empty" TitleLevel="3">
+            <ZenTable Items="_noOrders"
+                      TItem="Order"
+                      Label="No matching orders"
+                      Size="ZenSize.Small"
+                      EmptyText="No orders match this filter"
+                      EmptyDescription="There are 8 orders in total. Try widening the date range or clearing the status filter."
+                      EmptyIcon="@ZenIcons.Search">
+                <EmptyActions>
+                    <ZenButton Variant="ZenVariant.Outline" Size="ZenSize.Small">Clear filters</ZenButton>
+                    <ZenButton Intent="ZenIntent.Primary" Size="ZenSize.Small">New order</ZenButton>
+                </EmptyActions>
+                <Columns>
+                    <ZenColumn TItem="Order" Title="Reference" Field="@(o => o.Reference)" />
+                    <ZenColumn TItem="Order" Title="Customer" Field="@(o => o.Customer)" />
+                </Columns>
+            </ZenTable>
+        </ZenCard>
+    </div>
+
+    <p class="mt-3 text-sm text-content-subtle">
+        The second one is the version worth writing. &ldquo;No data&rdquo; alone leaves someone who
+        has just typed a filter unable to tell whether nothing matched or nothing exists &mdash;
+        and the two call for opposite actions.
     </p>
 </section>
 
@@ -206,7 +299,19 @@
 @code {
     private enum OrderStatus { Draft, Placed, Packed, Shipped, Delivered }
 
-    private sealed record Order(string Reference, string Customer, DateTime Placed, decimal Amount, OrderStatus Status);
+    private sealed record OrderLine(string Sku, string Description, int Quantity, decimal UnitPrice);
+
+    private sealed record Order(
+        string Reference,
+        string Customer,
+        DateTime Placed,
+        decimal Amount,
+        OrderStatus Status,
+        List<OrderLine> Lines)
+    {
+        public Order(string reference, string customer, DateTime placed, decimal amount, OrderStatus status)
+            : this(reference, customer, placed, amount, status, []) { }
+    }
 
     private sealed record Segment(string Name, int Accounts, decimal Revenue, List<Segment> Children)
     {
@@ -223,16 +328,46 @@
     private IReadOnlyCollection<Order> _selectedOrders = [];
     private Node? _selectedNode;
 
+    private readonly int[] _pageSizes = [5, 10, 25];
+
+    /// <summary>Deliberately empty, for the empty-state section.</summary>
+    private readonly List<Order> _noOrders = [];
+
     private readonly List<Order> _orders =
     [
-        new("A-1043", "Wren Logistics", new DateTime(2026, 9, 17), 1240.50m, OrderStatus.Shipped),
-        new("A-1042", "Alder & Co", new DateTime(2026, 9, 16), 89.00m, OrderStatus.Delivered),
-        new("A-1041", "Birch Retail", new DateTime(2026, 9, 16), 4980.25m, OrderStatus.Packed),
-        new("A-1040", "Cedar Works", new DateTime(2026, 9, 15), 312.75m, OrderStatus.Delivered),
+        new("A-1043", "Wren Logistics", new DateTime(2026, 9, 17), 1240.50m, OrderStatus.Shipped, [
+            new OrderLine("PLT-200", "Euro pallet, heat treated", 40, 24.00m),
+            new OrderLine("WRP-050", "Stretch wrap, 500mm", 12, 8.50m),
+            new OrderLine("LBL-010", "Thermal labels, 1000/roll", 6, 29.75m),
+        ]),
+        new("A-1042", "Alder & Co", new DateTime(2026, 9, 16), 89.00m, OrderStatus.Delivered, [
+            new OrderLine("BOX-114", "Double-wall carton, 400mm", 20, 4.45m),
+        ]),
+        new("A-1041", "Birch Retail", new DateTime(2026, 9, 16), 4980.25m, OrderStatus.Packed, [
+            new OrderLine("SHF-900", "Gondola shelving bay", 15, 289.00m),
+            new OrderLine("SHF-901", "Shelf divider, 300mm", 120, 3.75m),
+            new OrderLine("FIT-004", "Installation kit", 15, 12.00m),
+            new OrderLine("DEL-EXP", "Express delivery surcharge", 1, 145.00m),
+        ]),
+        new("A-1040", "Cedar Works", new DateTime(2026, 9, 15), 312.75m, OrderStatus.Delivered, [
+            new OrderLine("TMB-070", "Softwood batten, 2.4m", 75, 4.17m),
+        ]),
+
+        // No lines: HasRowDetail turns this row's disclosure off rather than offering a button
+        // that opens an empty panel.
         new("A-1039", "Dogwood Supply", new DateTime(2026, 9, 14), 27.99m, OrderStatus.Draft),
-        new("A-1038", "Elm Freight", new DateTime(2026, 9, 12), 1875.00m, OrderStatus.Delivered),
-        new("A-1037", "Fir Components", new DateTime(2026, 9, 11), 640.10m, OrderStatus.Placed),
-        new("A-1036", "Gorse Trading", new DateTime(2026, 9, 9), 15230.00m, OrderStatus.Delivered),
+
+        new("A-1038", "Elm Freight", new DateTime(2026, 9, 12), 1875.00m, OrderStatus.Delivered, [
+            new OrderLine("FRT-EU", "Groupage, EU zone 2", 5, 375.00m),
+        ]),
+        new("A-1037", "Fir Components", new DateTime(2026, 9, 11), 640.10m, OrderStatus.Placed, [
+            new OrderLine("BRK-012", "Angle bracket, galvanised", 400, 1.35m),
+            new OrderLine("FIX-088", "M8 coach screw, box of 100", 22, 4.55m),
+        ]),
+        new("A-1036", "Gorse Trading", new DateTime(2026, 9, 9), 15230.00m, OrderStatus.Delivered, [
+            new OrderLine("CNT-020", "20ft container, refurbished", 5, 2800.00m),
+            new OrderLine("LCK-001", "Container lock set", 5, 46.00m),
+        ]),
     ];
 
     private readonly List<Segment> _regions =

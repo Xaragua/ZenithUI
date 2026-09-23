@@ -38,9 +38,35 @@ specifically.
   toggle leaves the user no way back to it short of reloading the page. `aria-sort="none"` is
   stated on every sortable column and omitted on the rest, so the attribute is the affordance
   rather than a decoration on the one column already sorted.
+- **A row can open a detail panel holding anything**, including another `ZenTable`. The panel is a
+  sibling `<tr>` spanning every column, not content nested in a `<td>`: a `<tr>` cannot contain
+  another `<tr>`, and a panel constrained to one column's width is the one thing a panel meant to
+  hold a whole table must not be. It is rendered only while open, so a hundred-row table does not
+  build a hundred hidden panels and a detail that loads its own data does not load it a hundred
+  times on first paint. The disclosure is a plain `<button aria-expanded>`, which is valid markup
+  anywhere — so detail rows cost the table no role claim, and a flat table stays a flat table.
+  `aria-controls` is emitted only while the panel exists, because an idref pointing at nothing is
+  worse than no idref: a screen reader asked to follow it finds nothing at all. Details and
+  hierarchy coexist — the hierarchy chevron stays inline in the first data cell and the disclosure
+  gets a column of its own, because one expander doing both jobs could not express "children open,
+  detail closed".
 - **Paging counts top-level rows**, so a subtree travels with its parent. Paging after flattening
   would let one expanded row push its siblings onto the next page, and opening a row would look
   like it had deleted the ones below it.
+- **The pager offers numbered pages and a rows-per-page control.** Long ranges elide, but never to
+  hide a single page: an ellipsis standing in for one number is strictly worse than the number,
+  costing the same width while turning a one-click jump into a guess. The current page carries
+  `aria-current="page"`, and the ellipsis is `aria-hidden` because it is a gap rather than a
+  destination. Changing the page size **keeps the first visible row in view** rather than jumping
+  back to page one — someone who has paged to row 21 and then asks for more rows per page is
+  asking to see more of where they are, not to be sent back to the start. The footer appears
+  whenever paging is on at all, not only when there is more than one page, because the size control
+  is the only way to discover that ten rows fit where fifty did not; the page *buttons* still only
+  appear when there is somewhere to go.
+- **The size selector is a bare `<select>`, deliberately not a `ZenSelect`.** `ZenSelect` derives
+  from `ZenInputBase` and registers a field in any cascading `EditContext`, so a table dropped
+  inside an `EditForm` would have its page size join that form's validation and dirty tracking —
+  a bug nobody would think to look for. This control edits the table's view, not the user's data.
 - **Select-all governs the page, not the dataset.** The table only knows the items it was handed,
   and a box that silently selects rows the user has never seen is how a bulk action takes out more
   than it was meant to.
@@ -89,12 +115,31 @@ from the connecting line; an unordered list throws it away.
   the culture's formatting. Relative phrasing with no instant behind it renders as a plain span
   instead: a `<time>` without a valid `datetime` advertises a parseable value it does not have.
 
-**Core** — `ZenStyles.Fill` (an intent's solid fill with no text colour, for a shape that carries
-no text of its own), `ZenAlign`, and `ZenDefer`. `ZenDefer` is public only because the Razor
-compiler resolves markup elements to public component types; nothing in a page has a reason to
-write it.
+**`ZenEmptyState`** — "there is nothing here", said properly, and the default whenever a
+`ZenTable` has no rows.
 
-**Verification** — 500 tests, up from 466.
+An empty collection is the state a user is most likely to misread as a failure. A blank panel
+gives them no way to tell "nothing matched" from "this is still loading" from "something broke",
+so they wait, or reload, or file a bug. Saying so costs one line of markup and removes the whole
+ambiguity.
+
+- The illustration is an empty tray rather than a magnifier or a crossed-out circle: a magnifier
+  says "no results for your search" and a crossed circle says "forbidden", and an empty state
+  usually needs to say neither. It is marked decorative, because it carries nothing the text does
+  not and "image, inbox" ahead of the explanation is noise.
+- `EmptyDescription` is worth filling in whenever a table can be empty for more than one reason.
+  "No data" alone leaves someone who has just typed a filter unable to tell whether nothing
+  matched or nothing exists, and the two call for opposite actions.
+- Actions are a slot rather than an `OnClick` pair, because the useful offer is almost never one
+  button — an empty table wants "Add the first one" beside "Clear filters", and a component that
+  hardcodes a single callback forces the caller to abandon it for the template.
+
+**Core** — `ZenStyles.Fill` (an intent's solid fill with no text colour, for a shape that carries
+no text of its own), `ZenAlign`, `ZenIcons.Inbox`, and `ZenDefer`. `ZenDefer` is public only
+because the Razor compiler resolves markup elements to public component types; nothing in a page
+has a reason to write it.
+
+**Verification** — 514 tests, up from 466.
 
 ### Fixed during M4
 

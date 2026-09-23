@@ -64,6 +64,8 @@
 @source inline("zen-toast");
 @source inline("zen-toast-host");
 @source inline("zen-table-stack");
+@source inline("zen-table-detail");
+@source inline("zen-table-empty");
 @source inline("zen-timeline");
 @source inline("zen-timeline-line");
 @source inline("zen-timeline-body");

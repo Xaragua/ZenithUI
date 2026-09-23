@@ -1,0 +1,113 @@
+@namespace ZenithUI
+@inherits ZenComponentBase
+
+@*
+    "There is nothing here", said properly.
+
+    An empty collection is the state a user is most likely to misread as a failure. A blank panel
+    gives them no way to tell "nothing matched" from "this is still loading" from "something
+    broke", so they wait, or reload, or file a bug. Saying so explicitly costs one line of markup
+    and removes the whole ambiguity.
+
+    The illustration is decorative and marked so. It carries no information the text does not, and
+    a screen reader announcing "image, inbox" before the sentence that actually explains the state
+    is noise.
+
+    Actions are a slot rather than a parameter pair, because the useful thing to offer is almost
+    never one button: an empty table wants "Add the first one" next to "Clear filters", and a
+    component that hardcodes a single OnClick forces the caller to give up and use the template.
+*@
+
+<div class="@RootClass(ContainerClass)" style="@Style" @attributes="AttributesWithoutClass">
+    @if (Icon is not null)
+    {
+        <span class="@IconWrapperClass" aria-hidden="true">
+            <ZenIcon Path="@Icon" class="@IconClass" />
+        </span>
+    }
+
+    <p class="@TitleClass">@Title</p>
+
+    @if (Description is not null)
+    {
+        <p class="mt-1 max-w-sm text-sm text-content-subtle">@Description</p>
+    }
+
+    @if (Actions is not null)
+    {
+        <div class="mt-4 flex flex-wrap items-center justify-center gap-2">
+            @Actions
+        </div>
+    }
+
+    @ChildContent
+</div>
+
+@code {
+    /// <summary>The headline: what is empty, in the user's words.</summary>
+    [Parameter]
+    public string Title { get; set; } = "No data";
+
+    /// <summary>A sentence explaining why it is empty, or what to do about it.</summary>
+    [Parameter]
+    public string? Description { get; set; }
+
+    /// <summary>
+    /// An SVG path for the illustration. Defaults to an empty tray; pass <see langword="null"/>
+    /// for a text-only state.
+    /// </summary>
+    [Parameter]
+    public string? Icon { get; set; } = ZenIcons.Inbox;
+
+    /// <summary>Buttons offering the way out of the empty state.</summary>
+    [Parameter]
+    public RenderFragment? Actions { get; set; }
+
+    /// <summary>Anything else to render below the text.</summary>
+    [Parameter]
+    public RenderFragment? ChildContent { get; set; }
+
+    /// <summary>How much vertical room the state takes.</summary>
+    /// <remarks>
+    /// <see cref="ZenSize.Small"/> is for an empty state inside something already small - a
+    /// popover's list, a card. At the default size it would push the container taller than it is
+    /// when it has content, which makes the panel jump as data arrives.
+    /// </remarks>
+    [Parameter]
+    public ZenSize Size { get; set; } = ZenSize.Medium;
+
+    private string ContainerClass => CssBuilder
+        .Default("flex flex-col items-center justify-center px-4 text-center")
+        .AddClass(Size switch
+        {
+            ZenSize.Small => "py-6",
+            ZenSize.Large => "py-16",
+            _ => "py-12",
+        })
+        .Build()!;
+
+    // The tinted disc keeps the icon from reading as a stray glyph floating in the middle of an
+    // otherwise blank panel, and gives the state a shape at a glance.
+    private string IconWrapperClass => CssBuilder
+        .Default("mb-3 grid place-items-center rounded-full bg-surface-sunken text-content-subtle")
+        .AddClass(Size switch
+        {
+            ZenSize.Small => "size-10",
+            ZenSize.Large => "size-16",
+            _ => "size-14",
+        })
+        .Build()!;
+
+    private string IconClass => Size switch
+    {
+        ZenSize.Small => "size-5",
+        ZenSize.Large => "size-8",
+        _ => "size-7",
+    };
+
+    private string TitleClass => Size switch
+    {
+        ZenSize.Small => "text-sm font-medium text-content",
+        _ => "text-base font-medium text-content",
+    };
+}

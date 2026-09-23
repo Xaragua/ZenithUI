@@ -39,6 +39,14 @@ public static class ZenIcons
     /// <summary>Calendar. The date picker trigger.</summary>
     public const string Calendar = """<rect x="3" y="4.5" width="18" height="16" rx="2" /><path d="M3 9.5h18M8 3v3m8-3v3" />""";
 
+    /// <summary>An empty inbox tray. The default illustration for "there is nothing here".</summary>
+    /// <remarks>
+    /// A tray rather than a magnifier or a crossed-out circle. A magnifier says "no results for
+    /// your search", which is a different message from "this collection is empty", and a crossed
+    /// circle says "forbidden". An empty state usually needs to say neither.
+    /// </remarks>
+    public const string Inbox = """<path d="M3 13h4l2 3h6l2-3h4" /><path d="M5.4 4h13.2L21 13v5a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-5Z" />""";
+
     /// <summary>Magnifier. Search inputs.</summary>
     public const string Search = """<circle cx="11" cy="11" r="7" /><path d="m20 20-3.5-3.5" />""";
 

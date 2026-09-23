@@ -173,7 +173,7 @@ a palette fix is one edit rather than a guess-and-rerun loop:
 | **M1** ✅ | `ZenIcon`, `ZenButton`, `ZenBadge`, `ZenSpinner`, `ZenSkeleton`, `ZenCard`, `ZenStatCard`, `ZenField`, `ZenInputBase<T>` |
 | **M2** ✅ | Text, textarea, number, currency, date, search, checkbox, radio, select, `ZenToggle`, `ZenRangeSlider`, `ZenForm`, `ZenProgress`, `ZenIndicator`, `ZenDatePicker` |
 | **M3** ✅ | `ZenModal` + modal service, `ZenToast` + toast service, `ZenPopover`, `ZenCombobox`, `ZenList` |
-| **M4** ✅ | `ZenTable` + `ZenColumn` (sorting, paging, selection, hierarchy, responsive collapse), `ZenTree`, `ZenTimeline` |
+| **M4** ✅ | `ZenTable` + `ZenColumn` (sorting, paging, selection, hierarchy, detail rows, responsive collapse), `ZenEmptyState`, `ZenTree`, `ZenTimeline` |
 | **M5** | `ZenAppBar`, `ZenNavMenu`, `ZenSideNav`, `ZenFooter`, `ZenAppShell` |
 | **M6** | Docs, accessibility audit, NuGet publish, v1.0.0 |
 

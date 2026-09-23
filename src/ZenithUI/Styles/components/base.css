@@ -635,11 +635,23 @@
     }
 
     /*
-     * The empty-state and skeleton cells span the table, so they have no label and no partner to
-     * sit opposite. Centring them again keeps them looking deliberate rather than left over.
+     * Two kinds of cell span the whole table, and they want opposite treatment.
+     *
+     * The empty state has no label and no partner to sit opposite, so the flex row is dropped and
+     * it centres itself as it does at any width.
+     *
+     * A detail panel holds arbitrary content - a form, a chart, another table - and must not be
+     * laid out as a label/value pair at all. `display: block` hands it back to whatever its own
+     * markup does, which is the only correct answer for content this component did not write.
      */
-    .zen-table-stack td[colspan] {
-      justify-content: center;
+    .zen-table-stack td.zen-table-empty,
+    .zen-table-stack td.zen-table-detail {
+      display: block;
+      text-align: start;
+    }
+
+    .zen-table-stack td.zen-table-empty {
+      text-align: center;
     }
   }
 }
