@@ -254,6 +254,39 @@ public class ZenComboboxTests : BunitContext
     // ---- Selection ----------------------------------------------------------------------------
 
     [Fact]
+    public void Options_HighlightOnHover()
+    {
+        // Regression: the option rows had no hover treatment at all, so pointing at one gave no
+        // feedback that it was about to be clicked. ZenList had it; this did not.
+        var cut = RenderBox();
+
+        cut.Find("input").Focus();
+
+        cut.FindAll("[role='option']")[1].ClassList.ShouldContain("hover:bg-surface-hover");
+    }
+
+    [Fact]
+    public void Hovering_MovesTheKeyboardCursorToThatRow()
+    {
+        // Otherwise the cursor stays where the keyboard left it - usually the first option - while
+        // the pointer highlights another, so two rows look current and Enter commits the one the
+        // user is not pointing at.
+        string? selected = null;
+
+        var cut = RenderBox(p => p.Add(x => x.ValueChanged, v => selected = v));
+
+        cut.Find("input").Focus();
+        cut.FindAll("[role='option']")[2].MouseEnter();
+
+        cut.Find("input").GetAttribute("aria-activedescendant")
+            .ShouldBe(cut.FindAll("[role='option']")[2].Id);
+
+        cut.Find("input").KeyDown(new KeyboardEventArgs { Key = "Enter" });
+
+        selected.ShouldBe("Banana");
+    }
+
+    [Fact]
     public void ClickingAnOption_Selects()
     {
         string? selected = null;

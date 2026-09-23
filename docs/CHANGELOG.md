@@ -119,6 +119,16 @@ report a pointer going down outside a subtree. Every decision stays in C#.
 - **`ZenList` drew a keyboard cursor on a list nobody had touched.** The cursor starts on the first
   row, so an untouched list sat there with a focus ring on it, which reads as a rendering bug. It
   is now gated on the listbox actually holding focus.
+- **Combobox options had no hover treatment at all.** Pointing at a row gave no sign it was about
+  to be clicked — `ZenList` had a hover style and the combobox simply did not. Hovering now also
+  moves the keyboard cursor onto that row, so the pointer and the cursor cannot highlight two
+  different options while `Enter` commits a third.
+- **Row hover moved the wrong way in the dark palette.** It used `surface-sunken`, which is the
+  only neutral surface with usable delta — and at L 0.15 against an overlay panel at L 0.25 it made
+  a hovered row look *recessed* rather than live. There is no neutral surface lighter than the
+  overlay in dark, so this was a gap in the palette rather than a component bug: a new
+  `--zen-surface-hover` token now moves **away** from the page in each palette, darker in light and
+  lighter in dark. `ZenList` picks up the same fix.
 - **The combobox chevron did nothing when clicked.** It was a decorative icon with
   `pointer-events-none`, copied from `ZenSelect` — where that is right, because a native
   `<select>` fills the wrapper underneath and catches the click. In the combobox the chevron sits

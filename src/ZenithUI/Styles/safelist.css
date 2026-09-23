@@ -63,3 +63,4 @@
 @source inline("zen-modal");
 @source inline("zen-toast");
 @source inline("zen-toast-host");
+@source inline("{bg,hover:bg}-surface-hover");

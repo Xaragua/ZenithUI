@@ -24,6 +24,7 @@
     --zen-surface-raised: oklch(0.23 0.013 258);
     --zen-surface-sunken: oklch(0.15 0.012 258);
     --zen-surface-overlay: oklch(0.25 0.013 258);
+    --zen-surface-hover: oklch(0.31 0.014 258);
 
     --zen-content: oklch(0.96 0.004 258);
     --zen-content-muted: oklch(0.76 0.012 258);
@@ -88,6 +89,7 @@
   --zen-surface-raised: oklch(0.23 0.013 258);
   --zen-surface-sunken: oklch(0.15 0.012 258);
   --zen-surface-overlay: oklch(0.25 0.013 258);
+  --zen-surface-hover: oklch(0.31 0.014 258);
 
   --zen-content: oklch(0.96 0.004 258);
   --zen-content-muted: oklch(0.76 0.012 258);

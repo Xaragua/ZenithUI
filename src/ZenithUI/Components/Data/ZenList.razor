@@ -344,7 +344,7 @@ else
 
     private string OptionClass(bool selected, bool disabled, bool active) => CssBuilder
         .Default($"cursor-pointer transition-colors {RowPadding}")
-        .AddClass("text-content hover:bg-surface-sunken", !selected && !disabled)
+        .AddClass("text-content hover:bg-surface-hover", !selected && !disabled)
         // The selected row uses the soft tint with -strong text, never the solid fill: a list of
         // solid-filled rows reads as a column of buttons rather than a set of choices.
         .AddClass("bg-primary-soft font-medium text-primary-strong", selected)

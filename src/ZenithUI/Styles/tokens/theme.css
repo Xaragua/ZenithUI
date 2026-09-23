@@ -20,6 +20,7 @@
   --color-surface-raised: var(--zen-surface-raised);
   --color-surface-sunken: var(--zen-surface-sunken);
   --color-surface-overlay: var(--zen-surface-overlay);
+  --color-surface-hover: var(--zen-surface-hover);
 
   /* ---- Content ---- */
   --color-content: var(--zen-content);

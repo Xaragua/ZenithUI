@@ -133,10 +133,21 @@
                 {
                     @foreach (var (item, index) in _options.Select((x, i) => (x, i)))
                     {
+                        @*
+                            Hovering moves the keyboard cursor onto the row under the pointer.
+                            Without it the cursor sits where the keyboard left it - usually the
+                            first option - while the pointer highlights another, so two rows look
+                            current and Enter commits the one the user is not pointing at.
+
+                            The CSS `hover:` above is what makes this feel instant: the highlight
+                            paints immediately, and this event only has to arrive in time for
+                            aria-activedescendant and Enter to agree with it.
+                        *@
                         <div id="@OptionId(index)"
                              class="@OptionClass(IsSelected(item), index == _activeIndex)"
                              role="option"
                              aria-selected="@(IsSelected(item) ? "true" : "false")"
+                             @onmouseenter="@(() => _activeIndex = index)"
                              @onclick="@(() => ToggleAsync(item))">
                             @if (ItemTemplate is not null)
                             {
@@ -618,6 +629,12 @@
         .AddClass("bg-primary-soft font-medium text-primary-strong", selected)
         // The keyboard cursor is a background change rather than the focus ring: DOM focus is in
         // the input, so a ring drawn here would mean two focus indicators on screen at once.
-        .AddClass("bg-surface-sunken", active && !selected)
+        //
+        // The hover treatment is the same background on purpose. Pointer and keyboard are picking
+        // the same thing - "the option you are about to commit" - and the pointer moves the cursor
+        // to match, so only ever one row carries it. Two different highlights would only raise the
+        // question of which one Enter acts on.
+        .AddClass("bg-surface-hover", active && !selected)
+        .AddClass("hover:bg-surface-hover", !selected)
         .Build()!;
 }

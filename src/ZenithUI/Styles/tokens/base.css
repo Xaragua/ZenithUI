@@ -54,6 +54,14 @@
   --zen-surface-sunken: oklch(0.955 0.004 258);
   --zen-surface-overlay: oklch(1 0 0);
 
+  /*
+   * The row-hover surface. Not one of the elevation surfaces: hover has to read as "picked out"
+   * on every one of them, so it moves AWAY from the page rather than to a fixed depth - darker
+   * here, lighter in dark, where every elevation surface is darker than the overlay a menu sits on
+   * and `surface-sunken` would make a hovered row look recessed instead of live.
+   */
+  --zen-surface-hover: oklch(0.955 0.004 258);
+
   /* ---- Content --------------------------------------------------------- */
   --zen-content: oklch(0.21 0.015 258);
   --zen-content-muted: oklch(0.44 0.015 258);
