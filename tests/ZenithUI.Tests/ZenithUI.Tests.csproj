@@ -46,6 +46,14 @@
     <Content Include="..\..\src\ZenithUI\tailwind\zenith.theme.css"
              Link="Tailwind\%(Filename)%(Extension)"
              CopyToOutputDirectory="PreserveNewest" />
+
+    <!-- The two copies of the anti-flash initialiser - see ThemeInitScriptTests. -->
+    <Content Include="..\..\src\ZenithUI\Components\Theming\ZenThemeScript.razor"
+             Link="Theming\%(Filename)%(Extension)"
+             CopyToOutputDirectory="PreserveNewest" />
+    <Content Include="..\..\src\ZenithUI\wwwroot\js\zen-theme-init.js"
+             Link="Theming\%(Filename)%(Extension)"
+             CopyToOutputDirectory="PreserveNewest" />
   </ItemGroup>
 
   <ItemGroup>
