@@ -224,3 +224,12 @@ length of `0` as proof. Delete the `obj/**/compressed` directories and rebuild.
 
 **A colour is right in light and wrong in dark.** You overrode `:root` only. The dark palette is a
 separate declaration; see [Rebranding](#rebranding).
+
+**The theme resets when I navigate — the switcher seems to theme only the current page.** Enhanced
+navigation merges the server's document into the live DOM, `<html>` attributes included, and the
+server cannot know your stored preference — so its response has no `data-zen-theme` and the merge
+removes the one the theme service set. ZenithUI corrects this from a Blazor JS initializer,
+`_content/ZenithUI/ZenithUI.lib.module.js`, which re-applies the stored preference on every
+`enhancedload`. It is discovered and loaded by Blazor automatically; nothing to wire up. If you do
+see the reset, confirm that file is being served — a missing or blocked static asset is the only
+way this comes back.

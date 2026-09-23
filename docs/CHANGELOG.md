@@ -10,6 +10,33 @@ Everything in the plan ships. The package is installed from a feed and verified 
 Web App and a standalone WebAssembly app; the API is frozen pending whatever a release candidate
 turns up.
 
+### Fixed — the theme survives a navigation
+
+**`ZenithUI.lib.module.js`**, a Blazor JS initializer, re-applies the stored palette on every
+`enhancedload`. Blazor discovers it by name, so consuming applications wire up nothing.
+
+The bug read as a component fault and was not one. Enhanced navigation does not reload the page: it
+fetches the next document and merges it into the live DOM, `<html>` attributes included. The server
+cannot know the viewer's stored theme — `localStorage` is not sent with a request — so every
+response carries an `<html>` with no `data-zen-theme`, and the merge faithfully removed the one the
+theme service had set. The preference stayed in storage, the palette was applied correctly, and
+then the first navigation quietly reverted the document to the OS default. Hence the report: *the
+switcher only themes the current page.*
+
+`enhancedload` fires after each of those merges — navigations, enhanced form posts and
+streaming-rendering updates alike — which makes it the one place to put it right.
+
+Two details that matter more than they look:
+
+- **Re-applying means re-applying the *mode*, not the resolved palette.** In `System` mode the
+  attribute is removed, not set to `light` or `dark`; writing the resolved value would have frozen
+  the page against the OS from the first navigation onwards. Verified by navigating in `System`
+  mode and asserting the attribute stays absent.
+- **It imports `zen-theme.js` rather than repeating the rule.** Two copies of the "system means no
+  attribute" logic already exist, each for a reason, kept in lockstep by a test. A third — in a
+  file that runs after startup, where importing the real module costs nothing — would have been the
+  one that drifted. A test asserts this file contains no storage or attribute code of its own.
+
 ### Fixed — the date picker's panel
 
 **`ZenDatePicker` now opens its calendar in the top layer**, as a `ZenPopover`, instead of as an

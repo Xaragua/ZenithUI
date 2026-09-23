@@ -68,7 +68,12 @@ jobs:
           # The consumer @theme and the targets file that delivers it. Without either, an app
           # running its own Tailwind restores a package that builds fine and compiles none of
           # ZenithUI's semantic utilities for its own markup - see docs/theming.md.
-          for required in 'tailwind/zenith.theme.css' 'build/ZenithUI.targets' 'buildTransitive/ZenithUI.targets'; do
+          # ZenithUI.lib.module.js is the Blazor JS initializer. Without it the theme silently
+          # reverts on every enhanced navigation, which reads as "the switcher only themes one
+          # page" and is not a component bug.
+          # 'lib.module.js' without the ZenithUI prefix on purpose: static web assets are
+          # content-hashed in the package, so the entry is ZenithUI.<hash>.lib.module.js.
+          for required in 'tailwind/zenith.theme.css' 'build/ZenithUI.targets' 'buildTransitive/ZenithUI.targets' 'lib.module.js'; do
             if ! unzip -l "$package" | grep -q "$required"; then
               echo "::error::$required is missing from $package."
               unzip -l "$package"

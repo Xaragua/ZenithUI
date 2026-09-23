@@ -108,6 +108,21 @@ function applyMode(mode) {
 }
 
 /**
+ * Re-applies the stored preference to the document.
+ *
+ * For callers that did not change anything and only need the DOM to agree with storage again -
+ * specifically ZenithUI.lib.module.js after an enhanced navigation, which replaces the document's
+ * attributes with the server's. The server cannot know the viewer's preference, so its <html> has
+ * no `data-zen-theme` and the merge removes ours.
+ *
+ * Deliberately not animated: nothing changed from the viewer's point of view, and cross-fading a
+ * palette they are already looking at would turn every page navigation into a flicker.
+ */
+export function applyStoredMode() {
+    applyMode(readStoredMode());
+}
+
+/**
  * Applies a mode with a brief cross-fade instead of a hard snap.
  *
  * The transition class is added for the duration of the change only. Leaving it on permanently

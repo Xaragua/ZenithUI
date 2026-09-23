@@ -54,6 +54,11 @@
     <Content Include="..\..\src\ZenithUI\wwwroot\js\zen-theme-init.js"
              Link="Theming\%(Filename)%(Extension)"
              CopyToOutputDirectory="PreserveNewest" />
+
+    <!-- The JS initializer - see JsInitializerTests. -->
+    <Content Include="..\..\src\ZenithUI\wwwroot\ZenithUI.lib.module.js"
+             Link="Theming\%(Filename)%(Extension)"
+             CopyToOutputDirectory="PreserveNewest" />
   </ItemGroup>
 
   <ItemGroup>
