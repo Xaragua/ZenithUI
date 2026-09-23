@@ -1,4 +1,4 @@
-namespace ZenithUI.Core;
+namespace ZenithUI;
 
 /// <summary>
 /// Base class for every ZenithUI component. Provides class and attribute pass-through plus a

@@ -1,4 +1,4 @@
-namespace ZenithUI.Core;
+namespace ZenithUI;
 
 /// <summary>
 /// The inline SVG paths ZenithUI needs for its own components.

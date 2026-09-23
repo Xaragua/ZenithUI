@@ -1,6 +1,6 @@
 using Microsoft.AspNetCore.Components.Rendering;
 
-namespace ZenithUI.Core;
+namespace ZenithUI;
 
 /// <summary>
 /// Renders its content one step later in the render queue than the component that declares it.

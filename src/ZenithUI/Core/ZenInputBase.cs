@@ -3,7 +3,7 @@ using System.Globalization;
 using System.Linq.Expressions;
 using Microsoft.AspNetCore.Components.Forms;
 
-namespace ZenithUI.Core;
+namespace ZenithUI;
 
 /// <summary>
 /// Base class for ZenithUI form controls. Provides two-way binding, optional

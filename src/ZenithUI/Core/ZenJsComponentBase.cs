@@ -1,4 +1,4 @@
-namespace ZenithUI.Core;
+namespace ZenithUI;
 
 /// <summary>
 /// Base class for ZenithUI components backed by a JavaScript module. Encodes the rules that keep

@@ -1,6 +1,4 @@
-using ZenithUI.Core;
-
-namespace ZenithUI.Services;
+namespace ZenithUI;
 
 /// <summary>
 /// Reads and writes the active theme, persists the user's choice, and notifies subscribers when

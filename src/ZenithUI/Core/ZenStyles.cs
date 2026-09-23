@@ -1,4 +1,4 @@
-namespace ZenithUI.Core;
+namespace ZenithUI;
 
 /// <summary>
 /// Maps the <see cref="ZenIntent"/> x <see cref="ZenVariant"/> x <see cref="ZenSize"/> matrix onto

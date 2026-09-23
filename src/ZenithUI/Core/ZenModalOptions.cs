@@ -1,4 +1,4 @@
-namespace ZenithUI.Core;
+namespace ZenithUI;
 
 /// <summary>
 /// How a service-raised dialog looks and what dismisses it.

@@ -35,6 +35,9 @@ with WebAssembly interactivity has two service containers, so both `Program.cs` 
 builder.Services.AddZenithUI();
 ```
 
+Everything public is in one namespace, so `_Imports.razor` needs one line — `@using ZenithUI` —
+covering the components, the parameter enums and the service interfaces alike.
+
 **2. Reference the stylesheet and the anti-flash script** in `App.razor`:
 
 ```razor
@@ -198,8 +201,9 @@ repository root, because it is the GitHub landing page.
 
 | Document | Contents |
 | --- | --- |
-| [`docs/plan.md`](docs/plan.md) | The implementation plan of record — architecture, component inventory, milestones, and the design decisions behind them |
+| [`docs/getting-started.md`](docs/getting-started.md) | Install and wire-up for each hosting model, what works with no render mode, and the template defaults that fight the library |
 | [`docs/theming.md`](docs/theming.md) | The token surface, the three-state light/dark model, rebranding, and what an app running its own Tailwind has to do |
+| [`docs/plan.md`](docs/plan.md) | The implementation plan of record — architecture, component inventory, milestones, and the design decisions behind them |
 | [`docs/CHANGELOG.md`](docs/CHANGELOG.md) | What shipped, and what was fixed along the way |
 
 ## License

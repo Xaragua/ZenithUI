@@ -1,6 +1,4 @@
-using ZenithUI.Core;
-
-namespace ZenithUI.Services;
+namespace ZenithUI;
 
 /// <summary>Default <see cref="IZenModalService"/>. Registered scoped, so one stack per document.</summary>
 public sealed class ZenModalService : IZenModalService

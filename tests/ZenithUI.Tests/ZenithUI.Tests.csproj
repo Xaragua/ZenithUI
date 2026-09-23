@@ -64,8 +64,7 @@
     <Using Include="System.Linq.Expressions" />
     <Using Include="Microsoft.AspNetCore.Components" />
     <Using Include="Microsoft.AspNetCore.Components.Web" />
-    <Using Include="ZenithUI.Core" />
-    <Using Include="ZenithUI.Services" />
+    <Using Include="ZenithUI" />
   </ItemGroup>
 
 </Project>

@@ -1,6 +1,4 @@
-using ZenithUI.Core;
-
-namespace ZenithUI.Services;
+namespace ZenithUI;
 
 /// <summary>
 /// Default <see cref="IZenThemeService"/>. Delegates all DOM and storage work to the

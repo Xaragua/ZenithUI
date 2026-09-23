@@ -1,4 +1,4 @@
-namespace ZenithUI.Core;
+namespace ZenithUI;
 
 /// <summary>
 /// The ids and ARIA state a control needs in order to be correctly associated with the label,

@@ -1,6 +1,4 @@
-using ZenithUI.Core;
-
-namespace ZenithUI.Services;
+namespace ZenithUI;
 
 /// <summary>
 /// One open dialog: what to render, how, and the promise the opener is awaiting.

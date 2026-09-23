@@ -6,6 +6,16 @@ All notable changes to ZenithUI are documented here. The format follows
 
 ## [Unreleased]
 
+### Changed — M6, one namespace
+
+**Every public type is now in `ZenithUI`.** The enums lived in `ZenithUI.Core` and the service
+interfaces in `ZenithUI.Services`, which mirrored the folder layout and meant a consumer writing
+`Intent="ZenIntent.Primary"` got a build error until they had found and added a second `@using`.
+Installing the package into a scratch app is what surfaced it — three usings for one library, with
+nothing but the source tree to explain why. Components already declared `@namespace ZenithUI` for
+exactly this reason; the rest of the public surface now follows. Folder names are unchanged, and
+the time to do this was before 1.0, not after.
+
 ### Added — M6, the consumer `@theme`
 
 **`zenith.theme.css`** — the file an application running its own Tailwind imports, and the close of
@@ -48,6 +58,12 @@ the import has a spelling worth checking in:
 **[`docs/theming.md`](theming.md)** — the token surface, the three-state light/dark model,
 rebranding in both palettes, the consumer Tailwind setup, and a troubleshooting section for the
 failures that read as component bugs and are not.
+
+**[`docs/getting-started.md`](getting-started.md)** — wire-up per hosting model, written from a
+scratch app rather than from memory, which is why it can say what actually works with no render
+mode and which template defaults fight the library. The sharpest: both project templates link
+Bootstrap, whose rules are **unlayered** and therefore beat ZenithUI's layered utilities whatever
+the order — a `ZenButton` comes out Bootstrap blue until the template's link is removed.
 
 ### Added — M5, chrome and layout
 

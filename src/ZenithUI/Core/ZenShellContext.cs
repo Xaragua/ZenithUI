@@ -1,4 +1,4 @@
-namespace ZenithUI.Core;
+namespace ZenithUI;
 
 /// <summary>
 /// The element ids <c>ZenAppShell</c> hands to the chrome rendered inside it, so that a menu

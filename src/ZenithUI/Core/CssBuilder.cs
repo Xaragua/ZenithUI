@@ -1,4 +1,4 @@
-namespace ZenithUI.Core;
+namespace ZenithUI;
 
 /// <summary>
 /// Composes a CSS class string from conditional fragments, so components never concatenate

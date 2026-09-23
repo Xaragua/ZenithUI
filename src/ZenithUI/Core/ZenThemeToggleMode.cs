@@ -1,4 +1,4 @@
-namespace ZenithUI.Core;
+namespace ZenithUI;
 
 /// <summary>Shape rendered by the theme switcher.</summary>
 public enum ZenThemeToggleMode

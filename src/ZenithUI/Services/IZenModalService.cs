@@ -1,6 +1,4 @@
-using ZenithUI.Core;
-
-namespace ZenithUI.Services;
+namespace ZenithUI;
 
 /// <summary>
 /// Raises dialogs from anywhere, without the calling code owning any markup or state.

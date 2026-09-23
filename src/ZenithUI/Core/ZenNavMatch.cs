@@ -1,6 +1,6 @@
 using Microsoft.AspNetCore.Components.Routing;
 
-namespace ZenithUI.Core;
+namespace ZenithUI;
 
 /// <summary>
 /// Decides whether a navigation target covers the current location.

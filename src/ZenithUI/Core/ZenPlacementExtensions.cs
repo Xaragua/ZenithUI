@@ -1,6 +1,6 @@
 using System.Text.Json.Serialization;
 
-namespace ZenithUI.Core;
+namespace ZenithUI;
 
 /// <summary>
 /// The placement options handed to <c>zen-popover.js</c>.

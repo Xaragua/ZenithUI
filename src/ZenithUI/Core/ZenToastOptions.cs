@@ -1,4 +1,4 @@
-namespace ZenithUI.Core;
+namespace ZenithUI;
 
 /// <summary>How one toast behaves and what it offers.</summary>
 public sealed class ZenToastOptions

@@ -1,4 +1,4 @@
-namespace ZenithUI.Core;
+namespace ZenithUI;
 
 /// <summary>Control size scale shared by every ZenithUI component that has one.</summary>
 public enum ZenSize
