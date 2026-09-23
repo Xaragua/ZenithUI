@@ -1,0 +1,643 @@
+@namespace ZenithUI
+@typeparam TItem where TItem : notnull
+@inherits ZenJsComponentBase
+
+@*
+    A hierarchy the user can walk with the keyboard: the WAI-ARIA tree pattern, with real nesting.
+
+    Structure over attributes. The <li role="treeitem"> holds its children in a nested
+    <ul role="group">, which is what supplies depth, set size and position in set - so none of
+    aria-level, aria-setsize or aria-posinset is written by hand. Stating them as well would be a
+    second source of truth that drifts silently the moment the markup changes, and no test can
+    catch a level attribute that merely disagrees with the DOM. ZenTable has no such structure to
+    lean on and therefore does have to state them; that is a difference between the two components
+    rather than an inconsistency.
+
+    Roving tabindex, not aria-activedescendant - the opposite of ZenList, deliberately. A listbox
+    keeps focus on its container because the thing typing into it may be a combobox's text field.
+    A tree has no such partner: its items are what the user is navigating, screen-reader support
+    for tree mode is built around the focused item being a genuinely focused element, and the tree
+    stays one tab stop either way.
+
+    The flat navigation order is produced by the same pass that renders, so the keyboard can never
+    move to a node that is not on screen - the failure of a cached flat list that every expand and
+    collapse has to remember to invalidate.
+
+    TItem is constrained to `notnull` because expansion, lazy-load caching and selection are all
+    keyed by the item itself. A null node has no children, no label and no identity, so there is
+    nothing the tree could do with one except drop it silently.
+*@
+
+@{
+    // Rebuilt every render rather than cached and invalidated. It is O(visible nodes) of pure
+    // computation, and it is what guarantees the keyboard and the screen agree.
+    var roots = BuildVisibleTree();
+}
+
+<ul id="@Id"
+    class="@RootClass(TreeClass)"
+    style="@Style"
+    role="tree"
+    aria-label="@Label"
+    aria-labelledby="@LabelledBy"
+    @onfocusin="@(() => _hasFocus = true)"
+    @onfocusout="@(() => _hasFocus = false)"
+    @onkeydown="HandleKeyDownAsync"
+    @attributes="AttributesWithoutClass">
+    @foreach (var node in roots)
+    {
+        @RenderNode(node)
+    }
+</ul>
+
+@code {
+    /// <summary>
+    /// One node as the tree currently sees it: the item, where it sits, and what is known about
+    /// its children.
+    /// </summary>
+    /// <remarks>
+    /// <see cref="ElementId"/> comes from the node's index path rather than its position in the
+    /// flattened list, so expanding a node early in the tree does not renumber everything after
+    /// it - which would move DOM focus onto an unrelated row on the next render.
+    /// </remarks>
+    private sealed record Node(
+        TItem Item,
+        int Depth,
+        string ElementId,
+        Node? Parent,
+        bool HasChildren,
+        bool IsExpanded,
+        bool IsLoading)
+    {
+        public List<Node> Children { get; } = [];
+    }
+
+    private readonly HashSet<TItem> _expanded = [];
+    private readonly HashSet<TItem> _loading = [];
+    private readonly Dictionary<TItem, IReadOnlyList<TItem>> _loaded = [];
+    private readonly List<Node> _visible = [];
+
+    private TItem? _active;
+    private bool _hasFocus;
+    private bool _seeded;
+    private string? _focusedId;
+
+    private string _typeAhead = string.Empty;
+    private DateTimeOffset _typeAheadAt = DateTimeOffset.MinValue;
+
+    /// <inheritdoc />
+    /// <remarks>
+    /// Only <c>focusElement</c> is needed. <c>focus()</c> scrolls the element into view by itself,
+    /// so unlike ZenList this component wants nothing from zen-focus.js.
+    /// </remarks>
+    protected override string? ModulePath => "./_content/ZenithUI/js/zen-dom.js";
+
+    /// <summary>The root items.</summary>
+    [Parameter]
+    public IEnumerable<TItem>? Items { get; set; }
+
+    /// <summary>An item's children, for a hierarchy already in memory.</summary>
+    [Parameter]
+    public Func<TItem, IEnumerable<TItem>?>? ChildrenProvider { get; set; }
+
+    /// <summary>
+    /// An item's children, fetched the first time it is expanded. Results are cached for the
+    /// lifetime of the component.
+    /// </summary>
+    [Parameter]
+    public Func<TItem, Task<IEnumerable<TItem>>>? ChildrenLoader { get; set; }
+
+    /// <summary>
+    /// Whether an item can be expanded, when that is knowable without loading its children.
+    /// </summary>
+    /// <remarks>
+    /// Worth supplying whenever a <see cref="ChildrenLoader"/> is in play. Without it every node
+    /// has to be drawn as expandable until proven otherwise, because the alternative - drawing no
+    /// chevron - hides a subtree with no way for the user to discover it exists. The guess
+    /// corrects itself: a node whose loader returns nothing becomes a leaf.
+    /// </remarks>
+    [Parameter]
+    public Func<TItem, bool>? HasChildren { get; set; }
+
+    /// <summary>Text for a node, used for its label and for type-ahead.</summary>
+    [Parameter]
+    public Func<TItem, string>? ItemText { get; set; }
+
+    /// <summary>Custom markup for a node's label.</summary>
+    [Parameter]
+    public RenderFragment<TItem>? ItemTemplate { get; set; }
+
+    /// <summary>An SVG path drawn before a node's label.</summary>
+    [Parameter]
+    public Func<TItem, string?>? ItemIcon { get; set; }
+
+    /// <summary>The selected node.</summary>
+    [Parameter]
+    public TItem? Value { get; set; }
+
+    /// <summary>Raised when the selection changes.</summary>
+    [Parameter]
+    public EventCallback<TItem?> ValueChanged { get; set; }
+
+    /// <summary>Raised when a node is expanded or collapsed.</summary>
+    [Parameter]
+    public EventCallback<TItem> ExpandedChanged { get; set; }
+
+    /// <summary>Nodes to open on first render, for example to reveal the selected item.</summary>
+    [Parameter]
+    public Func<TItem, bool>? IsInitiallyExpanded { get; set; }
+
+    /// <summary>Accessible name for the tree.</summary>
+    [Parameter]
+    public string? Label { get; set; }
+
+    /// <summary>Id of the element naming the tree.</summary>
+    [Parameter]
+    public string? LabelledBy { get; set; }
+
+    /// <summary>Surround the tree with a border and a raised surface.</summary>
+    [Parameter]
+    public bool Bordered { get; set; }
+
+    /// <summary>Row density.</summary>
+    [Parameter]
+    public ZenSize Size { get; set; } = ZenSize.Medium;
+
+    // ---- Rendering ---------------------------------------------------------------------------
+
+    /// <summary>
+    /// One node and, when open, its group of children.
+    /// </summary>
+    /// <remarks>
+    /// A templated Razor delegate, so the recursion is one method rather than a second component.
+    /// The nesting is the accessible structure and therefore cannot be flattened for rendering,
+    /// even though navigation uses a flat list.
+    /// <para>
+    /// The row inside the <c>&lt;li&gt;</c> carries the padding, the hover tint and the focus
+    /// ring. Any of that on the <c>&lt;li&gt;</c> itself would wrap the node's entire subtree,
+    /// because the group of children lives inside it.
+    /// </para>
+    /// </remarks>
+    private RenderFragment RenderNode(Node node) =>
+        @<li id="@node.ElementId"
+             class="outline-none"
+             role="treeitem"
+             aria-expanded="@(node.HasChildren ? (node.IsExpanded ? "true" : "false") : null)"
+             aria-selected="@(IsSelected(node.Item) ? "true" : null)"
+             aria-busy="@(node.IsLoading ? "true" : null)"
+             tabindex="@(IsActive(node.Item) ? 0 : -1)">
+            <div class="@RowClass(node)" style="--zen-depth: @node.Depth" @onclick="@(() => SelectAsync(node))">
+                @if (node.HasChildren)
+                {
+                    @* tabindex="-1" keeps the toggle out of the tab order. The tree is one tab
+                       stop by contract, and a chevron per node would turn a hundred-node tree into
+                       a hundred stops. Keyboard users expand with ArrowRight instead. *@
+                    <button type="button"
+                            class="@ChevronClass"
+                            tabindex="-1"
+                            aria-hidden="true"
+                            @onclick="@(() => ToggleAsync(node))"
+                            @onclick:stopPropagation="true">
+                        @if (node.IsLoading)
+                        {
+                            @* Label="" suppresses the spinner's own status announcement: the
+                               treeitem already carries aria-busy, and two elements announcing the
+                               same load makes a screen reader say it twice. *@
+                            <ZenSpinner Size="ZenSize.Small" Label="" class="@IconClass" />
+                        }
+                        else
+                        {
+                            <ZenIcon Path="@ZenIcons.ChevronRight" class="@ChevronIconClass(node)" />
+                        }
+                    </button>
+                }
+                else
+                {
+                    @* A spacer exactly the chevron's width. Without it every leaf sits one chevron
+                       closer to the start than its expandable siblings, and the indent stops
+                       lining up. *@
+                    <span class="@ChevronClass" aria-hidden="true"></span>
+                }
+
+                @if (ItemIcon?.Invoke(node.Item) is { } icon)
+                {
+                    <ZenIcon Path="@icon" class="@($"{IconClass} shrink-0 text-content-muted")" />
+                }
+
+                <span class="truncate">
+                    @if (ItemTemplate is not null)
+                    {
+                        @ItemTemplate(node.Item)
+                    }
+                    else
+                    {
+                        @TextOf(node.Item)
+                    }
+                </span>
+            </div>
+
+            @if (node.IsExpanded && node.Children.Count > 0)
+            {
+                <ul class="m-0 list-none p-0" role="group">
+                    @foreach (var child in node.Children)
+                    {
+                        @RenderNode(child)
+                    }
+                </ul>
+            }
+        </li>;
+
+    // ---- Building the visible tree -----------------------------------------------------------
+
+    /// <summary>
+    /// Walks the data into the nodes currently on screen, filling <c>_visible</c> with the same
+    /// nodes in keyboard order.
+    /// </summary>
+    private List<Node> BuildVisibleTree()
+    {
+        SeedInitialExpansion();
+
+        _visible.Clear();
+
+        var roots = new List<Node>();
+        Walk(Items, depth: 0, parent: null, prefix: $"{Id}-n", into: roots);
+
+        return roots;
+    }
+
+    private void Walk(IEnumerable<TItem>? items, int depth, Node? parent, string prefix, List<Node> into)
+    {
+        if (items is null)
+        {
+            return;
+        }
+
+        var index = 0;
+
+        foreach (var item in items)
+        {
+            var children = ChildrenOf(item);
+            var loading = _loading.Contains(item);
+
+            var node = new Node(
+                item,
+                depth,
+                $"{prefix}-{index}",
+                parent,
+                HasChildrenOf(item, children, loading),
+                _expanded.Contains(item),
+                loading);
+
+            into.Add(node);
+            _visible.Add(node);
+
+            if (node.IsExpanded)
+            {
+                Walk(children, depth + 1, node, node.ElementId, node.Children);
+            }
+
+            index++;
+        }
+    }
+
+    /// <summary>
+    /// Children already known: cached from a <see cref="ChildrenLoader"/>, or produced by a
+    /// <see cref="ChildrenProvider"/>.
+    /// </summary>
+    private IEnumerable<TItem>? ChildrenOf(TItem item) =>
+        _loaded.TryGetValue(item, out var loaded) ? loaded : ChildrenProvider?.Invoke(item);
+
+    /// <summary>
+    /// Whether a node should be drawn with a chevron.
+    /// </summary>
+    /// <remarks>
+    /// An explicit <see cref="HasChildren"/> always wins. Otherwise a node is expandable when it
+    /// actually has children, or when a loader might still produce some - the optimistic guess
+    /// that keeps a lazily loaded subtree discoverable. Once the loader has answered, the cached
+    /// result decides, and an empty answer turns the node into a leaf.
+    /// </remarks>
+    private bool HasChildrenOf(TItem item, IEnumerable<TItem>? children, bool loading)
+    {
+        if (HasChildren is not null)
+        {
+            return HasChildren(item);
+        }
+
+        if (children is not null)
+        {
+            return children.Any();
+        }
+
+        return loading || (ChildrenLoader is not null && !_loaded.ContainsKey(item));
+    }
+
+    /// <summary>
+    /// Applies <see cref="IsInitiallyExpanded"/> once, on the first build.
+    /// </summary>
+    /// <remarks>
+    /// Once, not on every render. Re-applying it would reopen a node the user has just closed, and
+    /// the collapse would look as though it had been ignored.
+    /// </remarks>
+    private void SeedInitialExpansion()
+    {
+        if (_seeded || IsInitiallyExpanded is null || Items is null)
+        {
+            return;
+        }
+
+        _seeded = true;
+        Seed(Items);
+
+        void Seed(IEnumerable<TItem> items)
+        {
+            foreach (var item in items)
+            {
+                if (!IsInitiallyExpanded(item))
+                {
+                    continue;
+                }
+
+                _expanded.Add(item);
+
+                if (ChildrenProvider?.Invoke(item) is { } children)
+                {
+                    Seed(children);
+                }
+            }
+        }
+    }
+
+    // ---- Interaction -------------------------------------------------------------------------
+
+    private bool IsSelected(TItem item) => EqualityComparer<TItem>.Default.Equals(Value, item);
+
+    /// <summary>
+    /// Whether a node holds the tree's single tab stop.
+    /// </summary>
+    /// <remarks>
+    /// Before anything has been touched the stop sits on the first visible node, so that Tab
+    /// reaches the tree at all. A roving tabindex with nothing at 0 makes the whole widget
+    /// unreachable from the keyboard.
+    /// </remarks>
+    private bool IsActive(TItem item) =>
+        _active is not null
+            ? EqualityComparer<TItem>.Default.Equals(_active, item)
+            : _visible.Count > 0 && EqualityComparer<TItem>.Default.Equals(_visible[0].Item, item);
+
+    private string TextOf(TItem item) => ItemText?.Invoke(item) ?? item?.ToString() ?? string.Empty;
+
+    private async Task SelectAsync(Node node)
+    {
+        _active = node.Item;
+
+        if (!IsSelected(node.Item))
+        {
+            await ValueChanged.InvokeAsync(node.Item);
+        }
+    }
+
+    /// <summary>Opens or closes a node, loading its children the first time it opens.</summary>
+    private async Task ToggleAsync(Node node)
+    {
+        _active = node.Item;
+
+        if (_expanded.Remove(node.Item))
+        {
+            await ExpandedChanged.InvokeAsync(node.Item);
+            return;
+        }
+
+        _expanded.Add(node.Item);
+        await ExpandedChanged.InvokeAsync(node.Item);
+
+        if (ChildrenLoader is null || _loaded.ContainsKey(node.Item) || _loading.Contains(node.Item))
+        {
+            return;
+        }
+
+        // The node is open and marked busy before the await, so the chevron becomes a spinner
+        // immediately rather than when the fetch returns. A tree that sits inert for the length of
+        // a network call reads as a click that did not register, and the user clicks again.
+        _loading.Add(node.Item);
+        StateHasChanged();
+
+        try
+        {
+            var children = await ChildrenLoader(node.Item);
+            _loaded[node.Item] = children as IReadOnlyList<TItem> ?? children.ToList();
+        }
+        finally
+        {
+            _loading.Remove(node.Item);
+        }
+    }
+
+    /// <summary>
+    /// The tree's keyboard contract, per the WAI-ARIA tree pattern.
+    /// </summary>
+    /// <remarks>
+    /// ArrowRight and ArrowLeft each do two things depending on the node's state, which is what
+    /// lets one pair of keys both open a subtree and travel through it: Right opens a closed node
+    /// and otherwise descends, Left closes an open one and otherwise climbs. Anything simpler
+    /// leaves the user with no way back to a parent without reaching for the mouse.
+    /// </remarks>
+    private async Task HandleKeyDownAsync(KeyboardEventArgs args)
+    {
+        if (_visible.Count == 0)
+        {
+            return;
+        }
+
+        var index = ActiveIndex();
+        var current = _visible[index];
+
+        switch (args.Key)
+        {
+            case "ArrowDown":
+                MoveTo(Math.Min(index + 1, _visible.Count - 1));
+                break;
+
+            case "ArrowUp":
+                MoveTo(Math.Max(index - 1, 0));
+                break;
+
+            case "ArrowRight":
+                if (current.HasChildren && !current.IsExpanded)
+                {
+                    await ToggleAsync(current);
+                }
+                else if (current.IsExpanded && index + 1 < _visible.Count)
+                {
+                    MoveTo(index + 1);
+                }
+
+                break;
+
+            case "ArrowLeft":
+                if (current.IsExpanded)
+                {
+                    await ToggleAsync(current);
+                }
+                else if (current.Parent is not null)
+                {
+                    MoveTo(current.Parent.Item);
+                }
+
+                break;
+
+            case "Home":
+                MoveTo(0);
+                break;
+
+            case "End":
+                MoveTo(_visible.Count - 1);
+                break;
+
+            case "Enter":
+            case " ":
+                await SelectAsync(current);
+                break;
+
+            case "*":
+                // Opens every sibling at the current level. It is in the pattern because a tree
+                // deep enough to want it is one where opening each branch by hand is the slow part.
+                await ExpandSiblingsAsync(current);
+                break;
+
+            default:
+                if (args.Key.Length == 1 && !char.IsControl(args.Key[0]))
+                {
+                    TypeAhead(args.Key, index);
+                }
+
+                return;
+        }
+    }
+
+    private int ActiveIndex()
+    {
+        if (_active is null)
+        {
+            return 0;
+        }
+
+        var index = _visible.FindIndex(n => EqualityComparer<TItem>.Default.Equals(n.Item, _active));
+
+        // The active node can vanish: its parent was collapsed, or the data changed under it.
+        // Falling back to the top is the only answer guaranteed to be on screen.
+        return index < 0 ? 0 : index;
+    }
+
+    private void MoveTo(int index) => MoveTo(_visible[index].Item);
+
+    private void MoveTo(TItem item) => _active = item;
+
+    private async Task ExpandSiblingsAsync(Node node)
+    {
+        var siblings = node.Parent?.Children ?? _visible.FindAll(n => n.Depth == 0);
+
+        foreach (var sibling in siblings.Where(s => s.HasChildren && !s.IsExpanded).ToList())
+        {
+            await ToggleAsync(sibling);
+        }
+    }
+
+    /// <summary>
+    /// Moves to the next node whose text starts with what has been typed.
+    /// </summary>
+    /// <remarks>
+    /// The buffer expires by elapsed time rather than on a timer, so there is nothing to dispose
+    /// and no callback that can fire after the component is gone. The search starts after the
+    /// current node and wraps, which is what makes pressing the same letter repeatedly cycle
+    /// through the nodes beginning with it.
+    /// </remarks>
+    private void TypeAhead(string key, int from)
+    {
+        var now = DateTimeOffset.UtcNow;
+
+        _typeAhead = now - _typeAheadAt > TimeSpan.FromSeconds(1) ? key : _typeAhead + key;
+        _typeAheadAt = now;
+
+        // A repeated single character is a request for the next match, not for nodes starting
+        // "aa". Anything longer is taken literally.
+        var term = _typeAhead.Length > 1 && _typeAhead.Distinct().Count() == 1
+            ? _typeAhead[..1]
+            : _typeAhead;
+
+        for (var offset = 1; offset <= _visible.Count; offset++)
+        {
+            var candidate = _visible[(from + offset) % _visible.Count];
+
+            if (TextOf(candidate.Item).StartsWith(term, StringComparison.CurrentCultureIgnoreCase))
+            {
+                MoveTo(candidate.Item);
+                return;
+            }
+        }
+    }
+
+    /// <inheritdoc />
+    /// <remarks>
+    /// Focus is moved after the render rather than inside the key handler, because the row that
+    /// should take it may not exist until then - ArrowRight expands a node and descends into a
+    /// child that was not in the DOM when the key arrived.
+    /// <para>
+    /// Gated on the tree already holding focus. Without that, the first render of a page
+    /// containing a tree would pull focus out of whatever the user was doing.
+    /// </para>
+    /// </remarks>
+    protected override async Task OnAfterRenderAsync(bool firstRender)
+    {
+        await base.OnAfterRenderAsync(firstRender);
+
+        if (!_hasFocus || _active is null || !IsJsReady)
+        {
+            return;
+        }
+
+        var node = _visible.Find(n => EqualityComparer<TItem>.Default.Equals(n.Item, _active));
+
+        if (node is null || node.ElementId == _focusedId)
+        {
+            return;
+        }
+
+        _focusedId = node.ElementId;
+        await InvokeModuleVoidAsync("focusElement", node.ElementId);
+    }
+
+    // ---- Styling -----------------------------------------------------------------------------
+
+    private string TreeClass => CssBuilder
+        .Default("zen-focus m-0 list-none p-1")
+        .AddClass("rounded-zen-lg border border-border bg-surface-raised", Bordered)
+        .Build()!;
+
+    private string IconClass => Size == ZenSize.Large ? "size-5" : "size-4";
+
+    private string ChevronClass => CssBuilder
+        .Default("grid shrink-0 place-items-center rounded-zen-sm text-content-subtle")
+        .AddClass(Size == ZenSize.Large ? "size-6" : "size-5")
+        .Build()!;
+
+    private string ChevronIconClass(Node node) => CssBuilder
+        .Default($"{IconClass} transition-transform")
+        .AddClass("rotate-90", node.IsExpanded)
+        .Build()!;
+
+    private string RowClass(Node node) => CssBuilder
+        .Default($"zen-indent flex cursor-pointer items-center gap-1.5 rounded-zen-md pe-2 transition-colors {RowPadding}")
+        .AddClass("text-content hover:bg-surface-hover", !IsSelected(node.Item))
+        .AddClass("bg-primary-soft font-medium text-primary-strong", IsSelected(node.Item))
+        // The ring is drawn on the row rather than on the <li> that actually holds focus: the
+        // <li> contains the whole subtree, so an outline on it would encircle every descendant.
+        .AddClass("zen-focus-always", IsActive(node.Item) && _hasFocus)
+        .Build()!;
+
+    private string RowPadding => Size switch
+    {
+        ZenSize.Small => "py-1 text-sm",
+        ZenSize.Large => "py-2 text-base",
+        _ => "py-1.5 text-sm",
+    };
+}
