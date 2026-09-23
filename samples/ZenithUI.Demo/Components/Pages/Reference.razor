@@ -1,0 +1,93 @@
+@page "/reference"
+@page "/reference/{Section}"
+
+@*
+    Three routes under one prefix, so the side nav's collapsible "Reference" section has somewhere
+    real to go. Without live routes the interesting half of ZenNavGroup - opening itself when you
+    are already inside it - could only be described, not shown.
+
+    No render mode. Navigating between these is a fresh static render each time, and the section is
+    open on arrival because the group matched the URL during that render rather than after it.
+*@
+
+<PageTitle>@Current.Title &middot; ZenithUI</PageTitle>
+
+<header class="max-w-3xl">
+    <p class="text-sm font-medium text-primary-strong">Reference</p>
+    <h1 class="mt-1 text-3xl font-bold tracking-tight">@Current.Title</h1>
+    <p class="mt-3 text-content-muted">@Current.Summary</p>
+</header>
+
+<section class="mt-8 max-w-3xl">
+    <ZenCard Title="What just happened in the navigation" TitleLevel="2">
+        <ul class="space-y-2 text-sm text-content-muted">
+            <li>
+                The <strong>Reference</strong> section in the side nav is open, and you did not
+                open it. The group carries <code>Href="reference"</code> and matched this URL
+                during the render that produced the page.
+            </li>
+            <li>
+                <strong>@Current.Title</strong> inside it is marked
+                <code>aria-current="page"</code>, so it is announced as the current page and not
+                merely tinted.
+            </li>
+            <li>
+                Collapse the section by hand and it stays collapsed while you move between these
+                three pages &mdash; the platform owns the open state once rendered. The summary
+                still shows you are inside it, through
+                <code>:has([aria-current="page"])</code>.
+            </li>
+            <li>
+                All of it under <strong>static SSR</strong>. There is no circuit on this page.
+            </li>
+        </ul>
+    </ZenCard>
+</section>
+
+<section class="mt-6 max-w-3xl">
+    <h2 class="text-lg font-semibold">The other sections</h2>
+    <p class="mt-2 text-sm text-content-muted">
+        Navigate between them and watch the nav: the section stays open, and the current item
+        moves.
+    </p>
+
+    <div class="mt-4 flex flex-wrap gap-2">
+        @foreach (var section in Sections.Where(s => s.Key != Current.Key))
+        {
+            <ZenButton Href="@($"/reference/{section.Key}")"
+                       Variant="ZenVariant.Outline"
+                       Size="ZenSize.Small">
+                @section.Title
+            </ZenButton>
+        }
+    </div>
+</section>
+
+@code {
+    /// <summary>Which sub-page to show. Null for <c>/reference</c> itself.</summary>
+    [Parameter]
+    public string? Section { get; set; }
+
+    private sealed record ReferenceSection(string Key, string Title, string Summary);
+
+    private static readonly ReferenceSection[] Sections =
+    [
+        new("tokens", "Token list",
+            "Every --zen-* custom property, what it is for, and which of the four roles in an "
+            + "intent quartet it plays."),
+        new("components", "Component index",
+            "The full inventory, grouped the way the library's folders are: primitives, forms, "
+            + "overlays, data display, containers and chrome."),
+        new("a11y", "Accessibility notes",
+            "The role each component claims and the keyboard contract that comes with the claim - "
+            + "including the ones that deliberately claim less."),
+    ];
+
+    private ReferenceSection Current =>
+        Sections.FirstOrDefault(s => string.Equals(s.Key, Section, StringComparison.OrdinalIgnoreCase))
+        ?? new ReferenceSection(
+            "",
+            "Reference",
+            "Pick a section from the navigation. The point of these pages is the nav beside them: "
+            + "the collapsible group opens itself because the URL is underneath it.");
+}

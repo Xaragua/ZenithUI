@@ -67,6 +67,16 @@
                     {
                         <ZenNavLink Href="@link.Href" Text="@link.Label" Icon="@link.Icon" />
                     }
+
+                    @* A collapsible section, and the reason it can exist here: <details> is the
+                       whole widget, so a nav inside a layout that can never be interactive still
+                       expands and collapses. Href is what opens it when you are already inside -
+                       navigate to one of these and it is open on arrival. *@
+                    <ZenNavGroup Text="Reference" Icon="@ZenIcons.Info" Href="reference">
+                        <ZenNavLink Href="reference/tokens" Text="Token list" />
+                        <ZenNavLink Href="reference/components" Text="Component index" />
+                        <ZenNavLink Href="reference/a11y" Text="Accessibility notes" />
+                    </ZenNavGroup>
                 </ZenNavMenu>
             </ChildContent>
 

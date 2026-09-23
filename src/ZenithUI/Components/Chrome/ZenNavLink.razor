@@ -121,81 +121,23 @@ else
     /// Whether this link's destination is the location given.
     /// </summary>
     /// <remarks>
-    /// The query and fragment are dropped from the current location unless the link itself carries
-    /// one. Otherwise <c>/orders</c> would stop matching the moment the page added
-    /// <c>?page=2</c> - and a paged table deselecting its own nav item is a bug nobody attributes
-    /// to the nav.
+    /// The rules live in <see cref="ZenNavMatch"/> because <c>ZenNavGroup</c> applies the same ones
+    /// to decide whether a collapsed section starts open. If the two ever disagreed, a group would
+    /// either hide the current page behind a closed disclosure or open a section containing nothing
+    /// the user asked for.
     /// </remarks>
-    private bool ShouldMatch(string currentUri)
-    {
-        if (_hrefAbsolute is null)
-        {
-            return false;
-        }
-
-        var current = _hrefAbsolute.AsSpan().IndexOfAny('?', '#') >= 0
-            ? currentUri
-            : Trim(currentUri);
-
-        if (EqualsIgnoringTrailingSlash(current, _hrefAbsolute))
-        {
-            return true;
-        }
-
-        return EffectiveMatch == NavLinkMatch.Prefix
-            && IsStrictlyPrefixWithSeparator(current, _hrefAbsolute);
-    }
+    private bool ShouldMatch(string currentUri) =>
+        _hrefAbsolute is not null
+        && ZenNavMatch.IsActive(currentUri, _hrefAbsolute, EffectiveMatch);
 
     /// <summary>
     /// The match mode in force: the caller's, or exact for a link pointing at the application root
     /// and prefix for anything else.
     /// </summary>
     private NavLinkMatch EffectiveMatch =>
-        Match ?? (IsBaseUri ? NavLinkMatch.All : NavLinkMatch.Prefix);
-
-    private bool IsBaseUri =>
-        _hrefAbsolute is not null && EqualsIgnoringTrailingSlash(_hrefAbsolute, Nav.BaseUri);
-
-    private static string Trim(string uri)
-    {
-        var cut = uri.AsSpan().IndexOfAny('?', '#');
-
-        return cut < 0 ? uri : uri[..cut];
-    }
-
-    /// <summary>
-    /// Compares two absolute URIs, treating a trailing slash as insignificant.
-    /// </summary>
-    /// <remarks>
-    /// <c>NavigationManager.BaseUri</c> always ends in a slash and <c>ToAbsoluteUri("")</c> does
-    /// not, so the application root would never match itself without this.
-    /// </remarks>
-    private static bool EqualsIgnoringTrailingSlash(string left, string right) =>
-        string.Equals(TrimEndSlash(left), TrimEndSlash(right), StringComparison.OrdinalIgnoreCase);
-
-    private static string TrimEndSlash(string value) =>
-        value.Length > 1 && value[^1] == '/' ? value[..^1] : value;
-
-    /// <summary>
-    /// Whether <paramref name="value"/> continues <paramref name="prefix"/> at a path boundary.
-    /// </summary>
-    /// <remarks>
-    /// The separator test is what stops <c>/order</c> matching <c>/orders</c>. A plain
-    /// <c>StartsWith</c> highlights the wrong item in any nav whose routes share a stem, which is
-    /// most of them.
-    /// </remarks>
-    private static bool IsStrictlyPrefixWithSeparator(string value, string prefix)
-    {
-        var trimmed = TrimEndSlash(prefix);
-
-        if (value.Length <= trimmed.Length
-            || !value.StartsWith(trimmed, StringComparison.OrdinalIgnoreCase))
-        {
-            return false;
-        }
-
-        return value[trimmed.Length] is '/' or '?' or '#';
-    }
+        Match ?? (_hrefAbsolute is null
+            ? NavLinkMatch.Prefix
+            : ZenNavMatch.DefaultMatch(_hrefAbsolute, Nav.BaseUri));
 
     // ---- Rendering ---------------------------------------------------------------------------
 

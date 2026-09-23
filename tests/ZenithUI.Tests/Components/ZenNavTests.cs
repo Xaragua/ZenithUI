@@ -208,6 +208,138 @@ public class ZenNavTests : BunitContext
         RenderLink("orders").FindAll("li").Count.ShouldBe(0);
     }
 
+    // ---- Collapsible groups -------------------------------------------------------------------
+
+    [Fact]
+    public void AGroup_IsADetailsDisclosure()
+    {
+        // Not a button and a bool. A nav lives in a layout, a layout can never be interactive, and
+        // <details> is a whole disclosure widget the platform operates for free - including
+        // removing the collapsed content from the tab order rather than just hiding it.
+        var cut = RenderGroup();
+
+        cut.Find("details").ShouldNotBeNull();
+        cut.Find("details > summary").ShouldNotBeNull();
+        cut.FindAll("details > ul > li").Count.ShouldBe(2);
+    }
+
+    [Fact]
+    public void AGroup_OpensItselfWhenTheCurrentPageIsInsideIt()
+    {
+        // The half that cannot be done with a second render pass: static SSR never renders twice,
+        // so a group that opened itself on a callback from its children would ship a nav with the
+        // current page hidden inside a collapsed section.
+        _nav.NavigateTo("reports/weekly");
+
+        RenderGroup(href: "reports").Find("details").HasAttribute("open").ShouldBeTrue();
+    }
+
+    [Fact]
+    public void AGroup_StaysClosedWhenTheLocationIsElsewhere()
+    {
+        _nav.NavigateTo("catalog");
+
+        RenderGroup(href: "reports").Find("details").HasAttribute("open").ShouldBeFalse();
+    }
+
+    [Fact]
+    public void AGroupPrefix_NeedsAPathSeparatorToo()
+    {
+        // Same rule as the links, from the same code: /report must not open a /reports section, or
+        // a group and the link inside it would disagree about where the user is.
+        _nav.NavigateTo("reports");
+
+        RenderGroup(href: "report").Find("details").HasAttribute("open").ShouldBeFalse();
+    }
+
+    [Fact]
+    public void AGroupOpens_WhenNavigationMovesIntoIt()
+    {
+        var cut = RenderGroup(href: "reports");
+        cut.Find("details").HasAttribute("open").ShouldBeFalse();
+
+        _nav.NavigateTo("reports/daily");
+
+        cut.Find("details").HasAttribute("open").ShouldBeTrue();
+    }
+
+    [Fact]
+    public void ExpandedOpensAGroup_ThatHasNoRouteToMatch()
+    {
+        RenderGroup(expanded: true).Find("details").HasAttribute("open").ShouldBeTrue();
+    }
+
+    [Fact]
+    public void AGroupName_MakesSiblingsAnAccordion()
+    {
+        // The `name` attribute is the whole mechanism - the browser closes the others. Nothing in
+        // C# coordinates it, which is why it survives having no render mode.
+        RenderGroup(groupName: "sections").Find("details").GetAttribute("name").ShouldBe("sections");
+    }
+
+    [Fact]
+    public void AGroupWithoutAName_IsIndependent()
+    {
+        // An accordion that collapses the section you just came from is a nav that keeps losing
+        // your place, so it is opt-in rather than the default.
+        RenderGroup().Find("details").HasAttribute("name").ShouldBeFalse();
+    }
+
+    [Fact]
+    public void LinksInsideAGroup_StillRenderTheirOwnListItems()
+    {
+        // The group cascades a fresh context because it renders its own <ul>. Without that a group
+        // used outside a menu would emit bare anchors inside a list.
+        var cut = Render<ZenNavGroup>(p => p
+            .Add(x => x.Text, "Reports")
+            .Add(x => x.ChildContent, (RenderFragment)(builder =>
+            {
+                builder.OpenComponent<ZenNavLink>(0);
+                builder.AddComponentParameter(1, nameof(ZenNavLink.Href), "reports/daily");
+                builder.AddComponentParameter(2, nameof(ZenNavLink.Text), "Daily");
+                builder.CloseComponent();
+            })));
+
+        cut.FindAll("ul > li > a").Count.ShouldBe(1);
+    }
+
+    [Fact]
+    public void AGroupInsideAMenu_IsAListItemOfThatMenu()
+    {
+        var cut = Render<ZenNavMenu>(p => p
+            .Add(x => x.Landmark, false)
+            .Add(x => x.ChildContent, (RenderFragment)(builder =>
+            {
+                builder.OpenComponent<ZenNavGroup>(0);
+                builder.AddComponentParameter(1, nameof(ZenNavGroup.Text), "Reports");
+                builder.CloseComponent();
+            })));
+
+        cut.Find("ul > li > details").ShouldNotBeNull();
+    }
+
+    private IRenderedComponent<ZenNavGroup> RenderGroup(
+        string? href = null,
+        bool expanded = false,
+        string? groupName = null) =>
+        Render<ZenNavGroup>(p => p
+            .Add(x => x.Text, "Reports")
+            .Add(x => x.Href, href)
+            .Add(x => x.Expanded, expanded)
+            .Add(x => x.GroupName, groupName)
+            .Add(x => x.ChildContent, (RenderFragment)(builder =>
+            {
+                var seq = 0;
+
+                foreach (var (link, text) in new[] { ("reports/daily", "Daily"), ("reports/weekly", "Weekly") })
+                {
+                    builder.OpenComponent<ZenNavLink>(seq++);
+                    builder.AddComponentParameter(seq++, nameof(ZenNavLink.Href), link);
+                    builder.AddComponentParameter(seq++, nameof(ZenNavLink.Text), text);
+                    builder.CloseComponent();
+                }
+            })));
+
     private IRenderedComponent<ZenNavMenu> RenderMenu(
         string? label = null,
         string? title = null,

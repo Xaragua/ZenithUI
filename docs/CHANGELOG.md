@@ -57,6 +57,38 @@ carrying no render mode at all, drawer included.
   begins. That last one is the only measurement neither component can derive, because CSS gives an
   element no way to measure a sticky sibling.
 
+**`ZenNavGroup`** — a collapsible section of navigation, added after the milestone's first pass
+because `ZenNavMenu` could only render a flat list under a static heading.
+
+It is a `<details>`/`<summary>`, for the same reason the drawer is a popover: a nav lives in a
+layout, a layout can never be interactive, and a disclosure built on `@onclick` would be inert in
+the only place it goes. The platform supplies the whole widget — Enter and Space, the expanded
+state in the accessibility tree (the summary reports as a focusable disclosure whose `expanded`
+flips with the element), and content genuinely removed from the tab order when collapsed rather
+than painted out of sight. Sibling groups sharing a `GroupName` become an accordion, enforced by
+the browser through the `name` attribute with nothing in C# coordinating it. That is opt-in: an
+accordion that collapses the section you just came from is a nav that keeps losing your place.
+
+- **Expansion is driven by `Href`, not by the children, and that is not laziness.** The obvious
+  design is for a group to open itself when one of its links is current. It cannot: a parent builds
+  its entire render tree before any child component exists, so the `<details>` element and its
+  `open` attribute are written before a single `ZenNavLink` has worked out whether it matches.
+  `ZenDefer` fixes that ordering for `ZenTable` because a `ZenColumn` renders no markup and can
+  register in a pass of its own — a nav link renders the markup that has to go *inside* the element
+  whose attribute depends on it, so no ordering helps. The alternative is a second render pass,
+  which is precisely the M4 trap: static SSR never renders twice, so a server-rendered nav would
+  ship with the current page hidden inside a collapsed section and no interactive test would catch
+  it. The caller states the section's prefix once instead, and it is matched by `ZenNavMatch` — the
+  same code `ZenNavLink` uses, so a section and its links can never disagree about where the user
+  is. Confirmed in the served HTML: `/reference/tokens` arrives with `<details ... open>` already in
+  it.
+- **A section collapsed while you are standing inside it still says so**, through
+  `:not([open]):has([aria-current="page"])`. Without it a nav with everything collapsed shows no
+  current location at all — and tracking that in C# would need the second render pass static SSR
+  does not have.
+- The matching rules moved to `Core/ZenNavMatch.cs` so the link and the group share one
+  implementation rather than two that drift.
+
 ### Fixed during M5
 
 **Three elements in the chrome now carry no `display` utility, and the library states `display`

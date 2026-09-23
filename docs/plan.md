@@ -265,8 +265,8 @@ pattern).
 
 **Containers** — `ZenCard` (`Header` / `Body` / `Footer` / `Actions` slots), `ZenForm`.
 
-**Chrome & layout** — `ZenAppBar`, `ZenNavMenu` + `ZenNavLink`, `ZenSideNav` (off-canvas below
-`lg`), `ZenFooter`, `ZenAppShell`.
+**Chrome & layout** — `ZenAppBar`, `ZenNavMenu` + `ZenNavLink` + `ZenNavGroup` (collapsible
+sections), `ZenSideNav` (off-canvas below `lg`), `ZenFooter`, `ZenAppShell`.
 
 ### The shell needs no render mode, and that constraint chose its design
 
@@ -472,7 +472,7 @@ component's bUnit test asserts its required ARIA attributes.
 | **M2** ✅ | Text, textarea, number, currency, date, search, checkbox (+group), radio group, native select, `ZenToggle`, `ZenRangeSlider`, `ZenForm`, plus the feedback primitives `ZenProgress` and `ZenIndicator` | A demo form binds an `EditForm` + `DataAnnotationsValidator` and shows per-field errors; the same inputs also work **without** an `EditForm` | ✅ |
 | **M3** ✅ | `ZenModal` + `IZenModalService`, `ZenToast` + `IZenToastService`, `ZenPopover`, `ZenCombobox<TItem>`, `ZenList<TItem>` | A dialog can be raised and awaited from a service with no markup on the page; focus returns to the opener on close; combobox passes keyboard + ARIA tests and prerenders as a closed labelled field with JS disabled | ✅ |
 | **M4** ✅ | `ZenTable<TItem>` + `ZenColumn<TItem>` (sort/page/select/hierarchy/detail rows/responsive collapse), `ZenEmptyState`, `ZenTree<TItem>`, `ZenTimeline` + `ZenTimelineItem` | Demo renders a 3-level hierarchical table and a lazy-loading tree | ✅ |
-| **M5** ✅ | `ZenAppBar`, `ZenNavMenu` + `ZenNavLink`, `ZenSideNav`, `ZenFooter`, `ZenAppShell` | Shell demo usable at 360 / 768 / 1440 px; drawer traps focus and restores it on close | ✅ |
+| **M5** ✅ | `ZenAppBar`, `ZenNavMenu` + `ZenNavLink` + `ZenNavGroup`, `ZenSideNav`, `ZenFooter`, `ZenAppShell` | Shell demo usable at 360 / 768 / 1440 px; drawer traps focus and restores it on close | ✅ |
 | **M6** | Docs, a11y audit, `dotnet pack`, NuGet metadata, v1.0.0, **close the consumer-`@theme` gap** | `.nupkg` consumed successfully by a scratch Blazor Server app **and** a Blazor WASM app | |
 
 ---
@@ -520,6 +520,8 @@ Recorded because each changed the design rather than merely the code.
 | `TItem` constrained to `notnull` on `ZenTree` and `ZenTable` | Expansion, lazy-load caching and selection are all keyed by the item. A null node has no identity to key on. |
 | The side-nav drawer is a **popover**, not Blazor state | A layout cannot be interactive, so a shell whose nav needed a render mode could not be used as a layout. The platform's `popovertarget` crosses boundaries Blazor's cascade cannot. |
 | `ZenNavLink` does not wrap Blazor's `NavLink` | `NavLink` decides the same thing and spends it on a CSS class only — it never sets `aria-current`. The active item was visible to sighted users and silent to everyone else. |
+| `ZenNavGroup`, not in the original inventory | `ZenNavMenu` could only render a flat list under a static heading, so a nav with sections had no way to collapse them. It is a `<details>`, for the same reason the drawer is a popover. |
+| A group's expansion comes from its own `Href`, not from its children | A parent builds its render tree before any child exists, so `open` is written before a link knows whether it matches. `ZenDefer` cannot help: a nav link renders the markup that goes *inside* the element whose attribute depends on it. The alternative is a second pass, which static SSR does not have. |
 | Three elements in the chrome carry **no `display` utility at all** | A consumer running their own Tailwind emits `.flex` and almost certainly not `.lg\:hidden`, and their sheet loads last into the same `utilities` layer. See the note below — this was a real, shipped-looking bug. |
 | `ZenSideNav`'s explicit `Id` outranks the shell cascade | The only way to wire a nav the cascade cannot reach: one the consumer made an interactive island under a static shell. |
 

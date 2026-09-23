@@ -863,3 +863,88 @@
     outline-offset: 2px;
   }
 }
+
+@layer components {
+  /*
+   * ZenNavGroup: a collapsible section of navigation, built on <details>/<summary>.
+   *
+   * The platform supplies the entire widget - Enter and Space, the expanded state in the
+   * accessibility tree, and content that is genuinely removed from the tab order when collapsed
+   * rather than merely painted out of sight. None of that needs a render mode, which is the only
+   * reason a disclosure can live in a nav at all: a nav lives in a layout, and a layout is always
+   * static.
+   *
+   * `display` is declared here rather than as a `flex` utility, and not only for the cascade-order
+   * reason at the top of the side-nav section. A <summary> is `display: list-item` in the UA sheet,
+   * and `list-style: none` on a flex box is what suppresses the default triangle; the two are a
+   * pair, and splitting them across a utility and a rule is how one of them goes missing. The UA
+   * marker has to go because it cannot be moved to the end of the row, cannot be animated, and
+   * does not look the same in any two browsers.
+   */
+  .zen-nav-summary {
+    display: flex;
+    list-style: none;
+    cursor: pointer;
+  }
+
+  /* Safari still paints the marker through a pseudo-element of its own. */
+  .zen-nav-summary::-webkit-details-marker {
+    display: none;
+  }
+
+  .zen-nav-chevron {
+    margin-inline-start: 0.25rem;
+    color: var(--zen-content-subtle);
+    transition: transform 150ms ease;
+  }
+
+  .zen-nav-group[open] > .zen-nav-summary .zen-nav-chevron {
+    transform: rotate(180deg);
+  }
+
+  @media (prefers-reduced-motion: reduce) {
+    .zen-nav-chevron {
+      transition: none;
+    }
+  }
+
+  /*
+   * The nested links. Indented to sit under the label rather than the icon, with a hairline guide
+   * so a long section still reads as one group once its parent has scrolled off.
+   */
+  /*
+   * Spacing comes from a margin between siblings rather than a flex `gap`, and the rule declares
+   * no `display` at all.
+   *
+   * Current engines hide a closed <details>'s content through `::details-content` and
+   * `content-visibility`, which an author `display` on this element does not disturb - verified in
+   * the browser rather than assumed, because the neighbouring drawer rules exist for a collision
+   * of exactly that shape. Declaring nothing is simply the option that cannot be wrong if an
+   * engine goes back to hiding the content by setting `display` on it, and a margin buys the same
+   * layout as a gap.
+   */
+  .zen-nav-group-items {
+    list-style: none;
+    margin-block-start: 0.125rem;
+    margin-inline-start: 1.5rem;
+    padding-inline-start: 0.375rem;
+    border-inline-start: 1px solid var(--zen-border);
+  }
+
+  .zen-nav-group-items > li + li {
+    margin-block-start: 0.125rem;
+  }
+
+  /*
+   * A section the user has collapsed while standing inside it still says so.
+   *
+   * Without this the only indication of the current page is inside the thing that is shut, so a
+   * nav with everything collapsed shows no current location at all. `:has()` is what makes it a
+   * rule rather than state the component would have to track - and tracking it would need a second
+   * render pass, which static SSR does not have.
+   */
+  .zen-nav-group:not([open]):has([aria-current="page"]) > .zen-nav-summary {
+    color: var(--zen-content);
+    font-weight: 500;
+  }
+}

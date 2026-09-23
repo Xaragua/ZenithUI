@@ -73,4 +73,8 @@
 @source inline("zen-skip-link");
 @source inline("zen-sidenav-bar");
 @source inline("zen-nav-toggle");
+@source inline("zen-nav-group");
+@source inline("zen-nav-summary");
+@source inline("zen-nav-chevron");
+@source inline("zen-nav-group-items");
 @source inline("{bg,hover:bg}-surface-hover");

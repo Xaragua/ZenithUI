@@ -124,6 +124,88 @@
     </div>
 </section>
 
+<!-- ------------------------------------------------------------------- Nav groups -->
+<section class="mt-10">
+    <h2 class="text-lg font-semibold">ZenNavGroup &mdash; collapsible sections</h2>
+    <p class="mt-2 max-w-3xl text-sm text-content-muted">
+        A section that expands to reveal the links under it, built on
+        <code>&lt;details&gt;</code> and <code>&lt;summary&gt;</code>. Same constraint as the
+        drawer and the same answer: a nav lives in a layout, a layout can never be interactive, and
+        a disclosure built on an <code>@@onclick</code> would be inert in the only place it goes.
+        The platform gives the whole widget &mdash; Enter and Space, the expanded state in the
+        accessibility tree, and content genuinely removed from the tab order when collapsed rather
+        than merely painted out of sight.
+    </p>
+    <p class="mt-3 max-w-3xl text-sm text-content-muted">
+        <strong>The live one is in the side nav</strong>, not here: open
+        <a href="/reference/tokens" class="text-primary-strong underline">Reference &rsaquo; Token
+        list</a> and the section is already expanded on arrival, because the group matched the URL
+        during the render that produced the page &mdash; not in a second pass afterwards, which
+        static SSR does not have.
+    </p>
+
+    <div class="mt-4 grid gap-4 lg:grid-cols-2">
+        <ZenCard Title="Nested, with a badge and an icon" TitleLevel="3">
+            <ZenNavMenu Landmark="false">
+                <ZenNavLink Href="/shell" Text="Dashboard" Icon="@ZenIcons.Inbox" />
+
+                <ZenNavGroup Text="Reports" Icon="@ZenIcons.TrendUp" Expanded="true">
+                    <Trailing>
+                        <ZenBadge Intent="ZenIntent.Primary" Size="ZenSize.Small">4</ZenBadge>
+                    </Trailing>
+                    <ChildContent>
+                        <ZenNavLink Href="/shell/reports/daily" Text="Daily" />
+                        <ZenNavLink Href="/shell/reports/weekly" Text="Weekly" />
+                        <ZenNavGroup Text="Archived">
+                            <ZenNavLink Href="/shell/reports/2025" Text="2025" />
+                            <ZenNavLink Href="/shell/reports/2024" Text="2024" />
+                        </ZenNavGroup>
+                    </ChildContent>
+                </ZenNavGroup>
+
+                <ZenNavGroup Text="Settings" Icon="@ZenIcons.Monitor">
+                    <ZenNavLink Href="/shell/settings/profile" Text="Profile" />
+                    <ZenNavLink Href="/shell/settings/billing" Text="Billing" />
+                </ZenNavGroup>
+            </ZenNavMenu>
+
+            <p class="mt-4 text-sm text-content-subtle">
+                Groups nest. Each renders its own <code>&lt;ul&gt;</code> and cascades to the links
+                inside, so the indent guide compounds without anyone passing a depth.
+            </p>
+        </ZenCard>
+
+        <ZenCard Title="An accordion" TitleLevel="3">
+            <ZenNavMenu Landmark="false">
+                <ZenNavGroup Text="Orders" Icon="@ZenIcons.Inbox" GroupName="demo-accordion" Expanded="true">
+                    <ZenNavLink Href="/shell/orders/open" Text="Open" />
+                    <ZenNavLink Href="/shell/orders/shipped" Text="Shipped" />
+                </ZenNavGroup>
+
+                <ZenNavGroup Text="Catalog" Icon="@ZenIcons.Search" GroupName="demo-accordion">
+                    <ZenNavLink Href="/shell/catalog/products" Text="Products" />
+                    <ZenNavLink Href="/shell/catalog/suppliers" Text="Suppliers" />
+                </ZenNavGroup>
+
+                <ZenNavGroup Text="People" Icon="@ZenIcons.Success" GroupName="demo-accordion">
+                    <ZenNavLink Href="/shell/people/staff" Text="Staff" />
+                    <ZenNavLink Href="/shell/people/roles" Text="Roles" />
+                </ZenNavGroup>
+            </ZenNavMenu>
+
+            <p class="mt-4 text-sm text-content-muted">
+                <strong>Open one and the others close.</strong> That is the <code>name</code>
+                attribute on <code>&lt;details&gt;</code>, enforced by the browser &mdash; shared
+                <code>GroupName</code>, no coordinating state.
+            </p>
+            <p class="mt-3 text-sm text-content-subtle">
+                It is deliberately not the default for a side nav. An accordion that collapses the
+                section you just came from is a nav that keeps losing your place.
+            </p>
+        </ZenCard>
+    </div>
+</section>
+
 <!-- ------------------------------------------------------------------- App bar -->
 <section class="mt-10">
     <h2 class="text-lg font-semibold">ZenAppBar</h2>

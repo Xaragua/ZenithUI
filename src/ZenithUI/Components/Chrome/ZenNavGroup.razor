@@ -1,0 +1,231 @@
+@namespace ZenithUI
+
+@inherits ZenComponentBase
+@implements IDisposable
+
+@*
+    A collapsible section of navigation: a label that expands to reveal the links beneath it.
+
+    IT IS A <details>/<summary>, not a button and a bool. Same constraint as the drawer, and the
+    same answer: a nav lives in a layout, a layout can never be interactive, and a disclosure built
+    on @onclick would be inert in the only place it goes. The platform gives the whole widget -
+    Enter and Space, the expanded state in the accessibility tree, and content that is genuinely
+    removed from the tab order when collapsed rather than merely hidden.
+
+    The default marker is suppressed and a chevron drawn instead, because the UA triangle cannot be
+    positioned at the end of the row or animated, and it varies by browser.
+
+    WHY EXPANSION IS DRIVEN BY `Href` AND NOT BY THE CHILDREN. The obvious design is for the group
+    to open itself when one of its links is current. It cannot: a parent builds its entire render
+    tree before any child component exists, so the <details> element - and its `open` attribute -
+    is written before a single ZenNavLink has worked out whether it matches. ZenDefer solves that
+    ordering for ZenTable because a ZenColumn renders no markup and can register in a pass of its
+    own; a nav link renders the markup that has to go INSIDE the element whose attribute depends on
+    it, so there is no ordering that helps.
+
+    The alternative was a second render pass, which is exactly the trap M4 documented: static SSR
+    never renders twice, so a server-rendered nav would ship with the current page hidden inside a
+    collapsed section, and no interactive test would ever catch it. So the caller states the
+    section's route prefix once, and the group matches it with the same rules its links use.
+*@
+
+@if (InList)
+{
+    <li>@Disclosure</li>
+}
+else
+{
+    @Disclosure
+}
+
+@code {
+    private string? _hrefAbsolute;
+    private bool _containsCurrent;
+
+    [Inject]
+    private NavigationManager Nav { get; set; } = default!;
+
+    [CascadingParameter]
+    private ZenNavContext? NavMenu { get; set; }
+
+    /// <summary>The links in this section, usually <c>ZenNavLink</c> components.</summary>
+    [Parameter]
+    public RenderFragment? ChildContent { get; set; }
+
+    /// <summary>The section label. Ignored when <see cref="TitleContent"/> is supplied.</summary>
+    [Parameter]
+    public string? Text { get; set; }
+
+    /// <summary>The section label, for a heading that is more than a string.</summary>
+    [Parameter]
+    public RenderFragment? TitleContent { get; set; }
+
+    /// <summary>Leading icon markup, typically a <see cref="ZenIcons"/> constant.</summary>
+    [Parameter]
+    public string? Icon { get; set; }
+
+    /// <summary>Content before the chevron - a count badge, a status dot.</summary>
+    [Parameter]
+    public RenderFragment? Trailing { get; set; }
+
+    /// <summary>
+    /// The route prefix this section covers. The group starts open when the current location is
+    /// under it.
+    /// </summary>
+    /// <remarks>
+    /// Stated by the caller rather than derived from the links inside, for the reason in the note
+    /// at the top of this file. It is matched with <see cref="ZenNavMatch"/> - the same rules
+    /// <c>ZenNavLink</c> uses - so a section and its links can never disagree about whether the
+    /// user is inside it.
+    /// </remarks>
+    [Parameter]
+    public string? Href { get; set; }
+
+    /// <summary>How <see cref="Href"/> is compared against the current location.</summary>
+    [Parameter]
+    public NavLinkMatch Match { get; set; } = NavLinkMatch.Prefix;
+
+    /// <summary>
+    /// Whether the section is open when there is no <see cref="Href"/> match to decide it.
+    /// </summary>
+    /// <remarks>
+    /// Only the initial state. Once rendered, the user's own expanding and collapsing is the
+    /// platform's business, not this component's - which is what keeps the group working with no
+    /// render mode.
+    /// </remarks>
+    [Parameter]
+    public bool Expanded { get; set; }
+
+    /// <summary>
+    /// Groups sharing a name behave as an accordion: opening one closes the others.
+    /// </summary>
+    /// <remarks>
+    /// The <c>name</c> attribute on <c>&lt;details&gt;</c>, which the browser enforces. Left unset
+    /// the sections are independent, which is the better default for a side nav - an accordion
+    /// that collapses the section you just came from is a nav that keeps losing your place.
+    /// </remarks>
+    [Parameter]
+    public string? GroupName { get; set; }
+
+    /// <summary>
+    /// Whether the current location falls inside this section.
+    /// </summary>
+    private bool IsOpen => _containsCurrent || Expanded;
+
+    private bool InList => NavMenu?.InList ?? false;
+
+    /// <inheritdoc />
+    protected override void OnInitialized() =>
+        Nav.LocationChanged += HandleLocationChanged;
+
+    /// <inheritdoc />
+    protected override void OnParametersSet()
+    {
+        _hrefAbsolute = Href is null ? null : Nav.ToAbsoluteUri(Href).AbsoluteUri;
+        _containsCurrent = ShouldMatch(Nav.Uri);
+    }
+
+    private void HandleLocationChanged(object? sender, LocationChangedEventArgs args)
+    {
+        var contains = ShouldMatch(args.Location);
+
+        if (contains != _containsCurrent)
+        {
+            _containsCurrent = contains;
+            StateHasChanged();
+        }
+    }
+
+    private bool ShouldMatch(string currentUri) =>
+        _hrefAbsolute is not null && ZenNavMatch.IsActive(currentUri, _hrefAbsolute, Match);
+
+    /// <inheritdoc cref="IDisposable.Dispose" />
+    public void Dispose() => Nav.LocationChanged -= HandleLocationChanged;
+
+    // ---- Rendering ---------------------------------------------------------------------------
+
+    private RenderFragment Disclosure => builder =>
+    {
+        var seq = 0;
+
+        builder.OpenElement(seq++, "details");
+        builder.AddAttribute(seq++, "class", RootClass("zen-nav-group"));
+        builder.AddAttribute(seq++, "style", Style);
+        builder.AddAttribute(seq++, "open", IsOpen);
+        builder.AddAttribute(seq++, "name", GroupName);
+        builder.AddMultipleAttributes(seq++, AttributesWithoutClass);
+
+        builder.OpenElement(seq++, "summary");
+        builder.AddAttribute(seq++, "class", SummaryClass);
+        builder.AddContent(seq++, SummaryContent);
+        builder.CloseElement();
+
+        builder.OpenElement(seq++, "ul");
+        builder.AddAttribute(seq++, "class", "zen-nav-group-items");
+
+        // A new cascade rather than the parent's: this group renders its own <ul>, so the links
+        // inside it must emit their own <li> even when the group itself was used standalone.
+        builder.OpenComponent<CascadingValue<ZenNavContext>>(seq++);
+        builder.AddComponentParameter(
+            seq++,
+            nameof(CascadingValue<ZenNavContext>.Value),
+            new ZenNavContext(ZenNavOrientation.Vertical, InList: true));
+        builder.AddComponentParameter(
+            seq++,
+            nameof(CascadingValue<ZenNavContext>.ChildContent),
+            ChildContent);
+        builder.CloseComponent();
+
+        builder.CloseElement();
+        builder.CloseElement();
+    };
+
+    private RenderFragment SummaryContent => builder =>
+    {
+        var seq = 0;
+
+        if (Icon is not null)
+        {
+            builder.OpenComponent<ZenIcon>(seq++);
+            builder.AddComponentParameter(seq++, nameof(ZenIcon.Path), Icon);
+            builder.AddComponentParameter(seq++, nameof(ZenIcon.Size), ZenSize.Small);
+            builder.CloseComponent();
+        }
+
+        builder.OpenElement(seq++, "span");
+        builder.AddAttribute(seq++, "class", "min-w-0 flex-1 truncate text-start");
+        builder.AddContent(seq++, TitleContent ?? (RenderFragment)(b => b.AddContent(0, Text)));
+        builder.CloseElement();
+
+        if (Trailing is not null)
+        {
+            builder.OpenElement(seq++, "span");
+            builder.AddAttribute(seq++, "class", "flex shrink-0 items-center gap-1");
+            builder.AddContent(seq++, Trailing);
+            builder.CloseElement();
+        }
+
+        // Decorative: the expanded state is already on the <summary> itself, and announcing the
+        // chevron as well would give the user the same fact twice in two vocabularies.
+        builder.OpenComponent<ZenIcon>(seq++);
+        builder.AddComponentParameter(seq++, nameof(ZenIcon.Path), ZenIcons.ChevronDown);
+        builder.AddComponentParameter(seq++, nameof(ZenIcon.Size), ZenSize.Small);
+        builder.AddComponentParameter(seq++, nameof(ZenIcon.Class), "zen-nav-chevron");
+        builder.CloseComponent();
+    };
+
+    /// <summary>
+    /// The summary row, styled to match a <c>ZenNavLink</c> at rest.
+    /// </summary>
+    /// <remarks>
+    /// <c>display</c> comes from <c>.zen-nav-summary</c>, not a <c>flex</c> utility. A
+    /// <c>&lt;summary&gt;</c> is <c>display: list-item</c> in the UA sheet and has to become a flex
+    /// row for the chevron to sit at the end - and pairing that with <c>list-style: none</c> is
+    /// what suppresses the default triangle. Splitting the pair across a utility and a rule is how
+    /// one of them goes missing.
+    /// </remarks>
+    private string SummaryClass => CssBuilder
+        .Default("zen-nav-summary zen-focus items-center gap-2.5 rounded-zen-md px-3 py-2 text-sm")
+        .AddClass("text-content-muted transition-colors hover:bg-surface-sunken hover:text-content")
+        .Build()!;
+}
