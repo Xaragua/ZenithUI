@@ -154,6 +154,7 @@ coloured text on a page. Never `text-warning` on a surface.
 src/ZenithUI/          The package. Razor Class Library + Tailwind v4 build.
 samples/ZenithUI.Demo/ Live showcase. Server + WebAssembly + static SSR, one page per component.
 tests/ZenithUI.Tests/  xUnit + bUnit, including the contrast audit.
+tools/accessibility/   The axe-core sweep. Needs the demo running; not a CI step.
 ```
 
 ## Development

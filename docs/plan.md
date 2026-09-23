@@ -109,6 +109,7 @@ c:\code\2026\ZenithUI\
   samples/ZenithUI.Demo/          Blazor Web App host
   samples/ZenithUI.Demo.Client/   WebAssembly half — proves render-mode agnosticism
   tests/ZenithUI.Tests/           xUnit + bUnit, including the contrast audit
+  tools/accessibility/            axe-core sweep of the running demo (M6)
 ```
 
 ### Namespace convention
