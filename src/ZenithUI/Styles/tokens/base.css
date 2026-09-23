@@ -100,6 +100,17 @@
   --zen-info-soft: oklch(0.955 0.022 236);
   --zen-info-strong: oklch(0.48 0.1 236);
 
+  /* ---- Overlay --------------------------------------------------------- */
+  /*
+   * The scrim behind a modal. A backdrop dims, so it is dark in BOTH palettes - it cannot be
+   * derived from --zen-content, which flips to near-white in dark and would paint a white veil
+   * that washes the page out instead of receding it.
+   *
+   * Dark needs a heavier value than light, not a lighter one. The page underneath is already dark,
+   * so a gentle scrim leaves too little separation between it and the dialog surface above.
+   */
+  --zen-backdrop: oklch(0.21 0.015 258 / 0.45);
+
   /* ---- Focus ----------------------------------------------------------- */
   --zen-ring: var(--zen-primary);
   --zen-ring-offset: var(--zen-surface);

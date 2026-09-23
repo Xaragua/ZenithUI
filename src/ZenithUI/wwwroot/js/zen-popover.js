@@ -22,6 +22,59 @@ const DEFAULT_OFFSET = 4;
 /** Minimum gap kept between the panel and the viewport edge. */
 const VIEWPORT_PADDING = 8;
 
+/**
+ * The rectangle to anchor against.
+ *
+ * ZenPopover's anchor wrapper is `display: contents`, so that it is a positioning handle and
+ * nothing else - the caller's own element keeps whatever layout it had. The catch is that a
+ * `display: contents` element generates no box at all, so `getBoundingClientRect()` on it returns
+ * a zero rect at the origin. Measuring the wrapper directly put every panel in the top-left corner
+ * of the viewport regardless of its placement, because every coordinate was computed from (0, 0).
+ *
+ * So a zero-sized rect means "this element has no box", not "this element is empty", and the
+ * measurement descends to the first child that does have one. The recursion handles a caller whose
+ * own anchor is itself `display: contents`.
+ *
+ * @param {Element} element
+ * @returns {DOMRect}
+ */
+function anchorRect(element) {
+    const rect = element.getBoundingClientRect();
+
+    if (rect.width > 0 || rect.height > 0) {
+        return rect;
+    }
+
+    for (const child of element.children) {
+        const childRect = anchorRect(child);
+
+        if (childRect.width > 0 || childRect.height > 0) {
+            return childRect;
+        }
+    }
+
+    return rect;
+}
+
+/**
+ * The element actually worth observing for size changes.
+ *
+ * Same reason as {@link anchorRect}: a ResizeObserver on a `display: contents` element never
+ * fires, because there is no box to observe.
+ *
+ * @param {Element} element
+ * @returns {Element}
+ */
+function observableAnchor(element) {
+    const rect = element.getBoundingClientRect();
+
+    if (rect.width > 0 || rect.height > 0) {
+        return element;
+    }
+
+    return element.firstElementChild ?? element;
+}
+
 /** Physical opposites, used when a placement has to flip. */
 const OPPOSITE = {
     top: 'bottom',
@@ -70,33 +123,33 @@ function resolveDirection(anchor, side, align) {
  *
  * Fit is reported rather than acted on, so the caller can compare candidates before committing.
  *
- * @param {DOMRect} anchorRect
+ * @param {DOMRect} box The anchor rectangle, from {@link anchorRect}.
  * @param {DOMRect} panelRect
  * @param {string} side One of top/bottom/left/right.
  * @param {string} align One of start/center/end.
  * @param {number} offset
  * @returns {{x: number, y: number, fits: boolean}}
  */
-function place(anchorRect, panelRect, side, align, offset) {
+function place(box, panelRect, side, align, offset) {
     let x = 0;
     let y = 0;
 
     if (side === 'top' || side === 'bottom') {
         y = side === 'top'
-            ? anchorRect.top - panelRect.height - offset
-            : anchorRect.bottom + offset;
+            ? box.top - panelRect.height - offset
+            : box.bottom + offset;
 
-        x = align === 'start' ? anchorRect.left
-            : align === 'end' ? anchorRect.right - panelRect.width
-            : anchorRect.left + (anchorRect.width - panelRect.width) / 2;
+        x = align === 'start' ? box.left
+            : align === 'end' ? box.right - panelRect.width
+            : box.left + (box.width - panelRect.width) / 2;
     } else {
         x = side === 'left'
-            ? anchorRect.left - panelRect.width - offset
-            : anchorRect.right + offset;
+            ? box.left - panelRect.width - offset
+            : box.right + offset;
 
-        y = align === 'start' ? anchorRect.top
-            : align === 'end' ? anchorRect.bottom - panelRect.height
-            : anchorRect.top + (anchorRect.height - panelRect.height) / 2;
+        y = align === 'start' ? box.top
+            : align === 'end' ? box.bottom - panelRect.height
+            : box.top + (box.height - panelRect.height) / 2;
     }
 
     const fits =
@@ -141,23 +194,24 @@ function position(state) {
         return;
     }
 
-    // Width matching is applied before measuring: a combobox listbox that matches its field's
-    // width may wrap differently, and measuring first would use the wrong height.
+    const anchorBox = anchorRect(anchor);
+
+    // Width matching is applied before the panel is measured: a listbox widened to match its field
+    // may wrap differently, and measuring first would use a height that is about to change.
     if (state.matchWidth) {
-        panel.style.minWidth = `${anchor.getBoundingClientRect().width}px`;
+        panel.style.minWidth = `${anchorBox.width}px`;
     }
 
-    const anchorRect = anchor.getBoundingClientRect();
     const panelRect = panel.getBoundingClientRect();
     const resolved = resolveDirection(anchor, state.side, state.align);
 
-    let best = place(anchorRect, panelRect, resolved.side, resolved.align, state.offset);
+    let best = place(anchorBox, panelRect, resolved.side, resolved.align, state.offset);
     let side = resolved.side;
 
     // Flip to the opposite side when the preferred one does not fit, but only if the opposite
     // actually fits - flipping into an equally bad position just makes the panel jump.
     if (!best.fits && state.flip) {
-        const flipped = place(anchorRect, panelRect, OPPOSITE[resolved.side], resolved.align, state.offset);
+        const flipped = place(anchorBox, panelRect, OPPOSITE[resolved.side], resolved.align, state.offset);
 
         if (flipped.fits) {
             best = flipped;
@@ -241,7 +295,7 @@ export function open(anchorId, panelId, options, dotNetRef) {
         const anchor = document.getElementById(anchorId);
 
         if (anchor) {
-            state.resizeObserver.observe(anchor);
+            state.resizeObserver.observe(observableAnchor(anchor));
         }
     }
 

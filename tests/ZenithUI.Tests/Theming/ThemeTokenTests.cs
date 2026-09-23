@@ -179,6 +179,42 @@ public class ThemeTokenTests
             problems));
     }
 
+    [Theory]
+    [InlineData("light")]
+    [InlineData("dark")]
+    public void Backdrop_IsDarkerThanEverySurfaceItDims(string paletteName)
+    {
+        // Regression. The modal scrim was written as `oklch(from var(--zen-content) l c h / 0.45)`,
+        // on the reasoning that a backdrop should follow the palette. --zen-content flips to
+        // near-white in dark, so the "dim" became a white veil at 45% that washed the page out
+        // instead of pushing it back.
+        //
+        // A backdrop dims by definition, so its lightness has to sit below the surface it covers -
+        // in both palettes. That is the invariant, and it is what "derive it from a token that
+        // flips" cannot satisfy.
+        var palette = Palette(paletteName);
+        var backdrop = palette.ResolveColor("zen-backdrop");
+
+        backdrop.ShouldNotBeNull($"[{paletteName}] --zen-backdrop is missing.");
+
+        var problems = new List<string>();
+
+        foreach (var surfaceName in Surfaces)
+        {
+            var surface = palette.ResolveColor(surfaceName)!.Value;
+
+            if (backdrop.Value.L >= surface.L)
+            {
+                problems.Add(
+                    $"--zen-backdrop L={backdrop.Value.L:F3} is not below --{surfaceName} L={surface.L:F3}");
+            }
+        }
+
+        problems.ShouldBeEmpty(Report(
+            $"[{paletteName}] the modal scrim would lighten the page instead of dimming it",
+            problems));
+    }
+
     // ---- Contrast ---------------------------------------------------------------------------
 
     [Theory]

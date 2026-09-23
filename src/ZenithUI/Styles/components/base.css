@@ -460,12 +460,16 @@
    * utilities on the element itself. What cannot be reached from a utility is ::backdrop, which is
    * a pseudo-element on the top layer.
    *
-   * The backdrop colour is derived from the content token rather than a literal black, so it
-   * follows the palette: a dark page dimmed with black turns muddy, because the surface underneath
-   * is already dark and the backdrop has nothing to subtract.
+   * The scrim comes from --zen-backdrop, which each palette states outright.
+   *
+   * It was derived from --zen-content, on the reasoning that a backdrop should follow the palette.
+   * That token flips to near-white in dark, so the "dim" was a white veil at 45% that washed the
+   * page out instead of pushing it back. A backdrop dims by definition: it is dark in both
+   * palettes, and dark needs the HEAVIER value, not the lighter one, because the page underneath
+   * is already dark and a gentle scrim leaves too little between it and the dialog above.
    */
   .zen-modal::backdrop {
-    background-color: oklch(from var(--zen-content) l c h / 0.45);
+    background-color: var(--zen-backdrop);
     backdrop-filter: blur(2px);
   }
 

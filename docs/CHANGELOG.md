@@ -49,6 +49,19 @@ report a pointer going down outside a subtree. Every decision stays in C#.
 
 ### Fixed during M3
 
+- **Every popover opened in the top-left corner, whatever its placement.** The anchor wrapper is
+  `display: contents`, so that it is a positioning handle and nothing else — the caller's own
+  element keeps whatever layout it had. But a `display: contents` element generates no box, so
+  `getBoundingClientRect()` on it returns a zero rect at the origin, and every coordinate was
+  computed from (0, 0). The measurement now treats a zero-sized rect as "this element has no box"
+  rather than "this element is empty" and descends to the first child that does have one. The
+  `ResizeObserver` had the same blind spot — it never fires for an element with no box.
+- **The modal backdrop lightened the dark page instead of dimming it.** The scrim was written as
+  `oklch(from var(--zen-content) l c h / 0.45)`, reasoning that a backdrop should follow the
+  palette. `--zen-content` is near-white in dark, so the dim became a white veil at 45%. A
+  backdrop dims by definition: it is dark in *both* palettes, and dark needs the heavier value,
+  not the lighter one, because the page underneath is already dark. Now a stated `--zen-backdrop`
+  token per palette, with a test asserting its lightness sits below every surface it covers.
 - **`ZenModal`'s Escape suppression was a literal HTML attribute.** The dialog carried
   `@oncancel:preventDefault="true"` so the browser could not close it behind the component's back.
   `oncancel` is a recognised Blazor event but is registered *without* preventDefault support, so

@@ -33,6 +33,8 @@
     --zen-border: oklch(0.32 0.014 258);
     --zen-border-strong: oklch(0.44 0.016 258);
 
+    --zen-backdrop: oklch(0.11 0.01 258 / 0.7);
+
     --zen-primary: oklch(0.72 0.14 163);
     --zen-primary-content: oklch(0.17 0.03 163);
     --zen-primary-soft: oklch(0.3 0.05 163);
@@ -94,6 +96,8 @@
 
   --zen-border: oklch(0.32 0.014 258);
   --zen-border-strong: oklch(0.44 0.016 258);
+
+  --zen-backdrop: oklch(0.11 0.01 258 / 0.7);
 
   --zen-primary: oklch(0.72 0.14 163);
   --zen-primary-content: oklch(0.17 0.03 163);
