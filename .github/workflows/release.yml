@@ -90,27 +90,14 @@ jobs:
       # Exchanges the OIDC token for an API key valid for one hour. Done immediately before the
       # push for that reason - a key fetched at the start of a long job can expire before it is
       # used.
-      # TEMPORARY - remove once the first publish succeeds.
-      # Prints the shape of NUGET_USER, never its value: GitHub masks the secret itself, but a
-      # length and a character class are enough to tell a profile name from an email address or a
-      # value with a stray newline, which is what the token exchange rejects without saying so.
-      - name: Diagnose the NuGet username
-        run: |
-          user='${{ secrets.NUGET_USER }}'
-          echo "length: ${#user}"
-          case "$user" in
-            *@*) echo "contains '@' - this looks like an email address, and the exchange needs the profile name" ;;
-            *) echo "no '@' - not an email address" ;;
-          esac
-          case "$user" in
-            *[[:space:]]*) echo "contains whitespace - likely a stray newline or a display name" ;;
-            *) echo "no whitespace" ;;
-          esac
-          echo "repository: ${{ github.repository }}"
-          echo "repository_owner: ${{ github.repository_owner }}"
-          echo "workflow file: $(basename '${{ github.workflow_ref }}' | cut -d@ -f1)"
-          echo "ref: ${{ github.ref }}"
-
+      #
+      # The matching policy on nuget.org (username dropdown -> Trusted Publishing) has to hold the
+      # values the OIDC token actually carries, and every one of them is a slug rather than a
+      # label: Repository Owner is the GitHub account name, not the person's display name;
+      # Repository is the bare name without the owner; Workflow File is the filename alone, not
+      # its path; and Environment stays empty because this job declares none. A mismatch fails
+      # here with a 401 and "No matching trust policy owned by user ... was found", which does not
+      # say which field is wrong.
       - name: NuGet login
         uses: NuGet/login@v1
         id: login
