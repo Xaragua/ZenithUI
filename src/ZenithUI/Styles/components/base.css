@@ -668,6 +668,15 @@
     .zen-table-stack td.zen-table-empty {
       text-align: center;
     }
+
+    /*
+     * A group header spans the table as a <th>, which the rules above never reach - they are
+     * written for <td>. Left alone it would stay a table cell inside a block row and shrink to
+     * its content, so the header band would stop short of the cards it heads.
+     */
+    .zen-table-stack th.zen-table-group-cell {
+      display: block;
+    }
   }
 }
 

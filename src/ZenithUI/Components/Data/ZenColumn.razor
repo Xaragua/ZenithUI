@@ -58,6 +58,18 @@
     [Parameter]
     public Func<TItem, object?>? SortBy { get; set; }
 
+    /// <summary>
+    /// The name sent to the table's <c>ItemsProvider</c> when the user sorts by this column.
+    /// </summary>
+    /// <remarks>
+    /// Only a table with a provider reads it, and there it is required for the column to sort at
+    /// all: the server is doing the sorting, and a column it has no name for is a column it
+    /// cannot sort. A string rather than the <see cref="SortBy"/> delegate, because a delegate
+    /// cannot be translated into a query.
+    /// </remarks>
+    [Parameter]
+    public string? SortName { get; set; }
+
     /// <summary>Horizontal alignment of the header and cells.</summary>
     [Parameter]
     public ZenAlign Align { get; set; } = ZenAlign.Start;

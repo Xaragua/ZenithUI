@@ -30,9 +30,29 @@
 
     WHAT THE TABLE KNOWS
 
-    Sorting, paging and select-all operate on the items handed to this component. A table given
-    one page of a server-side query cannot sort the other pages and does not pretend to: set
-    PageSize to 0 and drive paging from outside when the data is remote.
+    Given Items, sorting, paging, grouping and select-all operate on exactly those items. Given an
+    ItemsProvider instead, the table asks for one window of rows at a time - a page, or whatever a
+    virtualized body has scrolled into view - and passes the sort along as the column's SortName.
+    The server does the work it is the only one able to do. The two are exclusive: a table cannot
+    sort rows it was never given, and it does not pretend to.
+
+    VIRTUALIZATION
+
+    Virtualize renders only the rows in view, through the framework's own <Virtualize>, with <tr>
+    spacers so the markup stays a valid table. It replaces paging rather than combining with it -
+    both are answers to "too many rows", and a paged table has at most one page to render anyway.
+    Every row is flattened into a single list first (group headers, tree rows, the lot), which is
+    what lets a virtualized body group and expand without a second code path. aria-rowcount and
+    aria-rowindex state the full size, because a screen reader otherwise counts only the handful
+    of rows that exist in the DOM and announces "row 3 of 12" in a table of ten thousand.
+
+    GROUPING
+
+    GroupBy inserts a header row before each group's rows. The header is a <th scope="rowgroup">
+    spanning the table, so a screen reader associates the rows below it with the group name the
+    way it associates cells with column headers. Groups collapse with a disclosure button, and
+    select as a whole with a tri-state checkbox. Grouping and the treegrid are exclusive: both
+    are ways of nesting rows, and a row cannot sit at two depths at once.
 *@
 
 @{
@@ -47,16 +67,17 @@
 
 <ZenDefer>
     @{
-        _rows = VisibleRows();
+        BuildRows();
     }
 
-    <div class="@RootClass(WrapperClass)" style="@Style" @attributes="AttributesWithoutClass">
+    <div id="@ScrollContainerId" class="@RootClass(WrapperClass)" style="@WrapperStyle" @attributes="AttributesWithoutClass">
         <table id="@Id"
                class="@TableClass"
-               role="@(Hierarchical ? "treegrid" : null)"
+               role="@TableRole"
                aria-label="@Label"
                aria-labelledby="@LabelledBy"
-               aria-busy="@(Loading ? "true" : null)"
+               aria-busy="@(IsLoading ? "true" : null)"
+               aria-rowcount="@AriaRowCount"
                @onfocusin="@(() => _hasFocus = true)"
                @onfocusout="@(() => _hasFocus = false)"
                @onkeydown="HandleKeyDownAsync">
@@ -68,7 +89,7 @@
             }
 
             <thead class="@HeadClass">
-                <tr>
+                <tr aria-rowindex="@(Virtualize ? 1 : null)">
                     @if (HasDetails)
                     {
                         @* The toggle column needs a header for the column count to line up, and a
@@ -100,7 +121,7 @@
                             class="@HeaderClassFor(column)"
                             style="@WidthStyle(column)"
                             aria-sort="@AriaSortFor(column)">
-                            @if (column.CanSort)
+                            @if (CanSort(column))
                             {
                                 <button type="button" class="@SortButtonClass" @onclick="@(() => ToggleSortAsync(column))">
                                     @HeaderContent(column)
@@ -122,12 +143,12 @@
             </thead>
 
             <tbody class="divide-y divide-border">
-                @if (Loading)
+                @if (IsLoading)
                 {
                     @* Skeleton rows keep the table's real shape, so the page does not jump when
                        the data lands. A spinner in place of the body collapses the table to
                        nothing and then pushes everything below it back down. *@
-                    @for (var i = 0; i < LoadingRowCount; i++)
+                    @for (var i = 0; i < SkeletonRowCount; i++)
                     {
                         <tr>
                             @for (var c = 0; c < ColumnCount; c++)
@@ -139,7 +160,7 @@
                         </tr>
                     }
                 }
-                else if (_rows.Count == 0)
+                else if (ShowEmptyState)
                 {
                     <tr>
                         @* zen-table-empty rather than a [colspan] selector, so the stacked mobile
@@ -160,115 +181,49 @@
                         </td>
                     </tr>
                 }
+                else if (UseVirtualize)
+                {
+                    @* Spacers are <tr>s so the table stays a table: the framework's default <div>
+                       spacer inside a <tbody> is invalid markup, and the browser hoists it out of
+                       the table entirely - taking the scroll height with it. *@
+                    @if (ItemsProvider is not null)
+                    {
+                        <Virtualize TItem="DisplayRow"
+                                    @ref="_virtualize"
+                                    ItemsProvider="_virtualRowsProvider"
+                                    ItemContent="RowTemplate"
+                                    Placeholder="PlaceholderTemplate"
+                                    ItemSize="ItemSize"
+                                    OverscanCount="OverscanCount"
+                                    SpacerElement="tr" />
+                    }
+                    else
+                    {
+                        @* A Placeholder even for rows already in memory. <Virtualize> renders one
+                           for every row it has not "loaded" yet - which, after a long jump, is
+                           every row in view - and its default is a <div> of ItemSize height. A
+                           <div> inside a <tbody> is wrapped by table layout and does not take
+                           that height, and the framework then measures the gap between its
+                           spacers, subtracts the height it assumed the placeholders had, and
+                           divides: the row height it arrives at collapses to a few pixels, the
+                           scroll box shrinks to a tenth of its length, and the view is left
+                           showing a handful of rows over empty space. A <tr> of the same height
+                           keeps the arithmetic true. *@
+                        <Virtualize TItem="DisplayRow"
+                                    @ref="_virtualize"
+                                    Items="_rows"
+                                    ItemContent="RowTemplate"
+                                    Placeholder="PlaceholderTemplate"
+                                    ItemSize="ItemSize"
+                                    OverscanCount="OverscanCount"
+                                    SpacerElement="tr" />
+                    }
+                }
                 else
                 {
-                    @for (var rowIndex = 0; rowIndex < _rows.Count; rowIndex++)
+                    @foreach (var row in _rows)
                     {
-                        var row = _rows[rowIndex];
-
-                        <tr id="@RowId(rowIndex)"
-                            class="@RowClassFor(row)"
-                            aria-level="@(Hierarchical ? row.Depth + 1 : null)"
-                            aria-expanded="@AriaExpandedFor(row)"
-                            aria-selected="@(Hierarchical && Selectable ? (IsSelected(row.Item) ? "true" : "false") : null)"
-                            tabindex="@(Hierarchical ? (IsActive(row.Item) ? 0 : -1) : null)"
-                            @onclick="@(() => RowClickedAsync(row))">
-                            @if (HasDetails)
-                            {
-                                <td class="@($"{BodyCellClass} w-px")" @onclick:stopPropagation="true">
-                                    @if (HasDetailFor(row.Item))
-                                    {
-                                        @* A disclosure button, which is why this stays a plain
-                                           table: aria-expanded on a button is valid markup
-                                           anywhere, so opening a detail row costs no role claim.
-
-                                           Kept in the tab order even inside a treegrid, on the
-                                           same reasoning as the selection checkbox - Left and
-                                           Right already belong to the hierarchy, so there is no
-                                           arrow key left to reach this with. *@
-                                        <button type="button"
-                                                class="@DetailToggleClass"
-                                                aria-expanded="@(IsDetailOpen(row.Item) ? "true" : "false")"
-                                                aria-controls="@(IsDetailOpen(row.Item) ? DetailRowId(rowIndex) : null)"
-                                                aria-label="@($"Details for {RowLabel(row)}")"
-                                                @onclick="@(() => ToggleDetailAsync(row.Item))">
-                                            <ZenIcon Path="@ZenIcons.ChevronRight" class="@DetailChevronClass(row.Item)" />
-                                        </button>
-                                    }
-                                </td>
-                            }
-
-                            @if (Selectable)
-                            {
-                                @* Kept in the tab order even inside the treegrid, where the
-                                   pattern would have every cell control at tabindex -1. Losing
-                                   keyboard access to selection is a worse failure than an extra
-                                   tab stop per row, and there is no arrow key left to reach it
-                                   with - Left and Right are spoken for by the hierarchy. *@
-                                <td class="@($"{BodyCellClass} w-px")" @onclick:stopPropagation="true">
-                                    <ZenCheckbox Value="@IsSelected(row.Item)"
-                                                 ValueChanged="@(_ => ToggleSelectionAsync(row.Item))"
-                                                 aria-label="@($"Select {RowLabel(row)}")" />
-                                </td>
-                            }
-
-                            @foreach (var (column, index) in _columns.Select((c, i) => (c, i)))
-                            {
-                                @* data-label is what the stacked mobile layout prints in front of
-                                   each value, because the header row is off screen there. It is a
-                                   plain attribute rather than a duplicated <span>, so the label
-                                   exists exactly once in the DOM and a screen reader - which
-                                   still has the real header association - never hears it twice. *@
-                                <td class="@BodyCellClassFor(column)"
-                                    data-label="@column.Title"
-                                    style="@(index == 0 && Hierarchical ? $"--zen-depth: {row.Depth}" : null)">
-                                    @if (index == 0 && Hierarchical)
-                                    {
-                                        <div class="zen-indent flex items-center gap-1.5">
-                                            @if (row.HasChildren)
-                                            {
-                                                <button type="button"
-                                                        class="grid size-5 shrink-0 place-items-center rounded-zen-sm text-content-subtle"
-                                                        tabindex="-1"
-                                                        aria-hidden="true"
-                                                        @onclick="@(() => ToggleExpanded(row.Item))"
-                                                        @onclick:stopPropagation="true">
-                                                    <ZenIcon Path="@ZenIcons.ChevronRight"
-                                                             class="@($"size-4 transition-transform {(row.IsExpanded ? "rotate-90" : null)}")" />
-                                                </button>
-                                            }
-                                            else
-                                            {
-                                                <span class="size-5 shrink-0" aria-hidden="true"></span>
-                                            }
-
-                                            <span class="min-w-0">@CellContent(column, row.Item)</span>
-                                        </div>
-                                    }
-                                    else
-                                    {
-                                        @CellContent(column, row.Item)
-                                    }
-                                </td>
-                            }
-                        </tr>
-
-                        @if (HasDetails && IsDetailOpen(row.Item))
-                        {
-                            @* A sibling row rather than content nested inside the data row. A
-                               <tr> cannot contain another <tr>, and a detail panel placed inside
-                               a <td> would be constrained by that column's width - which is the
-                               one thing a panel meant to hold a whole table must not be.
-
-                               It is rendered only while open, so a hundred-row table does not
-                               build a hundred hidden panels, and a detail that fetches its own
-                               data does not fetch it a hundred times. *@
-                            <tr id="@DetailRowId(rowIndex)" class="@DetailRowClass">
-                                <td colspan="@ColumnCount" class="zen-table-detail px-4 py-4">
-                                    @RowDetailTemplate!(row.Item)
-                                </td>
-                            </tr>
-                        }
+                        @RenderRow(row)
                     }
                 }
             </tbody>
@@ -279,9 +234,12 @@
        The page-size control is the reason: a table that fits on one page at 50 rows may not at
        10, and hiding the only way to find that out behind "there is already more than one page"
        is a chicken-and-egg. The page BUTTONS still only appear when there is somewhere to go. *@
-    @if (EffectivePageSize > 0 && !Loading)
+    @if (EffectivePageSize > 0 && !Loading && !(_fetching && _lastFetch is null))
     {
-        <nav class="mt-3 flex flex-wrap items-center justify-between gap-x-4 gap-y-3" aria-label="Pagination">
+        @* Named after the table, because a <nav> is a landmark and a page with two paged
+           tables would otherwise offer a screen reader two landmarks called "Pagination" with
+           nothing to tell them apart. *@
+        <nav class="mt-3 flex flex-wrap items-center justify-between gap-x-4 gap-y-3" aria-label="@PagerLabel">
             <div class="flex flex-wrap items-center gap-x-4 gap-y-2">
                 @* aria-live, because the rows change without anything moving focus - a screen
                    reader user pressing Next would otherwise get no confirmation that anything
@@ -362,14 +320,73 @@
 </ZenDefer>
 
 @code {
-    /// <summary>One row as the table currently sees it.</summary>
-    private sealed record Row(TItem Item, int Depth, bool HasChildren, bool IsExpanded);
+    /// <summary>One row of the body as the table currently sees it.</summary>
+    /// <remarks>
+    /// Every kind of row lives in one flat list - data rows, tree rows, group headers - because
+    /// that list is the single thing both the plain loop and <c>&lt;Virtualize&gt;</c> render.
+    /// <paramref name="Index"/> is the row's position in the whole list, not in the DOM, which is
+    /// what keeps ids and <c>aria-rowindex</c> correct once only a window of rows exists.
+    /// </remarks>
+    private abstract record DisplayRow(int Index);
+
+    /// <summary>A data row.</summary>
+    private sealed record ItemRow(TItem Item, int Depth, bool HasChildren, bool IsExpanded, int Index)
+        : DisplayRow(Index);
+
+    /// <summary>The header row that opens a group.</summary>
+    private sealed record GroupRow(ZenTableGroup<TItem> Group, bool IsCollapsed, int Index)
+        : DisplayRow(Index);
+
+    /// <summary>The shape of the last provider request, so an unchanged view is not refetched.</summary>
+    private sealed record FetchKey(int StartIndex, int? Count, string? SortName, bool SortDescending, int Version);
 
     private readonly List<ZenColumn<TItem>> _columns = [];
     private readonly HashSet<TItem> _expanded = [];
     private readonly HashSet<TItem> _detailsOpen = [];
+    private readonly HashSet<object> _collapsedGroups = [];
+    private readonly HashSet<object> _seenGroups = [];
 
     private static readonly int[] DefaultPageSizeOptions = [10, 25, 50, 100];
+
+    /// <summary>Stands in for a null group key, which a <see cref="HashSet{T}"/> cannot hold.</summary>
+    private static readonly object NullGroupKey = new();
+
+    /// <summary>
+    /// How many rows a virtualized table renders when there is no JavaScript to measure the
+    /// viewport with - static SSR, and the prerender pass before the circuit connects.
+    /// </summary>
+    /// <remarks>
+    /// Some rather than none, so a server-rendered page arrives with content and a crawler sees
+    /// data. Not all of them, because the reason to virtualize is that "all of them" is too many
+    /// to render - and that is at least as true on the server.
+    /// </remarks>
+    internal const int StaticVirtualRowCount = 50;
+
+    private Virtualize<DisplayRow>? _virtualize;
+    private readonly ItemsProviderDelegate<DisplayRow> _virtualRowsProvider;
+
+    private CancellationTokenSource? _fetch;
+    private FetchKey? _lastFetch;
+    private int _refreshVersion;
+    private FetchKey? _inFlight;
+    private bool _fetching;
+    private IReadOnlyList<TItem> _providerItems = [];
+    private int _totalCount;
+
+    /// <summary>
+    /// Rows a virtualized provider has delivered, by index, so the picker's keyboard cursor can
+    /// commit a row it moved onto by index before that row's markup existed.
+    /// </summary>
+    private readonly Dictionary<int, TItem> _loadedByIndex = [];
+
+    /// <summary>What paging counts: items, or items plus collapsed group headers when grouped.</summary>
+    private int _pagingTotal;
+
+    /// <summary>Every row of the body before any static-render cut, for aria-rowcount.</summary>
+    private int _rowTotal;
+
+    /// <summary>Creates the table.</summary>
+    public ZenTable() => _virtualRowsProvider = ProvideVirtualRowsAsync;
 
     /// <summary>The rows built by the current render pass, reused by everything that needs them.</summary>
     /// <remarks>
@@ -378,7 +395,10 @@
     /// row count - and the keyboard would be navigating a list built from slightly different state
     /// than the one on screen.
     /// </remarks>
-    private List<Row> _rows = [];
+    private List<DisplayRow> _rows = [];
+
+    /// <summary>The data rows of <see cref="_rows"/>, without the group headers.</summary>
+    private List<ItemRow> _itemRows = [];
 
     private int _generation;
     private int _collectedGeneration = -1;
@@ -427,6 +447,113 @@
     /// <summary>Rows to open on first render.</summary>
     [Parameter]
     public Func<TItem, bool>? IsInitiallyExpanded { get; set; }
+
+    /// <summary>
+    /// Loads rows on demand - a page at a time, or a window at a time when
+    /// <see cref="Virtualize"/> is on. Use instead of <see cref="Items"/> when the data lives on a
+    /// server.
+    /// </summary>
+    /// <remarks>
+    /// The request carries the sorted column's <see cref="ZenColumn{TItem}.SortName"/>, and only
+    /// columns that declare one are sortable: the server is doing the sorting, and a column it
+    /// has no name for is a column it cannot sort. Requests are cancelled when superseded, so
+    /// pass the token on to the query.
+    /// <para>
+    /// Selection compares rows with <see cref="object.Equals(object)"/>. Each request returns new
+    /// instances, so give <c>TItem</c> value equality - a record, or an overridden
+    /// <c>Equals</c> - or a selected row will not recognise itself on the next page load.
+    /// </para>
+    /// </remarks>
+    [Parameter]
+    public Func<ZenTableRequest, ValueTask<ZenTableResult<TItem>>>? ItemsProvider { get; set; }
+
+    // ---- Virtualization -----------------------------------------------------------------------
+
+    /// <summary>
+    /// Render only the rows in view. For long tables; replaces paging.
+    /// </summary>
+    /// <remarks>
+    /// Set <see cref="Height"/> as well, so the table scrolls inside its own box; without it the
+    /// page is the scroll container. The stacked mobile layout is switched off while
+    /// virtualizing, because it turns every row into a card of a different height and the
+    /// scrollbar is sized from <see cref="ItemSize"/>.
+    /// <para>
+    /// Under static SSR, and during prerender, the first
+    /// <c>50</c> rows are rendered - there is no JavaScript yet to measure the viewport with.
+    /// </para>
+    /// </remarks>
+    [Parameter]
+    public bool Virtualize { get; set; }
+
+    /// <summary>
+    /// A virtualized row's height in pixels, used to size the scrollbar before rows are measured.
+    /// </summary>
+    [Parameter]
+    public float ItemSize { get; set; } = 40f;
+
+    /// <summary>How many rows to render beyond each edge of the viewport.</summary>
+    [Parameter]
+    public int OverscanCount { get; set; } = 5;
+
+    /// <summary>
+    /// A CSS max-height for the table's own scroll box, for example <c>"28rem"</c>.
+    /// </summary>
+    /// <remarks>
+    /// Setting it also makes the header sticky: a table that scrolls inside a box and loses its
+    /// header on the first flick of the wheel is a table of unlabelled numbers.
+    /// </remarks>
+    [Parameter]
+    public string? Height { get; set; }
+
+    // ---- Grouping -----------------------------------------------------------------------------
+
+    /// <summary>
+    /// The value to group rows by. Each distinct value gets a header row, and groups are ordered
+    /// by it.
+    /// </summary>
+    /// <remarks>
+    /// Groups are ordered by their key, nulls first; the column sort then applies within each
+    /// group. Cannot be combined with <see cref="ChildrenProvider"/> or
+    /// <see cref="ItemsProvider"/>: the first is another way of nesting rows, and the second
+    /// never has every row to group.
+    /// </remarks>
+    [Parameter]
+    public Func<TItem, object?>? GroupBy { get; set; }
+
+    /// <summary>The text shown for a group's key. Defaults to its <c>ToString()</c>.</summary>
+    [Parameter]
+    public Func<object?, string>? GroupText { get; set; }
+
+    /// <summary>The header shown for rows whose key is null.</summary>
+    [Parameter]
+    public string UngroupedText { get; set; } = "(None)";
+
+    /// <summary>
+    /// Custom content for a group header, replacing the name and count.
+    /// </summary>
+    /// <remarks>
+    /// Rendered inside the collapse button when groups are collapsible, so it must not itself
+    /// contain anything interactive - a button inside a button is invalid, and neither one can be
+    /// operated reliably.
+    /// </remarks>
+    [Parameter]
+    public RenderFragment<ZenTableGroup<TItem>>? GroupHeaderTemplate { get; set; }
+
+    /// <summary>Let the user collapse and expand groups.</summary>
+    [Parameter]
+    public bool GroupsCollapsible { get; set; } = true;
+
+    /// <summary>Groups that start collapsed, by key.</summary>
+    [Parameter]
+    public Func<object?, bool>? IsGroupInitiallyCollapsed { get; set; }
+
+    /// <summary>Order groups by descending key.</summary>
+    [Parameter]
+    public bool GroupDescending { get; set; }
+
+    /// <summary>Set by <c>ZenLookup</c>, which hosts this table as its popup grid.</summary>
+    [CascadingParameter]
+    private ZenTablePicker<TItem>? Picker { get; set; }
 
     // ---- State --------------------------------------------------------------------------------
 
@@ -652,7 +779,41 @@
 
     private int ColumnCount => _columns.Count + (Selectable ? 1 : 0) + (HasDetails ? 1 : 0);
 
-    private IReadOnlyList<TItem> Source => Items as IReadOnlyList<TItem> ?? Items?.ToList() ?? [];
+    private bool Grouped => GroupBy is not null;
+
+    private IReadOnlyList<TItem> Source =>
+        ItemsProvider is not null
+            ? _providerItems
+            : Items as IReadOnlyList<TItem> ?? Items?.ToList() ?? [];
+
+    /// <summary>
+    /// Whether the body goes through <c>&lt;Virtualize&gt;</c>: asked for, and with a renderer
+    /// that has JavaScript to measure the viewport with.
+    /// </summary>
+    private bool UseVirtualize => Virtualize && RendererInfo.IsInteractive;
+
+    /// <summary>
+    /// Loading as far as the markup is concerned: the caller says so, or the first page of a
+    /// provider has not arrived.
+    /// </summary>
+    private bool IsLoading => Loading || _fetching;
+
+    /// <summary>
+    /// Skeleton rows match the page they replace, so paging through a server-backed table does
+    /// not collapse the body to five rows and back on every click.
+    /// </summary>
+    private int SkeletonRowCount =>
+        ItemsProvider is not null && _providerItems.Count > 0 ? _providerItems.Count : LoadingRowCount;
+
+    /// <summary>
+    /// A virtualized provider table never shows the empty state from here: until
+    /// <c>&lt;Virtualize&gt;</c> has asked, the table does not know it is empty.
+    /// </summary>
+    private bool ShowEmptyState =>
+        UseVirtualize && ItemsProvider is not null ? _lastFetch is not null && _totalCount == 0 : _rows.Count == 0;
+
+    /// <summary>The number of rows paging counts: see <see cref="_pagingTotal"/>.</summary>
+    private int PagingTotal => ItemsProvider is not null ? _totalCount : _pagingTotal;
 
     private int CurrentPage => Page > 0 ? Page : _page;
 
@@ -682,7 +843,7 @@
 
     private int PageCount => EffectivePageSize <= 0
         ? 1
-        : Math.Max(1, (Source.Count + EffectivePageSize - 1) / EffectivePageSize);
+        : Math.Max(1, (PagingTotal + EffectivePageSize - 1) / EffectivePageSize);
 
     /// <summary>
     /// The page numbers to draw, with <see langword="null"/> standing for a gap.
@@ -733,33 +894,57 @@
     }
 
     /// <summary>
-    /// The rows on screen: sorted, paged, then flattened through whatever is expanded.
+    /// Builds the rows on screen: sorted, grouped, paged, then flattened through whatever is
+    /// expanded.
     /// </summary>
     /// <remarks>
     /// That order matters. Paging after flattening would let one expanded row push its siblings
     /// onto the next page, so opening a row would appear to delete the ones below it. Pages are
     /// counted in top-level rows, and a subtree travels with its parent.
+    /// <para>
+    /// A provider's rows arrive already sorted and already paged - that was the request - so they
+    /// are only flattened.
+    /// </para>
     /// </remarks>
-    private List<Row> VisibleRows()
+    private void BuildRows()
     {
         SeedInitialExpansion();
 
         var roots = Sorted(Source);
+        var rows = new List<DisplayRow>(roots.Count);
 
-        if (EffectivePageSize > 0)
+        if (Grouped)
         {
-            roots = roots.Skip((Math.Clamp(CurrentPage, 1, PageCount) - 1) * EffectivePageSize)
-                .Take(EffectivePageSize)
-                .ToList();
+            BuildGroupedRows(roots, rows);
+        }
+        else
+        {
+            _pagingTotal = roots.Count;
+
+            if (EffectivePageSize > 0 && ItemsProvider is null)
+            {
+                roots = roots.Skip((Math.Clamp(CurrentPage, 1, PageCount) - 1) * EffectivePageSize)
+                    .Take(EffectivePageSize)
+                    .ToList();
+            }
+
+            Flatten(roots, 0, rows);
         }
 
-        var rows = new List<Row>(roots.Count);
-        Flatten(roots, 0, rows);
+        _rowTotal = rows.Count;
 
-        return rows;
+        // Virtualizing with no JavaScript: the first rows as plain markup. Cut after flattening, so
+        // the total above still counts every row for aria-rowcount.
+        if (Virtualize && !UseVirtualize && ItemsProvider is null && rows.Count > StaticVirtualRowCount)
+        {
+            rows.RemoveRange(StaticVirtualRowCount, rows.Count - StaticVirtualRowCount);
+        }
+
+        _rows = rows;
+        _itemRows = rows.OfType<ItemRow>().ToList();
     }
 
-    private void Flatten(IReadOnlyList<TItem> items, int depth, List<Row> into)
+    private void Flatten(IReadOnlyList<TItem> items, int depth, List<DisplayRow> into)
     {
         foreach (var item in items)
         {
@@ -767,12 +952,143 @@
             var childList = children is null ? [] : Sorted(children);
             var expanded = _expanded.Contains(item);
 
-            into.Add(new Row(item, depth, childList.Count > 0, expanded));
+            into.Add(new ItemRow(item, depth, childList.Count > 0, expanded, into.Count));
 
             if (expanded && childList.Count > 0)
             {
                 Flatten(childList, depth + 1, into);
             }
+        }
+    }
+
+    /// <summary>
+    /// Splits the sorted rows into groups, then pages across them.
+    /// </summary>
+    /// <remarks>
+    /// Paging counts what the user can see a row for: every row of an expanded group, and one
+    /// for each collapsed group's header. Counting group headers everywhere would make pages
+    /// shorter the more groups they cross, and counting a collapsed group's hidden rows would
+    /// produce pages that are nothing but headers.
+    /// <para>
+    /// A group that runs over a page boundary repeats its header at the top of the next page.
+    /// Without it the rows at the top of page two belong to a group whose name is on page one.
+    /// </para>
+    /// </remarks>
+    private void BuildGroupedRows(List<TItem> sorted, List<DisplayRow> into)
+    {
+        var groups = Groups(sorted);
+        var entries = new List<(ZenTableGroup<TItem> Group, bool Collapsed, TItem? Item)>(sorted.Count);
+
+        foreach (var group in groups)
+        {
+            var collapsed = IsGroupCollapsed(group);
+
+            if (collapsed)
+            {
+                entries.Add((group, true, default));
+                continue;
+            }
+
+            foreach (var item in group.Items)
+            {
+                entries.Add((group, false, item));
+            }
+        }
+
+        _pagingTotal = entries.Count;
+
+        IEnumerable<(ZenTableGroup<TItem> Group, bool Collapsed, TItem? Item)> window = entries;
+
+        if (EffectivePageSize > 0)
+        {
+            window = entries.Skip((Math.Clamp(CurrentPage, 1, PageCount) - 1) * EffectivePageSize)
+                .Take(EffectivePageSize);
+        }
+
+        ZenTableGroup<TItem>? current = null;
+
+        foreach (var (group, collapsed, item) in window)
+        {
+            if (!ReferenceEquals(group, current))
+            {
+                into.Add(new GroupRow(group, collapsed, into.Count));
+                current = group;
+            }
+
+            if (!collapsed)
+            {
+                into.Add(new ItemRow(item!, 0, false, false, into.Count));
+            }
+        }
+    }
+
+    /// <summary>The groups, in key order, each holding its rows in the current sort order.</summary>
+    private List<ZenTableGroup<TItem>> Groups(List<TItem> sorted)
+    {
+        var buckets = new Dictionary<object, (object? Key, List<TItem> Items)>();
+        var order = new List<object>();
+
+        foreach (var item in sorted)
+        {
+            var key = GroupBy!(item);
+            var slot = key ?? NullGroupKey;
+
+            if (!buckets.TryGetValue(slot, out var bucket))
+            {
+                bucket = (key, []);
+                buckets[slot] = bucket;
+                order.Add(slot);
+            }
+
+            bucket.Items.Add(item);
+        }
+
+        var comparer = Comparer<object?>.Create(CompareValues);
+        var keys = GroupDescending
+            ? order.OrderByDescending(slot => buckets[slot].Key, comparer)
+            : order.OrderBy(slot => buckets[slot].Key, comparer);
+
+        var groups = new List<ZenTableGroup<TItem>>(order.Count);
+
+        foreach (var slot in keys)
+        {
+            var (key, items) = buckets[slot];
+            var text = key is null ? UngroupedText : GroupText?.Invoke(key) ?? key.ToString() ?? UngroupedText;
+
+            groups.Add(new ZenTableGroup<TItem>(key, text, items));
+        }
+
+        return groups;
+    }
+
+    /// <summary>
+    /// Whether a group is collapsed, seeding it from <see cref="IsGroupInitiallyCollapsed"/> the
+    /// first time the group is seen.
+    /// </summary>
+    /// <remarks>
+    /// Seeded per group rather than once for the table, because groups come and go with the data:
+    /// a group that first appears after a refresh should still start the way the caller asked.
+    /// Seeded only once per group, so a group the user has opened stays open.
+    /// </remarks>
+    private bool IsGroupCollapsed(ZenTableGroup<TItem> group)
+    {
+        var slot = group.Key ?? NullGroupKey;
+
+        if (_seenGroups.Add(slot) && IsGroupInitiallyCollapsed?.Invoke(group.Key) == true)
+        {
+            _collapsedGroups.Add(slot);
+        }
+
+        return GroupsCollapsible && _collapsedGroups.Contains(slot);
+    }
+
+    private void ToggleGroup(ZenTableGroup<TItem> group)
+    {
+        var slot = group.Key ?? NullGroupKey;
+
+        if (!_collapsedGroups.Remove(slot))
+        {
+            _collapsedGroups.Add(slot);
         }
     }
 
@@ -785,7 +1101,9 @@
     /// </remarks>
     private List<TItem> Sorted(IEnumerable<TItem> items)
     {
-        if (_sortColumn?.SortKey is not { } key)
+        // A provider sorted on the server; re-sorting its page here would reorder one page of a
+        // sort that spans all of them.
+        if (ItemsProvider is not null || _sortColumn?.SortKey is not { } key)
         {
             return items.ToList();
         }
@@ -889,6 +1207,7 @@
         // is no longer where they left it. Returning to the first page is the only position that
         // means the same thing before and after.
         await GoToPageAsync(1);
+        await ReloadAsync();
     }
 
     private async Task GoToPageAsync(int page)
@@ -902,6 +1221,7 @@
 
         _page = target;
         await PageChanged.InvokeAsync(target);
+        await ReloadAsync();
     }
 
     /// <inheritdoc />
@@ -910,15 +1230,271 @@
     /// given a new value, so a consumer that binds it can reset the view - while a consumer that
     /// sets it once and never touches it does not have their user's choice overwritten on every
     /// re-render.
+    /// <para>
+    /// Contradictory parameters throw rather than being quietly resolved. Each pair below is two
+    /// answers to the same question, and silently preferring one would ship a table that ignores
+    /// half of what the page asked for.
+    /// </para>
     /// </remarks>
-    protected override void OnParametersSet()
+    protected override async Task OnParametersSetAsync()
     {
+        ValidateParameters();
+
         if (PageSize != _lastPageSizeParameter)
         {
             _lastPageSizeParameter = PageSize;
             _chosenPageSize = null;
         }
+
+        // A page that swaps the provider for Items (or back) must not keep rows from the old one.
+        if (ItemsProvider is null && _lastFetch is not null)
+        {
+            _lastFetch = null;
+            _providerItems = [];
+            _totalCount = 0;
+        }
+
+        await EnsureDataAsync();
     }
+
+    private void ValidateParameters()
+    {
+        if (Items is not null && ItemsProvider is not null)
+        {
+            throw new InvalidOperationException(
+                $"{nameof(ZenTable<TItem>)} takes {nameof(Items)} or {nameof(ItemsProvider)}, not both.");
+        }
+
+        if (ItemsProvider is not null && ChildrenProvider is not null)
+        {
+            throw new InvalidOperationException(
+                $"{nameof(ZenTable<TItem>)} cannot combine {nameof(ItemsProvider)} with {nameof(ChildrenProvider)}: " +
+                "a hierarchy has to be walked in full, and a provider only ever returns a window of it.");
+        }
+
+        if (GroupBy is not null && ChildrenProvider is not null)
+        {
+            throw new InvalidOperationException(
+                $"{nameof(ZenTable<TItem>)} cannot combine {nameof(GroupBy)} with {nameof(ChildrenProvider)}: " +
+                "both nest rows, and a row cannot sit at two depths at once.");
+        }
+
+        if (GroupBy is not null && ItemsProvider is not null)
+        {
+            throw new InvalidOperationException(
+                $"{nameof(ZenTable<TItem>)} cannot combine {nameof(GroupBy)} with {nameof(ItemsProvider)}: " +
+                "grouping needs every row, and a provider only returns a window of them.");
+        }
+
+        if (Virtualize && PageSize > 0)
+        {
+            throw new InvalidOperationException(
+                $"{nameof(ZenTable<TItem>)} cannot both {nameof(Virtualize)} and page. " +
+                $"They are alternatives - set {nameof(PageSize)} to 0 to virtualize.");
+        }
+    }
+
+    // ---- Provider data ------------------------------------------------------------------------
+
+    /// <summary>
+    /// Reloads the rows from <see cref="ItemsProvider"/>, keeping the current sort and page.
+    /// </summary>
+    /// <remarks>
+    /// For data that changed on the server - after a save, or when a filter outside the table
+    /// changed what the provider returns. Does nothing for a table given <see cref="Items"/>, which
+    /// re-reads them on every render anyway. Call it from the component's own dispatcher, as with
+    /// any method that renders: from an event handler, or through <c>InvokeAsync</c>.
+    /// </remarks>
+    public async Task RefreshDataAsync()
+    {
+        if (ItemsProvider is null)
+        {
+            return;
+        }
+
+        _refreshVersion++;
+
+        if (UseVirtualize)
+        {
+            // An empty table rendered its empty state instead of the <Virtualize>, so there is no
+            // live instance to refresh. Forgetting the last result brings a new one back, and a
+            // new one asks for its first window by itself.
+            var hadVirtualize = !ShowEmptyState && _virtualize is not null;
+
+            _lastFetch = null;
+            _loadedByIndex.Clear();
+
+            if (hadVirtualize)
+            {
+                await _virtualize!.RefreshDataAsync();
+            }
+
+            StateHasChanged();
+            return;
+        }
+
+        var load = EnsureDataAsync();
+        StateHasChanged();
+        await load;
+        StateHasChanged();
+    }
+
+    /// <summary>
+    /// Returns to the first page, for an owner whose query has changed what the rows are.
+    /// </summary>
+    internal async Task ResetToFirstPageAsync()
+    {
+        _page = 1;
+
+        if (Page > 1)
+        {
+            await PageChanged.InvokeAsync(1);
+        }
+    }
+
+    /// <summary>Re-requests the current view after a sort, page or page-size change.</summary>
+    private async Task ReloadAsync()
+    {
+        if (ItemsProvider is null)
+        {
+            return;
+        }
+
+        if (UseVirtualize)
+        {
+            _loadedByIndex.Clear();
+
+            if (_virtualize is not null)
+            {
+                await _virtualize.RefreshDataAsync();
+            }
+
+            return;
+        }
+
+        await EnsureDataAsync();
+    }
+
+    /// <summary>
+    /// Asks the provider for the current view, unless that exact view is already loaded or
+    /// already on its way.
+    /// </summary>
+    /// <remarks>
+    /// Keyed on the request rather than triggered per event, because the same change arrives by
+    /// more than one route - a page button raises PageChanged, the parent re-renders and hands the
+    /// new Page back as a parameter - and fetching once per route would load every page twice.
+    /// </remarks>
+    private async Task EnsureDataAsync()
+    {
+        if (ItemsProvider is null || UseVirtualize)
+        {
+            return;
+        }
+
+        var paged = EffectivePageSize > 0;
+        var start = paged ? (Math.Max(CurrentPage, 1) - 1) * EffectivePageSize : 0;
+        int? count = paged ? EffectivePageSize : Virtualize ? StaticVirtualRowCount : null;
+        var key = new FetchKey(start, count, _sortColumn?.SortName, _sortDescending, _refreshVersion);
+
+        if (key == _lastFetch || key == _inFlight)
+        {
+            return;
+        }
+
+        // Cancel the request in flight. A slow response for page 2 landing after a fast one for
+        // page 3 would otherwise put page 2's rows under a pager that says 3.
+        _fetch?.Cancel();
+        _fetch?.Dispose();
+        _fetch = new CancellationTokenSource();
+
+        var token = _fetch.Token;
+
+        _inFlight = key;
+        _fetching = true;
+
+        try
+        {
+            var result = await ItemsProvider(
+                new ZenTableRequest(key.StartIndex, key.Count, key.SortName, key.SortDescending, token));
+
+            if (token.IsCancellationRequested)
+            {
+                return;
+            }
+
+            _providerItems = result.Items;
+            _totalCount = result.TotalCount;
+            _lastFetch = key;
+        }
+        catch (OperationCanceledException)
+        {
+            // Superseded. The newer request owns the loading state now.
+        }
+        finally
+        {
+            if (!token.IsCancellationRequested)
+            {
+                _inFlight = null;
+                _fetching = false;
+            }
+        }
+    }
+
+    /// <summary>The virtualized body's source when the rows come from a provider.</summary>
+    private async ValueTask<ItemsProviderResult<DisplayRow>> ProvideVirtualRowsAsync(ItemsProviderRequest request)
+    {
+        if (ItemsProvider is null)
+        {
+            return new ItemsProviderResult<DisplayRow>([], 0);
+        }
+
+        var result = await ItemsProvider(new ZenTableRequest(
+            request.StartIndex,
+            request.Count,
+            _sortColumn?.SortName,
+            _sortDescending,
+            request.CancellationToken));
+
+        var rows = new List<DisplayRow>(result.Items.Count);
+
+        for (var i = 0; i < result.Items.Count; i++)
+        {
+            var index = request.StartIndex + i;
+
+            _loadedByIndex[index] = result.Items[i];
+            rows.Add(new ItemRow(result.Items[i], 0, false, false, index));
+        }
+
+        // The table's own markup depends on the total - aria-rowcount, and the empty state - so
+        // it re-renders when that changes. <Virtualize> does not refetch on a parent render, so
+        // this cannot loop.
+        var changed = _lastFetch is null || _totalCount != result.TotalCount;
+
+        _totalCount = result.TotalCount;
+        _lastFetch ??= new FetchKey(0, null, _sortColumn?.SortName, _sortDescending, _refreshVersion);
+
+        if (changed)
+        {
+            StateHasChanged();
+        }
+
+        return new ItemsProviderResult<DisplayRow>(rows, result.TotalCount);
+    }
+
+    /// <summary>
+    /// A virtualized provider row that has not arrived yet: a skeleton the height of a row.
+    /// </summary>
+    private RenderFragment<PlaceholderContext> PlaceholderTemplate => context => __builder =>
+    {
+        <tr aria-rowindex="@(context.Index + 2)" style="@RowHeightStyle">
+            @for (var c = 0; c < ColumnCount; c++)
+            {
+                <td class="@BodyCellClass">
+                    <ZenSkeleton Shape="ZenSkeletonShape.Text" />
+                </td>
+            }
+        </tr>
+    };
 
     /// <summary>
     /// Applies a new page size, keeping the row currently at the top of the page in view.
@@ -943,6 +1519,7 @@
 
         await PageSizeChanged.InvokeAsync(size);
         await GoToPageAsync((firstRowIndex / size) + 1);
+        await ReloadAsync();
     }
 
     // ---- Detail rows --------------------------------------------------------------------------
@@ -998,7 +1575,7 @@
     /// silently selects rows the user has never seen is how a bulk delete takes out more than it
     /// was meant to.
     /// </remarks>
-    private List<TItem> PageItems => _rows.ConvertAll(r => r.Item);
+    private List<TItem> PageItems => _itemRows.ConvertAll(r => r.Item);
 
     private bool AllOnPageSelected
     {
@@ -1029,9 +1606,14 @@
         await SelectedItemsChanged.InvokeAsync(next);
     }
 
-    private async Task RowClickedAsync(Row row)
+    private async Task RowClickedAsync(ItemRow row)
     {
         _active = row.Item;
+
+        if (Picker is not null)
+        {
+            await Picker.RowClicked(row.Item, row.Index);
+        }
 
         if (OnRowClick.HasDelegate)
         {
@@ -1046,7 +1628,7 @@
             return EqualityComparer<TItem>.Default.Equals(_active, item);
         }
 
-        return _rows.Count > 0 && EqualityComparer<TItem>.Default.Equals(_rows[0].Item, item);
+        return _itemRows.Count > 0 && EqualityComparer<TItem>.Default.Equals(_itemRows[0].Item, item);
     }
 
     /// <summary>
@@ -1068,7 +1650,7 @@
             return;
         }
 
-        var rows = _rows;
+        var rows = _itemRows;
 
         if (rows.Count == 0)
         {
@@ -1145,6 +1727,20 @@
 
     /// <inheritdoc />
     /// <remarks>
+    /// A provider request still in flight when the table goes away is cancelled, so a query that
+    /// honours the token stops rather than finishing for a table nobody can see.
+    /// </remarks>
+    protected override async ValueTask DisposeAsyncCore()
+    {
+        _fetch?.Cancel();
+        _fetch?.Dispose();
+        _fetch = null;
+
+        await base.DisposeAsyncCore();
+    }
+
+    /// <inheritdoc />
+    /// <remarks>
     /// Moving focus after the render rather than in the key handler, for the same reason ZenTree
     /// does: ArrowRight expands a row and descends into a child that did not exist in the DOM when
     /// the key arrived. Gated on the table already holding focus, so a page containing a treegrid
@@ -1154,19 +1750,21 @@
     {
         await base.OnAfterRenderAsync(firstRender);
 
+        Picker?.Rendered?.Invoke();
+
         if (!Hierarchical || !_hasFocus || _active is null || !IsJsReady)
         {
             return;
         }
 
-        var index = _rows.FindIndex(r => EqualityComparer<TItem>.Default.Equals(r.Item, _active));
+        var row = _itemRows.Find(r => EqualityComparer<TItem>.Default.Equals(r.Item, _active));
 
-        if (index < 0)
+        if (row is null)
         {
             return;
         }
 
-        var rowId = RowId(index);
+        var rowId = RowId(row.Index);
 
         if (rowId == _focusedId)
         {
@@ -1177,7 +1775,296 @@
         await InvokeModuleVoidAsync("focusElement", rowId);
     }
 
-    // ---- Cell content -------------------------------------------------------------------------
+    // ---- Row markup ---------------------------------------------------------------------------
+
+    /// <summary>The per-row markup, as <c>&lt;Virtualize&gt;</c> wants it.</summary>
+    private RenderFragment<DisplayRow> RowTemplate => RenderRow;
+
+    /// <summary>
+    /// One row of the body - a group header, or a data row followed by its detail row when open.
+    /// </summary>
+    /// <remarks>
+    /// One fragment serves both the plain loop and <c>&lt;Virtualize&gt;</c>, so the two bodies
+    /// cannot drift apart: a fix made to a row is made to both.
+    /// </remarks>
+    private RenderFragment RenderRow(DisplayRow displayRow) => __builder =>
+    {
+        if (displayRow is GroupRow groupRow)
+        {
+            var group = groupRow.Group;
+
+            <tr id="@RowId(groupRow.Index)"
+                class="zen-table-group bg-surface-sunken"
+                style="@(UseVirtualize ? RowHeightStyle : null)"
+                aria-rowindex="@AriaRowIndexFor(groupRow)">
+                @* A header cell scoped to the row group, so a screen reader reading a cell below
+                   announces the group it belongs to, the way it announces the column. *@
+                <th colspan="@ColumnCount" scope="rowgroup" class="@GroupCellClass">
+                    <div class="flex items-center gap-2">
+                        @if (Selectable)
+                        {
+                            @* The whole group, including rows on other pages and rows hidden by a
+                               collapse. That is broader than select-all, which stops at the page -
+                               and deliberately so: the header states how many rows it holds, so
+                               the scope of the click is on screen before it is made. *@
+                            <ZenCheckbox Value="@AllInGroupSelected(group)"
+                                         ValueChanged="@((bool selected) => ToggleGroupSelectionAsync(group, selected))"
+                                         Indeterminate="@(SomeInGroupSelected(group) && !AllInGroupSelected(group))"
+                                         aria-label="@($"Select all rows in {group.Text}")" />
+                        }
+
+                        @if (GroupsCollapsible)
+                        {
+                            <button type="button"
+                                    class="@GroupToggleClass"
+                                    aria-expanded="@(groupRow.IsCollapsed ? "false" : "true")"
+                                    @onclick="@(() => ToggleGroup(group))">
+                                <ZenIcon Path="@ZenIcons.ChevronRight" class="@GroupChevronClass(groupRow.IsCollapsed)" />
+                                @GroupLabel(group)
+                            </button>
+                        }
+                        else
+                        {
+                            <span class="inline-flex items-center gap-2">@GroupLabel(group)</span>
+                        }
+                    </div>
+                </th>
+            </tr>
+
+            return;
+        }
+
+        var row = (ItemRow)displayRow;
+
+        <tr id="@RowId(row.Index)"
+            class="@RowClassFor(row)"
+            style="@(UseVirtualize ? RowHeightStyle : null)"
+            aria-rowindex="@AriaRowIndexFor(row)"
+            aria-level="@(Hierarchical ? row.Depth + 1 : null)"
+            aria-expanded="@AriaExpandedFor(row)"
+            aria-selected="@AriaSelectedFor(row)"
+            tabindex="@(Hierarchical ? (IsActive(row.Item) ? 0 : -1) : null)"
+            @onclick="@(() => RowClickedAsync(row))"
+            @attributes="PickerRowAttributes(row)">
+            @if (HasDetails)
+            {
+                <td class="@($"{BodyCellClass} w-px")" @onclick:stopPropagation="true">
+                    @if (HasDetailFor(row.Item))
+                    {
+                        @* A disclosure button, which is why this stays a plain
+                           table: aria-expanded on a button is valid markup
+                           anywhere, so opening a detail row costs no role claim.
+
+                           Kept in the tab order even inside a treegrid, on the
+                           same reasoning as the selection checkbox - Left and
+                           Right already belong to the hierarchy, so there is no
+                           arrow key left to reach this with. *@
+                        <button type="button"
+                                class="@DetailToggleClass"
+                                aria-expanded="@(IsDetailOpen(row.Item) ? "true" : "false")"
+                                aria-controls="@(IsDetailOpen(row.Item) ? DetailRowId(row.Index) : null)"
+                                aria-label="@($"Details for {RowLabel(row)}")"
+                                @onclick="@(() => ToggleDetailAsync(row.Item))">
+                            <ZenIcon Path="@ZenIcons.ChevronRight" class="@DetailChevronClass(row.Item)" />
+                        </button>
+                    }
+                </td>
+            }
+
+            @if (Selectable)
+            {
+                @* Kept in the tab order even inside the treegrid, where the
+                   pattern would have every cell control at tabindex -1. Losing
+                   keyboard access to selection is a worse failure than an extra
+                   tab stop per row, and there is no arrow key left to reach it
+                   with - Left and Right are spoken for by the hierarchy. *@
+                <td class="@($"{BodyCellClass} w-px")" @onclick:stopPropagation="true">
+                    <ZenCheckbox Value="@IsSelected(row.Item)"
+                                 ValueChanged="@(_ => ToggleSelectionAsync(row.Item))"
+                                 aria-label="@($"Select {RowLabel(row)}")" />
+                </td>
+            }
+
+            @for (var index = 0; index < _columns.Count; index++)
+            {
+                var column = _columns[index];
+                var first = index == 0;
+
+                @* data-label is what the stacked mobile layout prints in front of
+                   each value, because the header row is off screen there. It is a
+                   plain attribute rather than a duplicated <span>, so the label
+                   exists exactly once in the DOM and a screen reader - which
+                   still has the real header association - never hears it twice.
+
+                   The first cell carries an id in a picker, because that is what the
+                   text field's aria-activedescendant names: the grid-popup pattern
+                   points at a cell, and the row's aria-selected carries the choice. *@
+                <td id="@(first && Picker is not null ? CellId(row.Index) : null)"
+                    class="@BodyCellClassFor(column)"
+                    data-label="@column.Title"
+                    style="@(first && Hierarchical ? $"--zen-depth: {row.Depth}" : null)">
+                    @if (first && Hierarchical)
+                    {
+                        <div class="zen-indent flex items-center gap-1.5">
+                            @if (row.HasChildren)
+                            {
+                                <button type="button"
+                                        class="grid size-5 shrink-0 place-items-center rounded-zen-sm text-content-subtle"
+                                        tabindex="-1"
+                                        aria-hidden="true"
+                                        @onclick="@(() => ToggleExpanded(row.Item))"
+                                        @onclick:stopPropagation="true">
+                                    <ZenIcon Path="@ZenIcons.ChevronRight"
+                                             class="@($"size-4 transition-transform {(row.IsExpanded ? "rotate-90" : null)}")" />
+                                </button>
+                            }
+                            else
+                            {
+                                <span class="size-5 shrink-0" aria-hidden="true"></span>
+                            }
+
+                            <span class="min-w-0">@CellContent(column, row.Item)</span>
+                        </div>
+                    }
+                    else
+                    {
+                        @CellContent(column, row.Item)
+                    }
+                </td>
+            }
+        </tr>
+
+        @if (HasDetails && IsDetailOpen(row.Item))
+        {
+            @* A sibling row rather than content nested inside the data row. A
+               <tr> cannot contain another <tr>, and a detail panel placed inside
+               a <td> would be constrained by that column's width - which is the
+               one thing a panel meant to hold a whole table must not be.
+
+               It is rendered only while open, so a hundred-row table does not
+               build a hundred hidden panels, and a detail that fetches its own
+               data does not fetch it a hundred times. *@
+            <tr id="@DetailRowId(row.Index)" class="@DetailRowClass">
+                <td colspan="@ColumnCount" class="zen-table-detail px-4 py-4">
+                    @RowDetailTemplate!(row.Item)
+                </td>
+            </tr>
+        }
+    };
+
+    /// <summary>A group's name and row count, or the caller's template.</summary>
+    private RenderFragment GroupLabel(ZenTableGroup<TItem> group) => __builder =>
+    {
+        if (GroupHeaderTemplate is not null)
+        {
+            <span class="inline-flex min-w-0 items-center gap-2">@GroupHeaderTemplate(group)</span>
+        }
+        else
+        {
+            <span class="font-medium text-content">@group.Text</span>
+
+            @* The count is a number to the eye and "12 rows" to a screen reader. A bare "12"
+               read out after the group name gives no hint what it is counting. *@
+            <span class="rounded-full bg-surface-raised px-2 py-0.5 text-xs font-normal text-content-muted tabular-nums">
+                @group.Count<span class="zen-sr-only">@(group.Count == 1 ? " row" : " rows")</span>
+            </span>
+        }
+    };
+
+    // ---- Groups -------------------------------------------------------------------------------
+
+    private bool AllInGroupSelected(ZenTableGroup<TItem> group) =>
+        group.Items.Count > 0 && group.Items.All(IsSelected);
+
+    private bool SomeInGroupSelected(ZenTableGroup<TItem> group) => group.Items.Any(IsSelected);
+
+    private async Task ToggleGroupSelectionAsync(ZenTableGroup<TItem> group, bool selected)
+    {
+        var next = new List<TItem>(SelectedItems ?? []);
+
+        foreach (var item in group.Items)
+        {
+            next.Remove(item);
+        }
+
+        if (selected)
+        {
+            next.AddRange(group.Items);
+        }
+
+        await SelectedItemsChanged.InvokeAsync(next);
+    }
+
+    // ---- Picker -------------------------------------------------------------------------------
+
+    /// <summary>The id of the element that scrolls the body - the table's wrapper.</summary>
+    internal string ScrollContainerId => SubId("scroll");
+
+    /// <summary>The id of a row's first cell, which a picker's text field points at.</summary>
+    internal string CellId(int index) => $"{Id}-cell-{index}";
+
+    /// <summary>Whether a row's text in any column contains the query - a picker's default search.</summary>
+    internal bool AnyColumnContains(TItem item, string query) =>
+        _columns.Exists(column =>
+            column.TextFor(item)?.Contains(query, StringComparison.CurrentCultureIgnoreCase) == true);
+
+    /// <summary>Whether the table has collected its columns yet.</summary>
+    internal bool HasColumns => _columns.Count > 0;
+
+    /// <summary>Whether the body is currently rendered through <c>&lt;Virtualize&gt;</c>.</summary>
+    internal bool IsVirtualized => UseVirtualize;
+
+    /// <summary>How many rows a picker's keyboard cursor can move through.</summary>
+    internal int PickerRowCount =>
+        UseVirtualize && ItemsProvider is not null ? _totalCount : _itemRows.Count;
+
+    /// <summary>The row at an index, if it has been loaded.</summary>
+    internal bool TryGetRow(int index, [MaybeNullWhen(false)] out TItem item)
+    {
+        if (UseVirtualize && ItemsProvider is not null)
+        {
+            return _loadedByIndex.TryGetValue(index, out item);
+        }
+
+        var row = index >= 0 && index < _rows.Count ? _rows[index] as ItemRow : null;
+        item = row is null ? default : row.Item;
+        return row is not null;
+    }
+
+    /// <summary>The index of a row on screen, or -1.</summary>
+    internal int IndexOf(TItem item)
+    {
+        if (UseVirtualize && ItemsProvider is not null)
+        {
+            foreach (var (index, loaded) in _loadedByIndex)
+            {
+                if (EqualityComparer<TItem>.Default.Equals(loaded, item))
+                {
+                    return index;
+                }
+            }
+
+            return -1;
+        }
+
+        return _itemRows.Find(r => EqualityComparer<TItem>.Default.Equals(r.Item, item))?.Index ?? -1;
+    }
+
+    /// <summary>
+    /// Pointer tracking for a picker's rows, and nothing for any other table.
+    /// </summary>
+    /// <remarks>
+    /// Splatted rather than written as <c>@@onmouseenter</c>, because an event attribute is wired
+    /// whether or not its handler does anything. On Blazor Server every wired mouseenter is a
+    /// round trip, and a table of a hundred rows would pay one per row the pointer crossed for a
+    /// feature only the picker uses.
+    /// </remarks>
+    private Dictionary<string, object>? PickerRowAttributes(ItemRow row) => Picker is null
+        ? null
+        : new Dictionary<string, object>
+        {
+            ["onmouseenter"] = EventCallback.Factory.Create(this, () => Picker.RowHovered(row.Index)),
+        };
 
     private RenderFragment HeaderContent(ZenColumn<TItem> column) => builder =>
     {
@@ -1212,52 +2099,130 @@
     /// </remarks>
     private string RowId(int index) => $"{Id}-row-{index}";
 
-    private string RowLabel(Row row) => RowText?.Invoke(row.Item) ?? row.Item.ToString() ?? "row";
+    private string RowLabel(ItemRow row) => RowText?.Invoke(row.Item) ?? row.Item.ToString() ?? "row";
 
     // ---- ARIA ---------------------------------------------------------------------------------
 
-    private string? AriaSortFor(ZenColumn<TItem> column) => column.CanSort
+    private string? AriaSortFor(ZenColumn<TItem> column) => CanSort(column)
         ? _sortColumn == column ? (_sortDescending ? "descending" : "ascending") : "none"
         : null;
 
-    private string? AriaExpandedFor(Row row) =>
+    /// <summary>
+    /// The table's role: a treegrid for a hierarchy, a grid inside a picker, and otherwise none -
+    /// a plain table.
+    /// </summary>
+    private string? TableRole => Hierarchical ? "treegrid" : Picker is not null ? "grid" : null;
+
+    /// <summary>
+    /// The total row count, stated only while virtualized - the one case where the DOM holds
+    /// fewer rows than the table does. Counts the header row, as the ARIA definition requires.
+    /// </summary>
+    private int? AriaRowCount => Virtualize
+        ? (ItemsProvider is not null ? _totalCount : _rowTotal) + 1
+        : null;
+
+    private int? AriaRowIndexFor(DisplayRow row) => Virtualize ? row.Index + 2 : null;
+
+    /// <summary>
+    /// A treegrid row states selection when rows are selectable; a picker row always does, since
+    /// choosing a row is what a picker is for. A plain table leaves it to the checkboxes.
+    /// </summary>
+    private string? AriaSelectedFor(ItemRow row)
+    {
+        if (Picker is not null)
+        {
+            return Picker.IsChosen(row.Item) ? "true" : "false";
+        }
+
+        return Hierarchical && Selectable ? (IsSelected(row.Item) ? "true" : "false") : null;
+    }
+
+    /// <summary>
+    /// Whether a column sorts. With a provider the server does the sorting, so a column needs a
+    /// <see cref="ZenColumn{TItem}.SortName"/> to send it.
+    /// </summary>
+    private bool CanSort(ZenColumn<TItem> column) => ItemsProvider is not null
+        ? (column.Sortable ?? true) && column.SortName is not null
+        : column.CanSort;
+
+    private string? AriaExpandedFor(ItemRow row) =>
         Hierarchical && row.HasChildren ? (row.IsExpanded ? "true" : "false") : null;
+
+    private string PagerLabel => (Label ?? Caption) is { } name ? $"{name} pagination" : "Pagination";
 
     private string PageSummary
     {
         get
         {
-            if (Source.Count == 0)
+            var total = PagingTotal;
+
+            if (total == 0)
             {
                 return "No rows";
             }
 
             var first = ((Math.Clamp(CurrentPage, 1, PageCount) - 1) * EffectivePageSize) + 1;
-            var last = Math.Min(first + EffectivePageSize - 1, Source.Count);
+            var last = Math.Min(first + EffectivePageSize - 1, total);
 
-            return $"{first}–{last} of {Source.Count}";
+            return $"{first}–{last} of {total}";
         }
     }
 
     // ---- Styling ------------------------------------------------------------------------------
 
+    /// <summary>
+    /// The stacked mobile layout, unless virtualizing: stacking turns each row into a card of a
+    /// different height, and a virtualized body sizes its scrollbar from one row height.
+    /// </summary>
+    private bool Stacks => ResponsiveCollapse && !Virtualize;
+
     private string WrapperClass => CssBuilder
-        .Default("w-full")
+        // relative, so the wrapper - which is a scroll container - is also the containing block of
+        // anything absolutely positioned inside the rows: visually hidden text, a checkbox's
+        // overlaid mark. Without it their containing block is outside the scroller, so they stay
+        // put while the rows scroll past. That is invisible to the eye, and it broke virtualization:
+        // <Virtualize> measures the box around the rendered rows, the stranded group-count text
+        // stretched that box by the whole scroll distance, and the row height it derived came out
+        // a hundred times too large - collapsing the scrollbar on the next jump.
+        .Default("relative w-full")
         // Horizontal scrolling only above the breakpoint where the table is still a table. Below
         // it the rows are stacked cards and there is nothing to scroll sideways.
-        .AddClass(ResponsiveCollapse ? "md:overflow-x-auto" : "overflow-x-auto")
+        .AddClass(Stacks ? "md:overflow-x-auto" : "overflow-x-auto")
+        // A height makes the wrapper the one scroll container on purpose. The header sticks to
+        // the nearest scrolling ancestor, and overflow-x alone already made the wrapper that
+        // ancestor - with no height, a sticky header had nothing inside it to stick against.
+        .AddClass("overflow-y-auto", Height is not null)
         .AddClass("rounded-zen-lg border border-border bg-surface-raised", Bordered)
         .Build()!;
 
+    private string? WrapperStyle => Height is null
+        ? Style
+        : $"max-height: {Height}; {Style}";
+
     private string TableClass => CssBuilder
         .Default("w-full border-collapse text-start")
-        .AddClass("zen-table-stack", ResponsiveCollapse)
+        .AddClass("zen-table-stack", Stacks)
         .Build()!;
 
     private string HeadClass => CssBuilder
         .Default("border-b border-border")
-        .AddClass("sticky top-0 z-10 bg-surface-raised", StickyHeader)
+        .AddClass("sticky top-0 z-10 bg-surface-raised", StickyHeader || Height is not null)
         .Build()!;
+
+    /// <summary>
+    /// A virtualized row is held to <see cref="ItemSize"/>, because the scrollbar was sized on
+    /// that promise. A row taller than its estimate makes the thumb drift as the user scrolls.
+    /// </summary>
+    private string RowHeightStyle => $"height: {ItemSize.ToString(CultureInfo.InvariantCulture)}px";
+
+    private string GroupCellClass => $"zen-table-group-cell text-start align-middle font-normal text-sm {CellPadding}";
+
+    private const string GroupToggleClass =
+        "zen-focus -mx-1 inline-flex min-w-0 items-center gap-2 rounded-zen-sm px-1 py-0.5 text-start";
+
+    private static string GroupChevronClass(bool collapsed) => collapsed
+        ? "size-4 shrink-0 text-content-subtle transition-transform"
+        : "size-4 shrink-0 rotate-90 text-content-subtle transition-transform";
 
     private string HeaderCellClass =>
         $"text-start align-middle font-medium text-content-muted {CellPadding}";
@@ -1276,12 +2241,17 @@
         .AddClass(column.CellClass)
         .Build()!;
 
-    private string RowClassFor(Row row) => CssBuilder
+    private string RowClassFor(ItemRow row) => CssBuilder
         .Default("transition-colors")
         .AddClass("odd:bg-surface-sunken", Striped)
         .AddClass("hover:bg-surface-hover", Hoverable)
-        .AddClass("cursor-pointer", OnRowClick.HasDelegate)
+        .AddClass("cursor-pointer", OnRowClick.HasDelegate || Picker is not null)
         .AddClass("bg-primary-soft", Selectable && IsSelected(row.Item))
+        // A picker's cursor is a background, not a focus ring: DOM focus is in the text field,
+        // and a ring here would put two focus indicators on screen at once. The same reasoning,
+        // and the same colours, as ZenCombobox's options.
+        .AddClass("bg-primary-soft", Picker is not null && Picker.IsChosen(row.Item))
+        .AddClass("bg-surface-hover", Picker is not null && Picker.ActiveIndex == row.Index && !Picker.IsChosen(row.Item))
         .AddClass("outline-none", Hierarchical)
         .AddClass("zen-focus-always", Hierarchical && IsActive(row.Item))
         .AddClass(RowClass?.Invoke(row.Item))
