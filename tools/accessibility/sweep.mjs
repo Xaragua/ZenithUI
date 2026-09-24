@@ -36,7 +36,7 @@ const EDGE = process.env.ZENITH_BROWSER ??
 /** Every routable page in the demo. */
 const pages = [
   "/", "/tokens", "/primitives", "/typography", "/layout", "/forms", "/theming",
-  "/overlays", "/data", "/shell", "/render-modes", "/reference",
+  "/overlays", "/data", "/stepper", "/shell", "/render-modes", "/reference",
 ];
 
 const states = JSON.parse(readFileSync(join(here, "states.json"), "utf8"));
@@ -55,8 +55,16 @@ const TAGS = ["wcag2a", "wcag2aa", "wcag21a", "wcag21aa", "wcag22aa", "best-prac
 
 const sleep = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
 
+/*
+ * The throttling switches matter more than they look. A few minutes into a run, Chromium treats
+ * the headless page as a long-hidden one and aligns its timers to once a minute - so a state whose
+ * drive waits 150 ms between polls takes a minute per poll, and the sweep appeared to hang on
+ * whichever such state it happened to reach after the five-minute mark.
+ */
 const browser = spawn(EDGE, [
   "--headless=new", "--disable-gpu", `--remote-debugging-port=${port}`,
+  "--disable-background-timer-throttling", "--disable-renderer-backgrounding",
+  "--disable-backgrounding-occluded-windows",
   `--user-data-dir=${mkdtempSync(join(tmpdir(), "zenith-axe-"))}`,
   "--window-size=1440,900", "about:blank",
 ], { stdio: "ignore" });
@@ -66,7 +74,10 @@ for (let attempt = 0; attempt < 40 && !socketUrl; attempt++) {
   await sleep(250);
   try {
     const targets = await (await fetch(`http://127.0.0.1:${port}/json`)).json();
-    socketUrl = targets.find((t) => t.type === "page")?.webSocketDebuggerUrl;
+    // The about:blank page this script opened, not merely the first page. A fresh profile can
+    // open a tab of its own on first run - an extension's onboarding page, installed by browser
+    // policy - and attaching to that one leaves the sweep driving a page it cannot navigate.
+    socketUrl = targets.find((t) => t.type === "page" && t.url === "about:blank")?.webSocketDebuggerUrl;
   } catch {
     // devtools not listening yet
   }
@@ -97,9 +108,15 @@ const send = (method, params = {}) =>
     socket.send(JSON.stringify({ id, method, params }));
   });
 
+// A deadline on every evaluate: an awaited promise that never settles would otherwise hang the
+// sweep silently, which is worse than a failed state because nothing says it did not finish.
+const EVALUATE_DEADLINE_MS = 60_000;
+
 const evaluate = async (expression) => {
-  const response = await send("Runtime.evaluate",
-    { expression, returnByValue: true, awaitPromise: true });
+  const response = await Promise.race([
+    send("Runtime.evaluate", { expression, returnByValue: true, awaitPromise: true }),
+    sleep(EVALUATE_DEADLINE_MS).then(() => ({ result: { result: { value: { timedOut: EVALUATE_DEADLINE_MS } } } })),
+  ]);
 
   return response.result?.exceptionDetails
     ? { error: response.result.exceptionDetails.exception?.description?.slice(0, 300) }
@@ -137,6 +154,19 @@ const audit = async (label) => {
 
 await send("Page.enable");
 
+/*
+ * Called before every navigation, not once. A few minutes into a run the sweep's page was found
+ * reporting visibilityState "hidden" - most likely because the fresh profile's own tab (the
+ * extension onboarding page above) took the foreground. A hidden page stops requestAnimationFrame,
+ * so no IntersectionObserver fires and a virtualized table never asks for its rows: the
+ * virtualized lookup state failed exactly that way, and only late in a run, which made it look
+ * flaky. Bringing the page forward before each navigation fixed it.
+ */
+const navigate = async (url) => {
+  await send("Page.bringToFront");
+  await send("Page.navigate", { url });
+};
+
 const report = [];
 
 for (const theme of ["light", "dark"]) {
@@ -146,7 +176,7 @@ for (const theme of ["light", "dark"]) {
   for (const path of pages) {
     await send("Emulation.setDeviceMetricsOverride",
       { width: 1440, height: 900, deviceScaleFactor: 1, mobile: false });
-    await send("Page.navigate", { url: base + path });
+    await navigate(base + path);
     await sleep(2200);
     report.push(await audit(`${theme} ${path}`));
   }
@@ -158,7 +188,7 @@ for (const state of states) {
   await send("Emulation.setDeviceMetricsOverride", {
     width: state.width ?? 1440, height: state.height ?? 900, deviceScaleFactor: 1, mobile: false,
   });
-  await send("Page.navigate", { url: base + state.path });
+  await navigate(base + state.path);
   await sleep(2400);
 
   const reached = await evaluate(state.drive);

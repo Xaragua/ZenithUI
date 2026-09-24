@@ -269,15 +269,18 @@ masking, which sidesteps caret-position bugs), `ZenSearchInput`, `ZenCheckbox`,
 
 **Selection** — `ZenSelect<TValue>` (native `<select>`, works in SSR with zero JS),
 `ZenCombobox<TItem>` (typeahead, async `ItemsProvider`, single/multi, full WAI-ARIA combobox
-pattern).
+pattern), `ZenLookup<TItem>` (added in `1.0.0-rc.1.4`: a search field whose popup is a
+`ZenTable`, the combobox-with-grid-popup pattern).
 
-**Data display** — `ZenList<TItem>`, `ZenTable<TItem>` + `ZenColumn<TItem>`, `ZenTree<TItem>`,
+**Data display** — `ZenList<TItem>`, `ZenTable<TItem>` + `ZenColumn<TItem>` (server data,
+virtualization and grouping added in `1.0.0-rc.1.4`), `ZenTree<TItem>`,
 `ZenTimeline` + `ZenTimelineItem`, `ZenStatCard`, `ZenEmptyState`.
 
 **Containers** — `ZenCard` (`Header` / `Body` / `Footer` / `Actions` slots), `ZenForm`.
 
 **Chrome & layout** — `ZenAppBar`, `ZenNavMenu` + `ZenNavLink` + `ZenNavGroup` (collapsible
-sections), `ZenSideNav` (off-canvas below `lg`), `ZenFooter`, `ZenAppShell`.
+sections), `ZenSideNav` (off-canvas below `lg`), `ZenFooter`, `ZenAppShell`, `ZenStepper` +
+`ZenStep` (added in `1.0.0-rc.1.4`).
 
 **Page layout** (added in `1.0.0-rc.1.3`) — `ZenStack`, `ZenGrid` + `ZenGridItem`, `ZenContainer`,
 `ZenSpacer`.
@@ -409,6 +412,75 @@ them all. That is not an inconsistency: a tree's nested `<ul role="group">` supp
 restating them would be a second source of truth that no test can catch disagreeing with the DOM.
 A table has no such structure to lean on.
 
+#### Server data, virtualization and grouping (M7)
+
+Every body row is built into **one flat list of display rows**, whatever its kind: data rows, tree
+rows and group headers. The plain loop and `<Virtualize>` both render that list through a single
+row fragment. So a virtualized table groups, expands and opens detail rows with no second code
+path, and a fix made to a row is made to both bodies. Each row carries its index in the whole list,
+which keeps ids and `aria-rowindex` correct once only a window of rows exists.
+
+- **`ItemsProvider`** is the answer to "the data is remote". The table asks for a window
+  (`ZenTableRequest`: start, count, `SortName`, direction and a cancellation token) and draws the
+  pager from the returned total. Sorting sends `ZenColumn.SortName`, and only columns with one
+  sort, because a `Field` delegate cannot become a query. Requests are keyed, so a view that arrives
+  both as an event and as a bound parameter loads once. A superseded request is cancelled.
+- **`Virtualize`** uses the framework's component with `<tr>` spacers **and a `<tr>`
+  placeholder**. The default placeholder is a `<div>`, which table layout wraps and does not size.
+  `<Virtualize>` subtracts the height it assumed the placeholders had from the gap it measured
+  between its spacers, so after a long jump the derived row height collapsed to a few pixels. The
+  table's scroll wrapper is also `relative`, for the same arithmetic: without it, absolutely
+  positioned text inside a row stays put while the rows scroll and stretches the measured box.
+  Virtualizing and paging are exclusive, since they answer the same problem. The stacked mobile
+  layout is off while virtualizing. Under static SSR the first 50 rows render as plain markup.
+- **`GroupBy`** inserts a `<th scope="rowgroup">` header row per group. Groups collapse, and a
+  tri-state checkbox selects the whole group. That checkbox deliberately reaches further than
+  select-all, which stops at the page, because the header states its count. Paging counts a
+  collapsed group as one row, and a group's header repeats at the top of a page it continues onto.
+  Grouping is exclusive with the treegrid, since both nest rows, and with a provider, which never
+  has every row.
+
+### `ZenLookup<TItem>`
+
+A search field whose popup is a table, for picking one record out of many by any of its columns.
+A combobox option is one line of text. A vendor, an account or a product is several facts, and
+telling two similar ones apart means seeing them side by side, sorted by the one that matters.
+
+- **The popup is a `ZenTable`.** An internal `ZenTablePicker<TItem>`, passed down as a cascading
+  value rather than as public parameters, puts the table into picker mode. In that mode the table
+  claims `role="grid"`, rows carry `aria-selected`, and each row's first cell has an id. A table
+  that claims to be a grid owes a keyboard contract, and here the text field keeps it. A page
+  cannot switch the mode on and then fail to keep it.
+- **Focus stays in the field**, per the APG combobox-with-grid-popup pattern.
+  `aria-activedescendant` names the active row's first cell. `aria-controls` names the grid, not
+  the panel around it, which also holds a pager and a confirm bar. The panel has no role.
+- **The panel is wider than the field** when the columns need it. `PanelWidth` sets it, with the
+  field's width as the minimum (`MatchWidth`) and the viewport's as the maximum (`max-width`, plus
+  `ZenPopover`'s shift).
+- **Closing without a pick never changes the value.** Escape, an outside click and Tab-ing away
+  all restore the committed text. `mousedown` is prevented inside the panel. Otherwise a click on a
+  row would blur the field first and close the panel before the click arrived.
+- **The commit mode** is `Immediate` or `Confirm`. In Confirm mode a pick only marks the row, a live
+  footer says which row, and Confirm (or Ctrl+Enter) writes the value.
+
+### `ZenStepper` + `ZenStep`
+
+A wizard. It is **not the tabs pattern**. Tabs promise every panel in any order with the arrow
+keys, and a linear wizard exists to refuse that. The header is an `<ol>` in a `<nav>`, the active
+step is `aria-current="step"` as in `ZenTimeline`, and each step's state is stated in words. A
+reachable step is a button; an unreachable one is text rather than a disabled button.
+
+- Only the active step's content renders. If a step has an `EditContext`, it must validate before
+  Next, and `OnLeaving` can then cancel the move. Back never validates, because blocking it traps a
+  user who needs to fix an earlier answer.
+- On every change, focus moves to the new step's heading, as `FocusOnNavigate` does for a page.
+  The heading has `tabindex="-1"`, and the existing rule keeps a ring off it.
+- **Steps are collected with `ZenDefer` but are not rebuilt on every pass**, as columns are. Blazor
+  only re-sets a child's parameters when one of them might have changed, and a step with nothing
+  but a title and a flag has none that can. Such a step registered once and then vanished from the
+  header on the next render. Steps now join the list the first time they register and leave it
+  when disposed. Each pass's registrations are used only to place new steps.
+
 ### `ZenModal` and `IZenModalService`
 
 The service exists because the alternative is worse. Without it every page that needs a dialog
@@ -490,7 +562,7 @@ is knowable without fetching.
 | `zen-theme.js` | localStorage, `data-zen-theme`, `matchMedia` → broadcast to all .NET listeners | ✅ M0 |
 | `zen-popover.js` | Anchored positioning with flip/shift, click-outside, Escape | M3 |
 | `zen-focus.js` | Focus trap, `scrollIntoView` for active listbox/tree items, focus restore | ✅ M3 |
-| `zen-dom.js` | Properties with no attribute equivalent, and imperative one-shots: `indeterminate`, `focus`, `blur`, active-element containment | ✅ M2 |
+| `zen-dom.js` | Properties with no attribute equivalent, and imperative one-shots: `indeterminate`, `focus`, `blur`, active-element containment, scrolling a grid row clear of a sticky header | ✅ M2, M7 |
 
 Currency formatting, debouncing and textarea auto-grow are handled in C#/CSS — no JS.
 
@@ -523,6 +595,7 @@ component's bUnit test asserts its required ARIA attributes.
 | **M4** ✅ | `ZenTable<TItem>` + `ZenColumn<TItem>` (sort/page/select/hierarchy/detail rows/responsive collapse), `ZenEmptyState`, `ZenTree<TItem>`, `ZenTimeline` + `ZenTimelineItem` | Demo renders a 3-level hierarchical table and a lazy-loading tree | ✅ |
 | **M5** ✅ | `ZenAppBar`, `ZenNavMenu` + `ZenNavLink` + `ZenNavGroup`, `ZenSideNav`, `ZenFooter`, `ZenAppShell` | Shell demo usable at 360 / 768 / 1440 px; drawer traps focus and restores it on close | ✅ |
 | **M6** ✅ | Docs, a11y audit, `dotnet pack`, NuGet metadata, **close the consumer-`@theme` gap**, one public namespace | `.nupkg` consumed successfully by a scratch Blazor Server app **and** a Blazor WASM app | ✅ `1.0.0-rc.1` |
+| **M7** ✅ | `ZenTable` `ItemsProvider`, virtualization and grouping; `ZenLookup<TItem>`; `ZenStepper` + `ZenStep` | A 10,000-row table scrolls and groups in the demo, a lookup binds from 5,010 server-side rows in both commit modes, and a wizard blocks Next on an invalid step; the sweep covers every new state | ✅ `1.0.0-rc.1.4` |
 
 ---
 
@@ -587,6 +660,9 @@ Recorded because each changed the design rather than merely the code.
 | The combobox popover panel **is** the listbox | A scrolling wrapper between the panel and the options made `aria-controls` name a roleless element, detached the options from the listbox claiming them, and pointed `scrollItemIntoView` at a node the accessibility tree does not contain. `ZenPopover` gained a `PanelId` parameter because a parent cannot read a child's generated id in the pass that creates it. |
 | That file carries the library's **whole candidate list**, not just `@theme` | `@theme` alone fixes only half the problem. The other half is cascade order, and the only way two stylesheets can stop disagreeing about `lg:hidden` is for both to emit it. The list comes from `@tailwindcss/oxide` — Tailwind's own scanner — so it cannot drift from what the library was built with. |
 | `ZenText`, not in the original inventory, and its element is **not** its variant | Every heading in the demo was hand-rolled Tailwind, and a consumer without Tailwind could not reach the type scale at all. The element is a separate `As` parameter because tying look to level makes people skip heading levels to get a size — the heading-order failure the M6 audit found in the demo. |
+| A table's pager is named after its table | Every pager was `<nav aria-label="Pagination">`, so the first page with two paged tables had two identical landmarks. The sweep found it as soon as M7's demo added the second one. |
+| `ZenStepper` keeps its steps across passes; `ZenTable` rebuilds its columns | Blazor skips `SetParametersAsync` for a child whose parameters are all unchanged primitives. A column always has a delegate, so it always re-registers. A disabled placeholder step has nothing but strings and bools, and it silently disappeared on the second render. |
+| `ZenLookup` hosts a `ZenTable` through an internal cascade | The alternative was a second grid duplicating sorting, paging, virtualization and the provider. Public parameters for the picker mode would have let a page claim `role="grid"` with nobody keeping the keyboard contract. |
 | Layout components, not in the original inventory | The plan left page layout to Tailwind, which assumed every consumer runs it. One who does not can theme every component and cannot place any of them, because `zenith.css` has only the layout classes the library happens to use. See [the section above](#layout-components-exist-because-zenithcss-is-not-tailwind). |
 
 ### The cascade-order trap a precompiled component library walks into

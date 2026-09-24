@@ -596,6 +596,49 @@
 }
 
 /*
+ * ZenStepper.
+ *
+ * Each step draws the connector to the next one, so the last step has none to draw. A
+ * `:last-child` rule rather than a flag from the component, because the component would have to
+ * know which step renders last - and a step shown or hidden with `@if` changes that without the
+ * stepper being told.
+ *
+ * A horizontal stepper on a phone has no room for five titles, or even for one beside four
+ * markers. Below `md` the steps show their numbered markers alone; the active step's title is
+ * still on screen, as the heading of its content. The titles are hidden visually rather than with
+ * `display: none`, so a screen reader walking the list still hears every step's name and state -
+ * the markers are `aria-hidden`, so without the text each step would be announced as nothing.
+ */
+@layer components {
+  .zen-stepper > .zen-step:last-child > .zen-step-line {
+    display: none;
+  }
+
+  /*
+   * ZenLookup's panel runs its table edge to edge, with no padding of its own. The table's pager
+   * is a sibling of the table's scroll box, which the lookup cannot put a class on, so the pager
+   * is reached from the wrapper instead.
+   */
+  .zen-lookup-grid > nav {
+    margin-block-end: 0.5rem;
+    padding-inline: 0.75rem;
+  }
+}
+
+@media (width < 48rem) {
+  @layer components {
+    .zen-stepper-horizontal > .zen-step .zen-step-text {
+      position: absolute;
+      width: 1px;
+      height: 1px;
+      overflow: hidden;
+      clip-path: inset(50%);
+      white-space: nowrap;
+    }
+  }
+}
+
+/*
  * ZenTable's stacked layout on a narrow screen.
  *
  * Below the `md` breakpoint each row becomes a card and each cell becomes a labelled line. The
@@ -667,6 +710,15 @@
 
     .zen-table-stack td.zen-table-empty {
       text-align: center;
+    }
+
+    /*
+     * A group header spans the table as a <th>, which the rules above never reach - they are
+     * written for <td>. Left alone it would stay a table cell inside a block row and shrink to
+     * its content, so the header band would stop short of the cards it heads.
+     */
+    .zen-table-stack th.zen-table-group-cell {
+      display: block;
     }
   }
 }

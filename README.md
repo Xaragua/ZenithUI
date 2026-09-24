@@ -3,9 +3,10 @@
 A TailwindCSS component library for Blazor. Render-mode agnostic, themed entirely through CSS
 custom properties, with first-class light and dark palettes.
 
-> **Status: M6 — `1.0.0-rc.1.3`.** Every component in the plan ships: tokens and theming, primitives,
+> **Status: M7 — `1.0.0-rc.1.4`.** Every component in the plan ships: tokens and theming, primitives,
 > the full form control set, the overlay family (modal + toast services, popover, combobox, list),
-> the data components (table, tree, timeline) and the application shell. The package is consumed
+> the data components (table, tree, timeline) and the application shell. M7 adds a table that reads
+> from a server, virtualizes and groups, a lookup whose popup is that table, and a wizard stepper. The package is consumed
 > and verified from a feed by both a Blazor Web App and a standalone WebAssembly app, the
 > accessibility sweep is clean, and the API is frozen pending whatever a release candidate turns
 > up.
@@ -212,6 +213,7 @@ a palette fix is one edit rather than a guess-and-rerun loop:
 | **rc.1.1** ✅ | `ZenText` — the type scale as a component: heading and body variants, a separate `As` element, logical alignment, token-backed tones |
 | **rc.1.2** ✅ | Fix: `zenith.css` and `zenith.nopreflight.css` ship as static web assets again, so `_content/ZenithUI/zenith.css` resolves in consuming apps |
 | **rc.1.3** ✅ | Layout without Tailwind: `ZenStack`, `ZenGrid` + `ZenGridItem`, `ZenContainer`, `ZenSpacer`, and a test that every class they emit is in `zenith.css` |
+| **M7** ✅ `rc.1.4` | `ZenTable` `ItemsProvider` (server paging and sorting), virtualization and grouping; `ZenLookup<TItem>`, a search field whose popup is a table, with pick-on-click or confirm-to-commit; `ZenStepper` + `ZenStep`, a wizard with per-step validation |
 
 ## Documentation
 
@@ -223,9 +225,12 @@ repository root, because it is the GitHub landing page.
 | [`docs/getting-started.md`](https://github.com/Xaragua/ZenithUI/blob/main/docs/getting-started.md) | Install and wire-up for each hosting model, what works with no render mode, and the template defaults that fight the library |
 | [`docs/theming.md`](https://github.com/Xaragua/ZenithUI/blob/main/docs/theming.md) | The token surface, the three-state light/dark model, rebranding, and what an app running its own Tailwind has to do |
 | [`docs/plan.md`](https://github.com/Xaragua/ZenithUI/blob/main/docs/plan.md) | The implementation plan of record — architecture, component inventory, milestones, and the design decisions behind them |
-| [`docs/accessibility.md`](https://github.com/Xaragua/ZenithUI/blob/main/docs/accessibility.md) | What the library guarantees, the three layers that verify it, the M6 audit findings, and what automated checks cannot see |
+| [`docs/accessibility.md`](https://github.com/Xaragua/ZenithUI/blob/main/docs/accessibility.md) | What the library guarantees, the three layers that verify it, the M6 and M7 audit findings, and what automated checks cannot see |
 | [`docs/CHANGELOG.md`](https://github.com/Xaragua/ZenithUI/blob/main/docs/CHANGELOG.md) | What shipped, and what was fixed along the way |
 
 ## License
 
-MIT
+MIT. The built-in icon paths derive from [Lucide](https://lucide.dev) (ISC),
+[Feather](https://feathericons.com) (MIT) and [Heroicons](https://heroicons.com) (MIT); their
+notices are in [`THIRD-PARTY-NOTICES.txt`](https://github.com/Xaragua/ZenithUI/blob/main/THIRD-PARTY-NOTICES.txt),
+which also ships in the NuGet package.

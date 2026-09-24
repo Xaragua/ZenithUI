@@ -90,3 +90,52 @@ export function focusElement(id, select) {
         element.select();
     }
 }
+
+/**
+ * Scrolls a table row into view inside its scroll container, clear of a sticky header.
+ *
+ * Not `scrollIntoView`, which knows nothing about the sticky `<thead>` and happily parks the row
+ * underneath it - the row is "in view" and the user cannot see it.
+ *
+ * The row may not exist. A virtualized body only renders the rows near the viewport, so a keyboard
+ * cursor moved by a page or to the end lands on an index with no element yet. Scrolling to where
+ * that row will be, estimated from the row height, is what makes the virtualizer render it.
+ *
+ * @param {string} containerId The scroll container's id.
+ * @param {string} rowId The row's id.
+ * @param {number} index The row's zero-based position among all rows.
+ * @param {number} rowHeight The estimated row height in pixels.
+ */
+export function scrollRowIntoView(containerId, rowId, index, rowHeight) {
+    const container = document.getElementById(containerId);
+
+    if (!container) {
+        return;
+    }
+
+    const head = container.querySelector('thead');
+    const headHeight = head ? head.getBoundingClientRect().height : 0;
+    const row = document.getElementById(rowId);
+
+    if (row) {
+        const box = container.getBoundingClientRect();
+        const rect = row.getBoundingClientRect();
+
+        if (rect.top < box.top + headHeight) {
+            container.scrollTop -= box.top + headHeight - rect.top;
+        } else if (rect.bottom > box.bottom) {
+            container.scrollTop += rect.bottom - box.bottom;
+        }
+
+        return;
+    }
+
+    const top = index * rowHeight;
+    const view = container.clientHeight - headHeight;
+
+    if (top < container.scrollTop) {
+        container.scrollTop = top;
+    } else if (top + rowHeight > container.scrollTop + view) {
+        container.scrollTop = top + rowHeight - view;
+    }
+}

@@ -1,11 +1,12 @@
 # Accessibility
 
-What ZenithUI guarantees, how that is checked, what the checks cannot see, and what the M6 audit
-found.
+What ZenithUI guarantees, how that is checked, what the checks cannot see, and what the M6 and M7
+audits found.
 
 - [The baseline](#the-baseline)
 - [How it is verified](#how-it-is-verified)
 - [The M6 audit](#the-m6-audit)
+- [The M7 audit](#the-m7-audit)
 - [What the checks cannot see](#what-the-checks-cannot-see)
 - [What a consuming application still owns](#what-a-consuming-application-still-owns)
 
@@ -48,7 +49,9 @@ element carries which state, which id references which element, how many tab sto
 **3. An axe-core sweep of the running demo** (manual, per milestone). Every page in both palettes,
 plus the states that only exist after interaction: an open modal, a raised toast, an open combobox
 listbox, an open popover, the drawer at 390 px, a sorted table with an expanded detail row, an
-expanded tree, a submitted invalid form, and an open date-picker calendar.
+expanded tree, a submitted invalid form, an open date-picker calendar, and, since M7, the lookup's
+grid open and with a pending row, collapsed and virtualized groups, a server-paged table, and the
+stepper in its error states and at 390 px.
 
 Layer 3 is the one that finds things. Layers 1 and 2 verify decisions already made; a browser
 audit sees the result, including markup no test thought to look at.
@@ -113,6 +116,72 @@ predicates, and the picker's static-SSR prerender.
 Zero violations across all twenty page/palette combinations and all nine interactive states, at
 `wcag2a`, `wcag2aa`, `wcag21a`, `wcag21aa`, `wcag22aa` and `best-practice`.
 
+## The M7 audit
+
+M7 added three patterns the sweep had never seen:
+
+- a virtualized table, with `aria-rowcount` and `aria-rowindex`;
+- a combobox whose popup is a grid, with `aria-activedescendant` pointing at a cell;
+- a wizard stepper, with `aria-current="step"`.
+
+The sweep grew to match: a `/stepper` page and eight new states. Those states are:
+
+- the lookup grid open;
+- a confirm-mode lookup with a row pending;
+- a collapsed group;
+- a grouped virtualized table scrolled deep;
+- a server-backed table on page 2;
+- a stepper showing validation errors;
+- a stepper step flagged by `OnLeaving`;
+- the stepper at 390 px.
+
+### Duplicate navigation landmarks — *fixed*
+
+Every table pager was a `<nav aria-label="Pagination">`. That was harmless while the demo had one
+paged table per page. With two, a screen reader's landmark list offered "Pagination navigation"
+twice, with nothing to tell them apart. The pager now takes its table's `Label` or `Caption`
+("Orders pagination") and falls back to the old name only for a table with neither.
+
+It is the same obligation this page lists under
+[what a consuming application still owns](#what-a-consuming-application-still-owns), except that the
+library was creating the landmarks itself, so the library had to name them.
+
+### A disabled step faded below 4.5:1 — *fixed*
+
+A disabled step was dimmed with `opacity`. That is the demo-side mistake the M6 audit recorded,
+repeated inside the library: fading a token changes its contrast, and nothing checks the result. The
+step's text now uses `text-content-subtle`, whose contrast the audit checks, and its marker switches
+to a dashed border. The dashed border shows the difference without relying on colour.
+
+### The sweep itself hung — *fixed*
+
+The last states never ran. The run stalled indefinitely a few minutes in. A probe showed the page
+reporting `visibilityState: "hidden"` at that point. A hidden page:
+
+- has its timers throttled to one wake-up a minute, so a state whose drive polls every 150 ms
+  never finishes;
+- stops `requestAnimationFrame`, so no `IntersectionObserver` fires, and a virtualized table never
+  asks for its rows.
+
+Each state had passed when run on its own, which is what made the failure look intermittent.
+
+The sweep now:
+
+- launches the browser with background throttling disabled;
+- brings its page to the front before every navigation;
+- gives every evaluation a 60-second deadline.
+
+With the deadline, a stuck state is reported as not reached instead of hanging the run.
+
+### Result
+
+Zero violations across all twenty-six page/palette combinations and all seventeen interactive
+states, at the same tag set.
+
+**Not covered.** Keyboard operation of the lookup grid and the stepper is covered by the bUnit
+tests: the cursor keys, Escape discarding a pending row, and focus moving to the step heading. axe
+does not check keyboard operation. As with every pattern here, no screen reader has narrated them.
+
 ## What the checks cannot see
 
 Stated plainly, because "passes axe" is routinely read as more than it is. Automated rules catch
@@ -150,8 +219,8 @@ A component library can supply correct components and nothing more. The page is 
 
 ## Re-running the sweep
 
-The sweep is a script, not a paragraph of instructions, so a later milestone runs exactly what M6
-ran:
+The sweep is a script, not a paragraph of instructions, so each milestone runs exactly what the
+last one ran:
 
 ```bash
 cd samples/ZenithUI.Demo && dotnet run          # one terminal

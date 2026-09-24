@@ -119,6 +119,103 @@ public partial class StylesheetCoverageTests : BunitContext
         AssertAllPresent(classes);
     }
 
+    [Fact]
+    public void StepperLookupAndTableModeClasses_AreAllInTheStylesheet()
+    {
+        // The components added with grouping, virtualization, ZenLookup and ZenStepper build their
+        // classes from state - a step's status, a group's collapse, a picker's cursor - so a class
+        // missing from the scan only shows up in the state that emits it. Each state is rendered
+        // here at least once.
+        JSInterop.Mode = JSRuntimeMode.Loose;
+
+        var classes = new SortedSet<string>(StringComparer.Ordinal);
+
+        foreach (var orientation in Enum.GetValues<ZenDirection>())
+        {
+            var stepper = Render<ZenStepper>(p => p
+                .Add(x => x.Orientation, orientation)
+                .Add(x => x.Linear, false)
+                .Add(x => x.ChildContent, (RenderFragment)(builder =>
+                {
+                    AddStep(builder, 0, "One");
+                    AddStep(builder, 10, "Two", error: "Wrong");
+                    AddStep(builder, 20, "Three", optional: true, description: "Details");
+                    AddStep(builder, 30, "Four", disabled: true);
+                })));
+
+            // Leaving the first step forward completes it, so all four states are on screen.
+            stepper.FindAll("section button").Last().Click();
+            Collect(classes, stepper.Markup);
+        }
+
+        Row[] rows = [new("A", "x"), new("B", "x"), new("C", null)];
+
+        foreach (var collapsible in new[] { true, false })
+        {
+            Collect(classes, Render<ZenTable<Row>>(p => p
+                .Add(x => x.Items, rows)
+                .Add(x => x.Columns, RowColumns)
+                .Add(x => x.GroupBy, r => r.Group)
+                .Add(x => x.GroupsCollapsible, collapsible)
+                .Add(x => x.IsGroupInitiallyCollapsed, key => key is null)
+                .Add(x => x.Selectable, true)
+                .Add(x => x.PageSize, 2)).Markup);
+        }
+
+        Collect(classes, Render<ZenTable<Row>>(p => p
+            .Add(x => x.Items, rows)
+            .Add(x => x.Columns, RowColumns)
+            .Add(x => x.Virtualize, true)
+            .Add(x => x.Height, "10rem")).Markup);
+
+        foreach (var commit in Enum.GetValues<ZenLookupCommit>())
+        {
+            var lookup = Render<ZenLookup<Row>>(p => p
+                .Add(x => x.Items, rows)
+                .Add(x => x.Columns, RowColumns)
+                .Add(x => x.Value, rows[0])
+                .Add(x => x.Commit, commit)
+                .Add(x => x.PageSize, 2));
+
+            lookup.Find("input").KeyDown(new KeyboardEventArgs { Key = "ArrowDown" });
+            lookup.Find("input").KeyDown(new KeyboardEventArgs { Key = "ArrowDown" });
+            Collect(classes, lookup.Markup);
+        }
+
+        // Hooks for the component's own tests and for consumers' CSS, deliberately unstyled.
+        classes.Remove("zen-table-group");
+
+        AssertAllPresent(classes);
+    }
+
+    private sealed record Row(string Name, string? Group);
+
+    private static readonly RenderFragment RowColumns = builder =>
+    {
+        builder.OpenComponent<ZenColumn<Row>>(0);
+        builder.AddComponentParameter(1, nameof(ZenColumn<Row>.Title), "Name");
+        builder.AddComponentParameter(2, nameof(ZenColumn<Row>.Field), (Func<Row, object?>)(r => r.Name));
+        builder.CloseComponent();
+    };
+
+    private static void AddStep(
+        Microsoft.AspNetCore.Components.Rendering.RenderTreeBuilder builder,
+        int seq,
+        string title,
+        string? error = null,
+        bool optional = false,
+        bool disabled = false,
+        string? description = null)
+    {
+        builder.OpenComponent<ZenStep>(seq);
+        builder.AddComponentParameter(seq + 1, nameof(ZenStep.Title), title);
+        builder.AddComponentParameter(seq + 2, nameof(ZenStep.Error), error);
+        builder.AddComponentParameter(seq + 3, nameof(ZenStep.Optional), optional);
+        builder.AddComponentParameter(seq + 4, nameof(ZenStep.Disabled), disabled);
+        builder.AddComponentParameter(seq + 5, nameof(ZenStep.Description), description);
+        builder.CloseComponent();
+    }
+
     [Theory]
     [InlineData("gap-1", ".gap-1{")]
     [InlineData("md:grid-cols-3", ".md\\:grid-cols-3{")]

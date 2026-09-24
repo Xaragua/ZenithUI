@@ -1,0 +1,937 @@
+@namespace ZenithUI
+@typeparam TItem where TItem : notnull
+@inherits ZenInputBase<TItem>
+@implements IAsyncDisposable
+
+@*
+    A search field whose suggestions are a table: pick one record from many, by any of its
+    columns. The WAI-ARIA "combobox with grid popup" pattern.
+
+    Why not ZenCombobox. A combobox option is one line of text, and that is right for a country
+    or a tag. A vendor, an account or a product is several facts - a name, an id, a region, a
+    figure - and telling two similar records apart means seeing those facts side by side, sorted
+    by the one that matters. That is a table's job, so the popup is a ZenTable: it brings sorting,
+    paging, virtualization and a server-side ItemsProvider along with it, and nothing here
+    re-implements any of them.
+
+    Focus stays in the text field. The rows never take DOM focus; the row under the keyboard
+    cursor is named with aria-activedescendant, pointing at its first cell, and the chosen row
+    carries aria-selected. That is what lets the user keep typing while arrowing through results.
+
+    The panel is wider than the field when it needs to be. A table squeezed to the width of a
+    text input is a table with one legible column, so the panel takes PanelWidth - at least the
+    field's width, at most the viewport's - and ZenPopover shifts it to stay on screen.
+
+    Closing without choosing never changes the value. Escape, a click outside and Tab-ing away all
+    put the field back to showing the committed value, and in Confirm mode they also discard the
+    row that was only marked. Only a pick (Immediate) or the Confirm button (Confirm) writes Value.
+*@
+
+<ZenField Label="@Label"
+          HelpText="@HelpText"
+          Errors="ValidationMessages"
+          Required="Required"
+          Disabled="Disabled"
+          For="@Id"
+          Size="Size"
+          Class="@FieldClass">
+
+    @*
+        Bare, because the panel's surface is drawn here: the table needs to run edge to edge, and
+        the popover's own padding would inset it. Role is left off - the panel holds a grid, a
+        pager and a footer, and the input's aria-controls names the grid itself, which is the
+        popup the pattern describes.
+    *@
+    <ZenPopover Open="_open"
+                OpenChanged="HandlePopoverOpenChangedAsync"
+                Placement="ZenPlacement.BottomStart"
+                MatchWidth="true"
+                Role="@((string?)null)"
+                PanelId="@PanelId"
+                Bare="true"
+                Class="@PanelClass"
+                Style="@PanelStyle"
+                CloseOnEscape="false">
+        <Anchor>
+            <div id="@ShellId" class="@WrapperClass" @onfocusout="HandleFocusOutAsync">
+                <ZenIcon Path="@ZenIcons.Search" Size="ZenSize.Small" class="shrink-0 text-content-subtle" />
+
+                <input id="@context.InputId"
+                       @ref="_input"
+                       type="text"
+                       class="@ZenStyles.InputInnerBase"
+                       style="@Style"
+                       role="combobox"
+                       value="@_query"
+                       placeholder="@Placeholder"
+                       disabled="@Disabled"
+                       readonly="@ReadOnly"
+                       autocomplete="off"
+                       aria-haspopup="grid"
+                       aria-expanded="@(_open ? "true" : "false")"
+                       aria-controls="@GridId"
+                       aria-autocomplete="list"
+                       aria-activedescendant="@ActiveDescendantId"
+                       aria-describedby="@context.DescribedBy"
+                       aria-invalid="@context.AriaInvalid"
+                       aria-required="@context.AriaRequired"
+                       @attributes="AttributesWithoutClass"
+                       @oninput="HandleQueryInputAsync"
+                       @onkeydown="HandleKeyDownAsync"
+                       @onclick="HandleInputClickAsync" />
+
+                @if (AllowClear && CurrentValue is not null && !Disabled && !ReadOnly)
+                {
+                    <button type="button"
+                            class="zen-focus grid shrink-0 place-items-center rounded-zen-sm p-0.5 text-content-subtle hover:text-content"
+                            aria-label="@ClearLabel"
+                            @onclick="ClearAsync">
+                        <ZenIcon Path="@ZenIcons.Close" Size="ZenSize.Small" />
+                    </button>
+                }
+
+                @* Out of the tab order for the same reason as ZenCombobox's chevron: the field
+                   already opens the panel from the keyboard, so a second stop is one more thing
+                   to tab past. *@
+                <button type="button"
+                        class="zen-focus grid shrink-0 place-items-center rounded-zen-sm p-0.5 text-content-subtle transition-colors hover:text-content"
+                        tabindex="-1"
+                        aria-label="@(_open ? CollapseLabel : ExpandLabel)"
+                        disabled="@(Disabled || ReadOnly)"
+                        @onclick="ToggleOpenAsync">
+                    <ZenIcon Path="@ZenIcons.ChevronDown"
+                             Size="ZenSize.Small"
+                             class="@(_open ? "rotate-180 transition-transform" : "transition-transform")" />
+                </button>
+            </div>
+        </Anchor>
+
+        <ChildContent>
+            @*
+                mousedown:preventDefault keeps focus in the text field when a row, a sort header or
+                a footer button is clicked. Without it the field blurs on the way to the click,
+                the focusout check finds focus on nothing, and the panel closes before the click
+                it was about to receive - the row the user aimed at is never picked. The click
+                itself still fires; only the focus move is cancelled.
+            *@
+            <div class="flex min-h-0 flex-col"
+                 @onfocusout="HandleFocusOutAsync"
+                 @onkeydown="HandlePanelKeyDownAsync"
+                 @onmousedown:preventDefault="true">
+                @if (HeaderContent is not null)
+                {
+                    <div class="border-b border-border px-3 py-2">@HeaderContent</div>
+                }
+
+                @* The pager is the table's own, rendered beside its scroll box; the panel has no
+                   padding of its own, so the pager is given some here. *@
+                <div class="zen-lookup-grid min-h-0">
+                <CascadingValue Value="_picker" IsFixed="true">
+                    <ZenTable @ref="_table"
+                              TItem="TItem"
+                              Id="@GridId"
+                              Items="@(ItemsProvider is null ? _filtered : null)"
+                              ItemsProvider="@(ItemsProvider is null ? null : _tableProvider)"
+                              Columns="@Columns"
+                              Label="@(Label ?? "Results")"
+                              Virtualize="@Virtualize"
+                              ItemSize="@ItemSize"
+                              PageSize="@PageSize"
+                              ShowPageSizeSelector="false"
+                              Height="@PanelHeight"
+                              Size="ZenSize.Small"
+                              Bordered="false"
+                              ResponsiveCollapse="false"
+                              EmptyText="@NoResultsText"
+                              EmptyDescription="@NoResultsDescription"
+                              EmptyIcon="@ZenIcons.Search"
+                              RowText="@DisplayFor" />
+                </CascadingValue>
+                </div>
+
+                @if (Commit == ZenLookupCommit.Confirm)
+                {
+                    <div class="flex flex-wrap items-center justify-between gap-x-3 gap-y-2 border-t border-border px-3 py-2">
+                        @* Live, so choosing a row by keyboard is confirmed aloud: aria-selected
+                           changes on a row the screen reader is not reading, and without this
+                           the user hears nothing when they press Enter. *@
+                        <p class="min-w-0 truncate text-sm text-content-muted" aria-live="polite">
+                            @if (_hasPending)
+                            {
+                                <span>@PendingLabel </span>
+                                <span class="font-medium text-content">@DisplayFor(_pending!)</span>
+                            }
+                            else
+                            {
+                                @NothingPendingText
+                            }
+                        </p>
+
+                        <div class="flex shrink-0 items-center gap-2">
+                            <ZenButton Variant="ZenVariant.Ghost"
+                                       Size="ZenSize.Small"
+                                       Disabled="@(!_hasPending && CurrentValue is null)"
+                                       OnClick="ClearPendingAsync">
+                                @ClearSelectionText
+                            </ZenButton>
+                            <ZenButton Intent="ZenIntent.Primary"
+                                       Size="ZenSize.Small"
+                                       Disabled="@(!_hasPending)"
+                                       OnClick="ConfirmAsync">
+                                @ConfirmText
+                            </ZenButton>
+                        </div>
+                    </div>
+                }
+
+                @if (FooterContent is not null)
+                {
+                    <div class="border-t border-border px-3 py-2">@FooterContent</div>
+                }
+            </div>
+        </ChildContent>
+    </ZenPopover>
+</ZenField>
+
+@code {
+    private readonly ZenTablePicker<TItem> _picker;
+    private readonly Func<ZenTableRequest, ValueTask<ZenTableResult<TItem>>> _tableProvider;
+
+    private ZenTable<TItem>? _table;
+    private ElementReference _input;
+    private IJSObjectReference? _dom;
+    private CancellationTokenSource? _search;
+
+    private List<TItem> _filtered = [];
+    private string _query = string.Empty;
+    private string _appliedQuery = string.Empty;
+    private int _activeIndex = -1;
+    private bool _open;
+    private bool _filtering;
+    private bool _seekActive;
+    private bool _disposed;
+
+    private TItem? _pending;
+    private bool _hasPending;
+
+    /// <summary>Creates the lookup.</summary>
+    public ZenLookup()
+    {
+        _picker = new ZenTablePicker<TItem>
+        {
+            IsChosen = IsChosen,
+            RowClicked = HandleRowClickedAsync,
+            RowHovered = HandleRowHovered,
+            Rendered = HandleTableRendered,
+        };
+
+        _tableProvider = ProvideAsync;
+    }
+
+    // ---- Parameters ---------------------------------------------------------------------------
+
+    /// <summary>The <see cref="ZenColumn{TItem}"/> declarations for the popup table.</summary>
+    [Parameter]
+    public RenderFragment? Columns { get; set; }
+
+    /// <summary>The rows to search. Ignored when <see cref="ItemsProvider"/> is set.</summary>
+    [Parameter]
+    public IEnumerable<TItem>? Items { get; set; }
+
+    /// <summary>
+    /// Loads matching rows from a server, a window at a time. Use instead of <see cref="Items"/>
+    /// for a large or remote set.
+    /// </summary>
+    /// <remarks>
+    /// Called with the search text once typing pauses for
+    /// <see cref="SearchDebounceMilliseconds"/>, and again as the user pages, sorts or scrolls.
+    /// Columns sort only if they declare a <see cref="ZenColumn{TItem}.SortName"/>, which is
+    /// passed through. Give <c>TItem</c> value equality: the chosen row is recognised by
+    /// <see cref="object.Equals(object)"/>, and each request returns new instances.
+    /// </remarks>
+    [Parameter]
+    public Func<ZenLookupRequest, ValueTask<ZenTableResult<TItem>>>? ItemsProvider { get; set; }
+
+    /// <summary>The text shown in the field for the chosen row. Defaults to <c>ToString()</c>.</summary>
+    [Parameter]
+    public Func<TItem, string>? ItemText { get; set; }
+
+    /// <summary>
+    /// The text <see cref="Items"/> are searched in. Defaults to every column's displayed text.
+    /// </summary>
+    /// <remarks>
+    /// The default matches what is on screen, so a user who can see a value can find a row by
+    /// it. Supply this to search fields that are not displayed - a legal name behind a trading
+    /// name, an alias, a tax number.
+    /// </remarks>
+    [Parameter]
+    public Func<TItem, string>? SearchText { get; set; }
+
+    /// <summary>When a pick becomes the value. See <see cref="ZenLookupCommit"/>.</summary>
+    [Parameter]
+    public ZenLookupCommit Commit { get; set; } = ZenLookupCommit.Immediate;
+
+    /// <summary>Render only the rows in view. For long lists; replaces paging.</summary>
+    [Parameter]
+    public bool Virtualize { get; set; }
+
+    /// <summary>A row's height in pixels, for virtualization and keyboard paging.</summary>
+    [Parameter]
+    public float ItemSize { get; set; } = 36f;
+
+    /// <summary>Rows per page in the panel. Zero shows every row in a scrolling panel.</summary>
+    [Parameter]
+    public int PageSize { get; set; }
+
+    /// <summary>
+    /// The panel's width, as CSS. Never narrower than the field, never wider than the viewport.
+    /// </summary>
+    [Parameter]
+    public string PanelWidth { get; set; } = "min(48rem, calc(100vw - 1rem))";
+
+    /// <summary>The most the table may take before it scrolls, as CSS.</summary>
+    [Parameter]
+    public string PanelHeight { get; set; } = "20rem";
+
+    /// <summary>Content above the table - filter chips, a hint, a result count.</summary>
+    [Parameter]
+    public RenderFragment? HeaderContent { get; set; }
+
+    /// <summary>Content below the table and the confirm bar - a "create new" link, a legend.</summary>
+    [Parameter]
+    public RenderFragment? FooterContent { get; set; }
+
+    /// <summary>Offer a clear button once a value is chosen.</summary>
+    [Parameter]
+    public bool AllowClear { get; set; } = true;
+
+    /// <summary>How long typing must pause before <see cref="ItemsProvider"/> is asked.</summary>
+    [Parameter]
+    public int SearchDebounceMilliseconds { get; set; } = 250;
+
+    /// <summary>Headline when nothing matches.</summary>
+    [Parameter]
+    public string NoResultsText { get; set; } = "No matches";
+
+    /// <summary>A sentence under the headline when nothing matches.</summary>
+    [Parameter]
+    public string? NoResultsDescription { get; set; } = "Try a different search.";
+
+    /// <summary>The Confirm button's text, in <see cref="ZenLookupCommit.Confirm"/> mode.</summary>
+    [Parameter]
+    public string ConfirmText { get; set; } = "Confirm";
+
+    /// <summary>The button that clears the choice, in <see cref="ZenLookupCommit.Confirm"/> mode.</summary>
+    [Parameter]
+    public string ClearSelectionText { get; set; } = "Clear selection";
+
+    /// <summary>Precedes the marked row's name in the confirm bar.</summary>
+    [Parameter]
+    public string PendingLabel { get; set; } = "Selected:";
+
+    /// <summary>The confirm bar's text while no row is marked.</summary>
+    [Parameter]
+    public string NothingPendingText { get; set; } = "Choose a row, then confirm.";
+
+    /// <summary>Accessible name for the clear button.</summary>
+    [Parameter]
+    public string ClearLabel { get; set; } = "Clear selection";
+
+    /// <summary>Accessible name for the chevron when the panel is closed.</summary>
+    [Parameter]
+    public string ExpandLabel { get; set; } = "Show results";
+
+    /// <summary>Accessible name for the chevron when the panel is open.</summary>
+    [Parameter]
+    public string CollapseLabel { get; set; } = "Hide results";
+
+    // ---- Ids and state ------------------------------------------------------------------------
+
+    private string ShellId => SubId("shell");
+
+    private string PanelId => SubId("panel");
+
+    private string GridId => SubId("grid");
+
+    private string? ActiveDescendantId =>
+        _open && _table is not null && _activeIndex >= 0 && _activeIndex < _table.PickerRowCount
+            ? _table.CellId(_activeIndex)
+            : null;
+
+    private string DisplayFor(TItem item) => ItemText?.Invoke(item) ?? item.ToString() ?? string.Empty;
+
+    /// <summary>The marked row while one is pending, otherwise the value.</summary>
+    private bool IsChosen(TItem item) =>
+        _hasPending
+            ? EqualityComparer<TItem>.Default.Equals(_pending, item)
+            : CurrentValue is not null && EqualityComparer<TItem>.Default.Equals(CurrentValue, item);
+
+    /// <inheritdoc />
+    protected override void OnParametersSet()
+    {
+        if (!_open)
+        {
+            _query = CurrentValue is null ? string.Empty : DisplayFor(CurrentValue);
+        }
+
+        if (ItemsProvider is null)
+        {
+            _filtered = FilterLocally();
+        }
+    }
+
+    // ---- Data ---------------------------------------------------------------------------------
+
+    /// <summary>
+    /// The rows of <see cref="Items"/> matching the query.
+    /// </summary>
+    /// <remarks>
+    /// Nothing is filtered until the user types. The field shows the chosen row's own text, and
+    /// filtering by it on open would match only that row - leaving the user unable to see any
+    /// other without first clearing the field.
+    /// </remarks>
+    private List<TItem> FilterLocally()
+    {
+        var source = Items ?? [];
+        var query = _query.Trim();
+
+        if (!_filtering || query.Length == 0)
+        {
+            return [.. source];
+        }
+
+        return [.. source.Where(item => Matches(item, query))];
+    }
+
+    private bool Matches(TItem item, string query)
+    {
+        if (SearchText is not null)
+        {
+            return SearchText(item).Contains(query, StringComparison.CurrentCultureIgnoreCase);
+        }
+
+        if (_table is { HasColumns: true } table)
+        {
+            return table.AnyColumnContains(item, query);
+        }
+
+        return DisplayFor(item).Contains(query, StringComparison.CurrentCultureIgnoreCase);
+    }
+
+    private ValueTask<ZenTableResult<TItem>> ProvideAsync(ZenTableRequest request) =>
+        ItemsProvider!(new ZenLookupRequest(
+            _appliedQuery,
+            request.StartIndex,
+            request.Count,
+            request.SortName,
+            request.SortDescending,
+            request.CancellationToken));
+
+    /// <summary>
+    /// Applies the query: at once for <see cref="Items"/>, after a pause for a provider.
+    /// </summary>
+    /// <remarks>
+    /// Filtering a list in memory is instant, and debouncing it would only make the field feel
+    /// slow. A provider is a round trip per keystroke, and cancelling the wait on the next key is
+    /// what stops "ab" landing after "abcd".
+    /// </remarks>
+    private async Task ApplyQueryAsync()
+    {
+        _activeIndex = -1;
+        _seekActive = true;
+
+        if (ItemsProvider is null)
+        {
+            _filtered = FilterLocally();
+
+            if (_table is not null)
+            {
+                await _table.ResetToFirstPageAsync();
+            }
+
+            return;
+        }
+
+        _search?.Cancel();
+        _search?.Dispose();
+        _search = new CancellationTokenSource();
+
+        var token = _search.Token;
+
+        try
+        {
+            if (SearchDebounceMilliseconds > 0)
+            {
+                await Task.Delay(SearchDebounceMilliseconds, token);
+            }
+        }
+        catch (OperationCanceledException)
+        {
+            return;
+        }
+
+        if (token.IsCancellationRequested || _disposed)
+        {
+            return;
+        }
+
+        var query = _filtering ? _query.Trim() : string.Empty;
+
+        if (query == _appliedQuery)
+        {
+            return;
+        }
+
+        _appliedQuery = query;
+
+        if (_table is not null)
+        {
+            await _table.ResetToFirstPageAsync();
+            await _table.RefreshDataAsync();
+        }
+    }
+
+    // ---- Opening and closing ------------------------------------------------------------------
+
+    private async Task OpenAsync()
+    {
+        if (_open || Disabled || ReadOnly)
+        {
+            return;
+        }
+
+        // Opened by typing, the first request already carries the text; the debounced one that
+        // follows then finds nothing new to ask for. Filtering itself was reset by Close.
+        _open = true;
+        _appliedQuery = _filtering ? _query.Trim() : string.Empty;
+        _activeIndex = -1;
+        _seekActive = true;
+        _filtered = FilterLocally();
+
+        await Task.CompletedTask;
+    }
+
+    /// <summary>
+    /// Closes without choosing: the field goes back to the committed value, and a row that was
+    /// only marked is forgotten.
+    /// </summary>
+    private void Close()
+    {
+        _search?.Cancel();
+
+        _open = false;
+        _filtering = false;
+        _activeIndex = -1;
+        _hasPending = false;
+        _pending = default;
+        _query = CurrentValue is null ? string.Empty : DisplayFor(CurrentValue);
+    }
+
+    private async Task ToggleOpenAsync()
+    {
+        if (_open)
+        {
+            Close();
+            return;
+        }
+
+        await OpenAsync();
+        await FocusInputAsync();
+    }
+
+    private Task HandleInputClickAsync() => OpenAsync();
+
+    private Task HandlePopoverOpenChangedAsync(bool open)
+    {
+        if (open)
+        {
+            return OpenAsync();
+        }
+
+        Close();
+        return Task.CompletedTask;
+    }
+
+    private async Task HandleQueryInputAsync(ChangeEventArgs args)
+    {
+        _query = args.Value?.ToString() ?? string.Empty;
+        _filtering = true;
+
+        await OpenAsync();
+        await ApplyQueryAsync();
+    }
+
+    /// <summary>
+    /// Closes once focus has left both the field and the panel.
+    /// </summary>
+    /// <remarks>
+    /// Two subtrees, because the panel is a DOM sibling of the field in the top layer - the same
+    /// shape as ZenDatePicker. Asking about the field alone would read a Tab into the pager as
+    /// focus leaving, and close the panel on the way in.
+    /// </remarks>
+    private async Task HandleFocusOutAsync(FocusEventArgs args)
+    {
+        if (!_open || !RendererInfo.IsInteractive)
+        {
+            return;
+        }
+
+        // focusout fires before the next element takes focus; yielding lets focus settle first.
+        await Task.Yield();
+
+        if (!_open || await IsFocusInsideAsync())
+        {
+            return;
+        }
+
+        Close();
+        StateHasChanged();
+    }
+
+    // ---- Choosing -----------------------------------------------------------------------------
+
+    private async Task ChooseAsync(TItem item)
+    {
+        if (Commit == ZenLookupCommit.Confirm)
+        {
+            _pending = item;
+            _hasPending = true;
+            return;
+        }
+
+        CurrentValue = item;
+        Close();
+        _query = DisplayFor(item);
+
+        await FocusInputAsync();
+    }
+
+    private async Task ConfirmAsync()
+    {
+        if (!_hasPending)
+        {
+            return;
+        }
+
+        var item = _pending!;
+
+        CurrentValue = item;
+        Close();
+        _query = DisplayFor(item);
+
+        await FocusInputAsync();
+    }
+
+    /// <summary>
+    /// The confirm bar's clear: forgets the marked row, and the value along with it - the bar is
+    /// where a Confirm-mode user manages the choice, so it has to be able to remove one.
+    /// </summary>
+    private async Task ClearPendingAsync()
+    {
+        _hasPending = false;
+        _pending = default;
+
+        if (CurrentValue is not null)
+        {
+            CurrentValue = default;
+        }
+
+        await FocusInputAsync();
+    }
+
+    private async Task ClearAsync()
+    {
+        _hasPending = false;
+        _pending = default;
+        _query = string.Empty;
+        _filtering = false;
+        CurrentValue = default;
+
+        if (_open)
+        {
+            await ApplyQueryAsync();
+        }
+
+        await FocusInputAsync();
+    }
+
+    private async Task HandleRowClickedAsync(TItem item, int index)
+    {
+        _activeIndex = index;
+        await ChooseAsync(item);
+        StateHasChanged();
+    }
+
+    /// <summary>
+    /// Moves the keyboard cursor to the row under the pointer, so there is only ever one "row
+    /// you are about to pick" - the reasoning is ZenCombobox's.
+    /// </summary>
+    private void HandleRowHovered(int index)
+    {
+        if (_activeIndex == index)
+        {
+            return;
+        }
+
+        _activeIndex = index;
+        StateHasChanged();
+    }
+
+    /// <summary>
+    /// Puts the cursor on a row once there are rows to put it on: the chosen one if it is on
+    /// screen, otherwise the first.
+    /// </summary>
+    /// <remarks>
+    /// Highlighted, not chosen - the reason ZenCombobox gives. It happens after the table renders
+    /// rather than on open because a provider's rows arrive after this component last rendered,
+    /// and only the table knows when they have.
+    /// </remarks>
+    private void HandleTableRendered()
+    {
+        if (!_open || !_seekActive || _table is null || _table.PickerRowCount == 0)
+        {
+            return;
+        }
+
+        _seekActive = false;
+
+        var chosen = _hasPending ? _pending : CurrentValue;
+        var index = chosen is null ? -1 : _table.IndexOf(chosen);
+
+        _activeIndex = index >= 0 ? index : 0;
+        StateHasChanged();
+    }
+
+    // ---- Keyboard -----------------------------------------------------------------------------
+
+    private async Task HandleKeyDownAsync(KeyboardEventArgs args)
+    {
+        var count = _table?.PickerRowCount ?? 0;
+
+        switch (args.Key)
+        {
+            case "ArrowDown" when !_open:
+            case "ArrowUp" when !_open:
+                await OpenAsync();
+                return;
+
+            case "ArrowDown":
+                await MoveToAsync(Math.Min(_activeIndex + 1, count - 1));
+                break;
+
+            case "ArrowUp":
+                await MoveToAsync(Math.Max(_activeIndex - 1, 0));
+                break;
+
+            case "PageDown" when _open:
+                await MoveToAsync(Math.Min(_activeIndex + RowsPerView, count - 1));
+                break;
+
+            case "PageUp" when _open:
+                await MoveToAsync(Math.Max(_activeIndex - RowsPerView, 0));
+                break;
+
+            // With Ctrl only. Plain Home and End belong to the text field, where they move the
+            // caret - taking them would stop the user editing the start of their own query.
+            case "Home" when _open && args.CtrlKey:
+                await MoveToAsync(0);
+                break;
+
+            case "End" when _open && args.CtrlKey:
+                await MoveToAsync(count - 1);
+                break;
+
+            case "Enter" when _open && args.CtrlKey && Commit == ZenLookupCommit.Confirm:
+                await ConfirmAsync();
+                break;
+
+            case "Enter" when _open:
+                if (_table is not null && _activeIndex >= 0 && _table.TryGetRow(_activeIndex, out var item))
+                {
+                    await ChooseAsync(item);
+                }
+
+                break;
+
+            case "Escape" when _open:
+                // Closes and restores the committed value's text. It does not clear the field: a
+                // user who opened the panel by accident should not lose their value to close it.
+                Close();
+                break;
+        }
+    }
+
+    /// <summary>Escape from anywhere in the panel - a footer button, a sort header.</summary>
+    /// <remarks>
+    /// Focus goes back to the field. The panel is about to disappear, and the element holding
+    /// focus with it; without this focus falls to the top of the document.
+    /// </remarks>
+    private async Task HandlePanelKeyDownAsync(KeyboardEventArgs args)
+    {
+        if (args.Key != "Escape" || !_open)
+        {
+            return;
+        }
+
+        Close();
+        await FocusInputAsync();
+    }
+
+    /// <summary>How far PageUp and PageDown move: roughly one panel of rows.</summary>
+    private int RowsPerView => PageSize > 0 ? PageSize : 8;
+
+    private async Task MoveToAsync(int index)
+    {
+        if (index < 0)
+        {
+            return;
+        }
+
+        _activeIndex = index;
+        _seekActive = false;
+
+        if (!RendererInfo.IsInteractive || _table is null || _disposed)
+        {
+            return;
+        }
+
+        var dom = await DomAsync();
+
+        if (dom is null)
+        {
+            return;
+        }
+
+        try
+        {
+            await dom.InvokeVoidAsync(
+                "scrollRowIntoView",
+                _table.ScrollContainerId,
+                $"{GridId}-row-{index}",
+                index,
+                ItemSize);
+        }
+        catch (JSDisconnectedException)
+        {
+        }
+        catch (OperationCanceledException)
+        {
+        }
+    }
+
+    // ---- JavaScript ---------------------------------------------------------------------------
+
+    [Inject]
+    private IJSRuntime JS { get; set; } = default!;
+
+    private async Task<IJSObjectReference?> DomAsync()
+    {
+        if (!RendererInfo.IsInteractive || _disposed)
+        {
+            return null;
+        }
+
+        try
+        {
+            return _dom ??= await JS.InvokeAsync<IJSObjectReference>(
+                "import", "./_content/ZenithUI/js/zen-dom.js");
+        }
+        catch (JSDisconnectedException)
+        {
+            return null;
+        }
+        catch (OperationCanceledException)
+        {
+            return null;
+        }
+    }
+
+    private async Task<bool> IsFocusInsideAsync()
+    {
+        var dom = await DomAsync();
+
+        if (dom is null)
+        {
+            return true;
+        }
+
+        try
+        {
+            return await dom.InvokeAsync<bool>("containsActiveElement", ShellId, PanelId);
+        }
+        catch (JSDisconnectedException)
+        {
+            return true;
+        }
+        catch (OperationCanceledException)
+        {
+            return true;
+        }
+    }
+
+    private async Task FocusInputAsync()
+    {
+        if (!RendererInfo.IsInteractive || _disposed)
+        {
+            return;
+        }
+
+        try
+        {
+            await _input.FocusAsync();
+        }
+        catch (JSDisconnectedException)
+        {
+        }
+        catch (InvalidOperationException)
+        {
+            // Not rendered yet, or already gone.
+        }
+    }
+
+    /// <inheritdoc />
+    public async ValueTask DisposeAsync()
+    {
+        _disposed = true;
+
+        _search?.Cancel();
+        _search?.Dispose();
+        _search = null;
+
+        if (_dom is not null)
+        {
+            try
+            {
+                await _dom.DisposeAsync();
+            }
+            catch (JSDisconnectedException)
+            {
+            }
+            catch (OperationCanceledException)
+            {
+            }
+
+            _dom = null;
+        }
+
+        GC.SuppressFinalize(this);
+    }
+
+    // ---- Styling ------------------------------------------------------------------------------
+
+    private string WrapperClass => CssBuilder
+        .Default(ZenStyles.InputWrapperBase)
+        .AddClass(ZenStyles.InputSize(Size))
+        .AddClass(ZenStyles.InputRadius(Size))
+        .AddClass("gap-1.5")
+        .Build()!;
+
+    private string PanelClass => CssBuilder
+        .Default("overflow-hidden rounded-zen-lg border border-border bg-surface-overlay")
+        .AddClass(ZenStyles.Elevation(ZenElevation.High))
+        .Build()!;
+
+    // max-width as well as width: the width can be a fixed length, and a fixed length wider than
+    // a phone would push the panel off screen with nothing left for Shift to do.
+    private string PanelStyle => $"width: {PanelWidth}; max-width: calc(100vw - 1rem);";
+}
