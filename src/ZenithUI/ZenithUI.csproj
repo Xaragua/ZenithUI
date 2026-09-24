@@ -95,4 +95,24 @@
     <Exec Command="npm run css:build" WorkingDirectory="$(MSBuildProjectDirectory)" />
   </Target>
 
+  <!--
+    The stylesheets are gitignored, so on a clean checkout (CI, release) they do not exist when the
+    SDK globs wwwroot/** into Content at evaluation time - and a file that is not Content is never
+    discovered as a static web asset. The package then shipped them as plain contentFiles instead of
+    under staticwebassets/, and _content/ZenithUI/zenith.css 404'd in every consuming app. Adding them
+    here, after Tailwind has written them and before discovery reads Content, closes that gap. The
+    Exclude keeps a warm build, where the glob already found them, from adding them twice.
+
+    DependsOnTargets, not AfterTargets: ResolveProjectStaticWebAssets runs before BuildTailwind's
+    own BeforeTargets hooks fire, so Tailwind has to be pulled forward to here.
+  -->
+  <Target Name="ZenithIncludeGeneratedStyles"
+          DependsOnTargets="BuildTailwind"
+          BeforeTargets="ResolveProjectStaticWebAssets">
+    <ItemGroup>
+      <Content Include="wwwroot\zenith.css;wwwroot\zenith.nopreflight.css"
+               Exclude="@(Content)" />
+    </ItemGroup>
+  </Target>
+
 </Project>

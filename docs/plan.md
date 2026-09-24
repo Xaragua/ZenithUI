@@ -1,6 +1,6 @@
 # ZenithUI — implementation plan
 
-> **Status:** M0 through M6 complete (2026-09-23), shipping as `1.0.0-rc.1.1`. The consumer-`@theme`
+> **Status:** M0 through M6 complete (2026-09-23), shipping as `1.0.0-rc.1.2`. The consumer-`@theme`
 > gap is closed, the package is verified from a feed by both a Blazor Web App and a standalone
 > WebAssembly app, and the accessibility sweep is clean across every page, both palettes and nine
 > interactive states. `1.0.0` follows whatever the release candidate turns up.

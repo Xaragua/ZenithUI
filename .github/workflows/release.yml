@@ -78,7 +78,17 @@ jobs:
         run: |
           set -euo pipefail
           package=$(ls ./artifacts/*.nupkg | head -1)
-          for required in 'zenith.css' 'tailwind/zenith.theme.css' 'build/ZenithUI.targets' 'buildTransitive/ZenithUI.targets' 'lib.module.js'; do
+          # Matched exactly: rc.1.1 shipped the stylesheets under content/ and 404'd everywhere.
+          for sheet in zenith.css zenith.nopreflight.css; do
+            if ! unzip -l "$package" | grep -qE "[[:space:]]staticwebassets/${sheet//./\\.}$" \
+              || unzip -l "$package" | grep -qE "[[:space:]]content(Files/[^ ]*)?/wwwroot/${sheet//./\\.}$" \
+              || ! unzip -p "$package" build/Microsoft.AspNetCore.StaticWebAssetEndpoints.props | grep -q "Include=\"_content/ZenithUI/$sheet\""; then
+              echo "::error::$sheet is not packed as a static web asset served at _content/ZenithUI/$sheet."
+              unzip -l "$package"
+              exit 1
+            fi
+          done
+          for required in 'tailwind/zenith.theme.css' 'build/ZenithUI.targets' 'buildTransitive/ZenithUI.targets' 'lib.module.js'; do
             if ! unzip -l "$package" | grep -q "$required"; then
               echo "::error::$required is missing from $package."
               unzip -l "$package"
