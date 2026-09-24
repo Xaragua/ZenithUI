@@ -44,6 +44,19 @@ class built at runtime, or an `@source` glob that stopped matching a folder, wou
 every other test. The test was checked by deleting one layout rule and one typography rule from
 its copy of the stylesheet: both tests failed and named the missing class.
 
+### Fixed — a focus ring around every page title
+
+Blazor's `FocusOnNavigate` gives the page's `h1` `tabindex="-1"` and focuses it after each
+navigation, so a screen reader announces the new page. Browsers count focus on page load as
+keyboard focus, so `:focus-visible` matched and every page opened with the default outline drawn
+around its title, which nothing can activate.
+
+Inside `.zen-root`, a heading with `tabindex="-1"` no longer draws a focus outline. It is still
+focused and still announced. The rule is kept narrow on purpose. Anything a user can tab to keeps its ring, and a
+broader `[tabindex="-1"]` rule would have hidden the ring on roving-tabindex tree rows and calendar
+days for the moment between the focus call and the re-render. `ProgrammaticFocusTests` enforces
+both limits.
+
 ## [1.0.0-rc.1.2] — 2026-09-24
 
 A packaging fix. No API changes. Every consumer of `1.0.0-rc.1.1` should upgrade.
