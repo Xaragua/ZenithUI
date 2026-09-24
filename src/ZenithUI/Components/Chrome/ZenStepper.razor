@@ -1,0 +1,648 @@
+@namespace ZenithUI
+@inherits ZenJsComponentBase
+
+@*
+    A wizard: a numbered list of steps, the active step's content, and Back / Next / Finish.
+
+    WHY NOT TABS
+
+    A stepper looks like a tab strip laid on its side, and the tabs pattern is the obvious thing
+    to borrow. It would be wrong. Tabs promise that every panel is equally reachable, in any
+    order, with the arrow keys - and a linear wizard exists precisely to refuse that: step three
+    is not available until step two is valid. Claiming role="tablist" would advertise a keyboard
+    contract the component must then break.
+
+    So the header is what it is: an ordered list of steps inside a <nav>, the active one marked
+    aria-current="step" (as ZenTimeline marks its current entry), each step's state stated in
+    text as well as in colour. Steps the user may go to are buttons; steps they may not are plain
+    text rather than disabled buttons, because a disabled button is still a tab stop in some
+    browsers and still announced as a control that does nothing.
+
+    HOW STEPS ARE COLLECTED
+
+    Steps are child components that register themselves, and ZenDefer orders the render so they
+    have all registered before the header is drawn - the mechanism ZenTable uses for its columns,
+    described in Core/ZenDefer.cs. One pass, so a server-rendered wizard arrives with its header
+    and its first step intact.
+
+    Unlike ZenTable's columns, the list is not rebuilt from scratch on every pass. Blazor only
+    hands a child new parameters when one of them might have changed, and a step with nothing but
+    a title and a flag - a disabled placeholder, say - has none that can. It would register once
+    and then silently vanish from the header on the next render. So a step joins the list when it
+    first registers and leaves it when it is disposed, and each pass's registrations are used
+    only to place steps that are new, in the order they were written.
+
+    Only the active step's content is rendered. A wizard's steps are usually forms, and rendering
+    every one of them hidden would validate, fetch and subscribe for steps the user has not
+    reached. State belongs in the model the steps edit, not in markup kept alive off screen.
+
+    WITHOUT JAVASCRIPT
+
+    Under static SSR the header and the active step render, and the buttons are there - but
+    nothing handles their clicks. Drive the step from the URL instead (ActiveIndex from a query
+    string) if a wizard must work with no interactive render mode.
+*@
+
+@{
+    _generation++;
+}
+
+<CascadingValue Value="this" IsFixed="true">
+    @ChildContent
+</CascadingValue>
+
+<ZenDefer>
+    @{
+        MergeRegistrations();
+    }
+
+    <div id="@Id" class="@RootClass(RootClasses)" style="@Style" @attributes="AttributesWithoutClass">
+        <nav aria-label="@Label" class="@(Orientation == ZenDirection.Vertical ? "shrink-0 md:w-64" : null)">
+            <ol class="@ListClass">
+                @for (var i = 0; i < _steps.Count; i++)
+                {
+                    var index = i;
+                    var step = _steps[index];
+                    var state = StateOf(index);
+
+                    <li class="@ItemClass(index)"
+                        data-state="@StateName(state)"
+                        aria-current="@(index == ActiveStepIndex ? "step" : null)">
+                        @if (CanGoTo(index) && index != ActiveStepIndex)
+                        {
+                            <button type="button" class="@TriggerClass(step)" @onclick="@(() => GoToAsync(index))">
+                                @StepLabel(step, index, state)
+                            </button>
+                        }
+                        else
+                        {
+                            <div class="@TriggerClass(step)">
+                                @StepLabel(step, index, state)
+                            </div>
+                        }
+
+                        <span class="@LineClass(state)" aria-hidden="true"></span>
+                    </li>
+                }
+            </ol>
+        </nav>
+
+        @if (ActiveStep is { } active)
+        {
+            <section class="min-w-0 flex-1" aria-labelledby="@HeadingId">
+                @* The heading takes focus after every step change, so a screen reader announces
+                   where the user has arrived - the same move FocusOnNavigate makes for a page.
+                   tabindex="-1" keeps it out of the tab order, and the rule in base.css keeps a
+                   ring off a heading nothing can activate. *@
+                <ZenText Variant="ZenTextVariant.H4"
+                         As="@HeadingElement"
+                         Id="@HeadingId"
+                         tabindex="-1"
+                         class="@(ShowStepTitle ? null : "zen-sr-only")">
+                    @active.Title
+                </ZenText>
+
+                @if (active.Error is not null)
+                {
+                    <p class="mt-2 flex items-start gap-1.5 text-sm text-danger-strong" role="alert">
+                        <ZenIcon Path="@ZenIcons.Danger" Size="ZenSize.Small" class="mt-px size-4 shrink-0" />
+                        <span>@active.Error</span>
+                    </p>
+                }
+
+                <div class="@(ShowStepTitle || active.Error is not null ? "mt-4" : null)">
+                    @active.ChildContent
+                </div>
+
+                @if (NavigationTemplate is not null)
+                {
+                    @NavigationTemplate(Context)
+                }
+                else if (ShowNavigation)
+                {
+                    <div class="mt-6 flex items-center justify-between gap-3 border-t border-border pt-4">
+                        @if (CanGoBack)
+                        {
+                            <ZenButton Variant="ZenVariant.Outline"
+                                       Icon="@ZenIcons.ChevronLeft"
+                                       Disabled="_busy"
+                                       OnClick="BackAsync">
+                                @BackText
+                            </ZenButton>
+                        }
+                        else
+                        {
+                            <span></span>
+                        }
+
+                        <ZenButton Intent="ZenIntent.Primary"
+                                   TrailingIcon="@(IsLast ? null : ZenIcons.ChevronRight)"
+                                   Loading="_busy"
+                                   OnClick="NextAsync">
+                            @(IsLast ? FinishText : NextText)
+                        </ZenButton>
+                    </div>
+                }
+            </section>
+        }
+    </div>
+</ZenDefer>
+
+@code {
+    /// <summary>What a step looks like in the header.</summary>
+    private enum StepState
+    {
+        Upcoming,
+        Current,
+        Complete,
+        Error,
+    }
+
+    private readonly List<ZenStep> _steps = [];
+
+    /// <summary>The steps that registered during the current pass, in document order.</summary>
+    private readonly List<ZenStep> _passOrder = [];
+    private readonly HashSet<int> _completed = [];
+
+    private int _generation;
+    private int _collectedGeneration = -1;
+
+    private int _active;
+    private int _lastActiveParameter = -1;
+    private int _furthest;
+    private bool _busy;
+    private bool _focusHeading;
+
+    /// <inheritdoc />
+    /// <remarks>Only to move focus to the new step's heading after a step change.</remarks>
+    protected override string? ModulePath => "./_content/ZenithUI/js/zen-dom.js";
+
+    /// <summary>The <see cref="ZenStep"/> declarations.</summary>
+    [Parameter]
+    public RenderFragment? ChildContent { get; set; }
+
+    /// <summary>The active step, zero-based.</summary>
+    [Parameter]
+    public int ActiveIndex { get; set; }
+
+    /// <summary>Raised when the active step changes.</summary>
+    [Parameter]
+    public EventCallback<int> ActiveIndexChanged { get; set; }
+
+    /// <summary>
+    /// Require the steps in order. On by default - it is what makes a stepper a wizard.
+    /// </summary>
+    /// <remarks>
+    /// In a linear stepper a header step is a button only once it has been reached, so the user
+    /// can go back to any step they have seen but not jump past one they have not. Turn it off
+    /// for a settings-style flow where the steps are independent: every step is then reachable,
+    /// and leaving the current one still runs its validation.
+    /// </remarks>
+    [Parameter]
+    public bool Linear { get; set; } = true;
+
+    /// <summary>Steps in a row above the content, or in a column beside it.</summary>
+    [Parameter]
+    public ZenDirection Orientation { get; set; } = ZenDirection.Horizontal;
+
+    /// <summary>Render the Back and Next / Finish buttons under the step.</summary>
+    [Parameter]
+    public bool ShowNavigation { get; set; } = true;
+
+    /// <summary>
+    /// Custom navigation buttons, replacing the built-in ones. Given what they need to call.
+    /// </summary>
+    [Parameter]
+    public RenderFragment<ZenStepperContext>? NavigationTemplate { get; set; }
+
+    /// <summary>Raised by Finish on the last step, after it has validated.</summary>
+    [Parameter]
+    public EventCallback OnFinish { get; set; }
+
+    /// <summary>Accessible name for the step list.</summary>
+    [Parameter]
+    public string Label { get; set; } = "Progress";
+
+    /// <summary>Show the active step's title above its content.</summary>
+    /// <remarks>
+    /// Turned off, the heading is still rendered, visually hidden: it is what names the step's
+    /// region and what takes focus on a step change.
+    /// </remarks>
+    [Parameter]
+    public bool ShowStepTitle { get; set; } = true;
+
+    /// <summary>The heading level of the active step's title.</summary>
+    [Parameter]
+    public int TitleLevel { get; set; } = 2;
+
+    /// <summary>The Back button's text.</summary>
+    [Parameter]
+    public string BackText { get; set; } = "Back";
+
+    /// <summary>The Next button's text.</summary>
+    [Parameter]
+    public string NextText { get; set; } = "Next";
+
+    /// <summary>The Next button's text on the last step.</summary>
+    [Parameter]
+    public string FinishText { get; set; } = "Finish";
+
+    /// <summary>Visually hidden text after a completed step's title.</summary>
+    [Parameter]
+    public string CompletedText { get; set; } = "completed";
+
+    /// <summary>Visually hidden text after the title of a step with an error.</summary>
+    [Parameter]
+    public string ErrorText { get; set; } = "has errors";
+
+    /// <summary>The label shown on optional steps.</summary>
+    [Parameter]
+    public string OptionalText { get; set; } = "Optional";
+
+    // ---- Registration -------------------------------------------------------------------------
+
+    /// <summary>Called by a <see cref="ZenStep"/> as it receives its parameters.</summary>
+    internal void Register(ZenStep step)
+    {
+        if (_collectedGeneration != _generation)
+        {
+            _collectedGeneration = _generation;
+            _passOrder.Clear();
+        }
+
+        if (!_passOrder.Contains(step))
+        {
+            _passOrder.Add(step);
+        }
+    }
+
+    /// <summary>Called by a <see cref="ZenStep"/> as it is disposed - removed by an <c>@@if</c>.</summary>
+    internal void Unregister(ZenStep step)
+    {
+        _steps.Remove(step);
+        _passOrder.Remove(step);
+    }
+
+    /// <summary>
+    /// Folds this pass's registrations into the step list.
+    /// </summary>
+    /// <remarks>
+    /// A new step goes in front of the next step written after it that the list already knows,
+    /// which is its document position. When every step registered this pass - the usual case,
+    /// since a step with content always does - the pass order simply is the order.
+    /// </remarks>
+    private void MergeRegistrations()
+    {
+        for (var i = 0; i < _passOrder.Count; i++)
+        {
+            var step = _passOrder[i];
+
+            if (_steps.Contains(step))
+            {
+                continue;
+            }
+
+            var next = _passOrder.Skip(i + 1).FirstOrDefault(_steps.Contains);
+
+            if (next is null)
+            {
+                _steps.Add(step);
+            }
+            else
+            {
+                _steps.Insert(_steps.IndexOf(next), step);
+            }
+        }
+
+        if (_passOrder.Count == _steps.Count && !_passOrder.SequenceEqual(_steps))
+        {
+            _steps.Clear();
+            _steps.AddRange(_passOrder);
+        }
+    }
+
+    // ---- State --------------------------------------------------------------------------------
+
+    /// <inheritdoc />
+    /// <remarks>
+    /// The internal index follows the parameter only when the parameter changes, so a page that
+    /// sets <c>ActiveIndex="0"</c> once without binding it does not snap the wizard back to the
+    /// start on every re-render.
+    /// </remarks>
+    protected override void OnParametersSet()
+    {
+        if (ActiveIndex != _lastActiveParameter)
+        {
+            _lastActiveParameter = ActiveIndex;
+            _active = Math.Max(0, ActiveIndex);
+            _furthest = Math.Max(_furthest, _active);
+        }
+    }
+
+    private int ActiveStepIndex => _steps.Count == 0 ? -1 : Math.Clamp(_active, 0, _steps.Count - 1);
+
+    private ZenStep? ActiveStep => ActiveStepIndex >= 0 ? _steps[ActiveStepIndex] : null;
+
+    private int PreviousIndex => Seek(ActiveStepIndex, -1);
+
+    private int NextIndex => Seek(ActiveStepIndex, 1);
+
+    private bool CanGoBack => PreviousIndex >= 0;
+
+    private bool IsLast => NextIndex < 0;
+
+    private string HeadingId => SubId("heading");
+
+    private ZenTextElement HeadingElement => TitleLevel switch
+    {
+        1 => ZenTextElement.H1,
+        3 => ZenTextElement.H3,
+        4 => ZenTextElement.H4,
+        5 => ZenTextElement.H5,
+        6 => ZenTextElement.H6,
+        _ => ZenTextElement.H2,
+    };
+
+    private ZenStepperContext Context => new(
+        ActiveStepIndex,
+        _steps.Count,
+        CanGoBack,
+        IsLast,
+        _busy,
+        NextAsync,
+        BackAsync,
+        GoToAsync);
+
+    /// <summary>The nearest step in a direction that is not disabled, or -1.</summary>
+    private int Seek(int from, int direction)
+    {
+        for (var i = from + direction; i >= 0 && i < _steps.Count; i += direction)
+        {
+            if (!_steps[i].Disabled)
+            {
+                return i;
+            }
+        }
+
+        return -1;
+    }
+
+    private StepState StateOf(int index)
+    {
+        var step = _steps[index];
+
+        if (step.Error is not null)
+        {
+            return StepState.Error;
+        }
+
+        if (index == ActiveStepIndex)
+        {
+            return StepState.Current;
+        }
+
+        return _completed.Contains(index) ? StepState.Complete : StepState.Upcoming;
+    }
+
+    /// <summary>
+    /// Whether the header may take the user to a step.
+    /// </summary>
+    /// <remarks>
+    /// Linear: any step already reached. Free: any step at all. Never a disabled one.
+    /// </remarks>
+    private bool CanGoTo(int index) =>
+        !_steps[index].Disabled && !_busy && (!Linear || index <= _furthest);
+
+    // ---- Moving -------------------------------------------------------------------------------
+
+    private async Task NextAsync()
+    {
+        if (_busy || ActiveStepIndex < 0)
+        {
+            return;
+        }
+
+        if (IsLast)
+        {
+            if (await CanLeaveAsync(ActiveStepIndex, _steps.Count))
+            {
+                _completed.Add(ActiveStepIndex);
+                await OnFinish.InvokeAsync();
+            }
+
+            return;
+        }
+
+        await MoveAsync(NextIndex);
+    }
+
+    private async Task BackAsync()
+    {
+        if (!_busy && CanGoBack)
+        {
+            await MoveAsync(PreviousIndex);
+        }
+    }
+
+    private async Task GoToAsync(int index)
+    {
+        if (index < 0 || index >= _steps.Count || index == ActiveStepIndex || !CanGoTo(index))
+        {
+            return;
+        }
+
+        await MoveAsync(index);
+    }
+
+    /// <summary>
+    /// Leaves the current step for another, if the current step lets it go.
+    /// </summary>
+    /// <remarks>
+    /// A step left forward counts as complete; one left backward keeps whatever state it had.
+    /// Going back to fix an answer should not un-complete the step the user was on, only
+    /// re-validate it when they next move forward from it.
+    /// </remarks>
+    private async Task MoveAsync(int target)
+    {
+        var from = ActiveStepIndex;
+
+        if (!await CanLeaveAsync(from, target))
+        {
+            return;
+        }
+
+        if (target > from)
+        {
+            _completed.Add(from);
+        }
+
+        _active = target;
+        _lastActiveParameter = target;
+        _furthest = Math.Max(_furthest, target);
+        _focusHeading = true;
+
+        await ActiveIndexChanged.InvokeAsync(target);
+    }
+
+    /// <summary>
+    /// Asks the step being left whether it may be left: its form first, then its own hook.
+    /// </summary>
+    /// <remarks>
+    /// The form is only checked going forward. Blocking Back until the step is valid traps a
+    /// user who wants to change an earlier answer that this step depends on.
+    /// </remarks>
+    private async Task<bool> CanLeaveAsync(int from, int to)
+    {
+        var step = _steps[from];
+
+        if (to > from && step.EditContext is { } form && !form.Validate())
+        {
+            return false;
+        }
+
+        if (step.OnLeaving is null)
+        {
+            return true;
+        }
+
+        var args = new ZenStepLeavingArgs(from, to);
+
+        _busy = true;
+        StateHasChanged();
+
+        try
+        {
+            await step.OnLeaving(args);
+        }
+        finally
+        {
+            _busy = false;
+        }
+
+        return !args.Cancel;
+    }
+
+    /// <inheritdoc />
+    protected override async Task OnAfterRenderAsync(bool firstRender)
+    {
+        await base.OnAfterRenderAsync(firstRender);
+
+        if (_focusHeading && IsJsReady)
+        {
+            _focusHeading = false;
+            await InvokeModuleVoidAsync("focusElement", HeadingId);
+        }
+    }
+
+    // ---- Markup -------------------------------------------------------------------------------
+
+    private RenderFragment StepLabel(ZenStep step, int index, StepState state) => __builder =>
+    {
+        <span class="@MarkerClass(state, step.Disabled)" aria-hidden="true">
+            @switch (state)
+            {
+                case StepState.Complete:
+                    <ZenIcon Path="@ZenIcons.Check" class="size-4" />
+                    break;
+                case StepState.Error:
+                    <span>!</span>
+                    break;
+                default:
+                    <span>@(index + 1)</span>
+                    break;
+            }
+        </span>
+
+        <span class="zen-step-text flex min-w-0 flex-col text-start">
+            <span class="@(step.Disabled ? "text-sm text-content-subtle" : TitleClass(state))">
+                @step.Title
+                @* The state in words. Colour and a tick carry it to the eye; a screen reader
+                   would otherwise hear eight step names with no way to tell which are done. The
+                   current step needs none - aria-current announces it. *@
+                @if (state == StepState.Complete)
+                {
+                    <span class="zen-sr-only">(@CompletedText)</span>
+                }
+                else if (state == StepState.Error)
+                {
+                    <span class="zen-sr-only">(@ErrorText)</span>
+                }
+            </span>
+
+            @if (step.Optional)
+            {
+                <span class="text-xs text-content-subtle">@OptionalText</span>
+            }
+
+            @if (step.Description is not null)
+            {
+                <span class="@(step.Disabled ? "text-xs text-content-subtle" : "text-xs text-content-muted")">@step.Description</span>
+            }
+        </span>
+    };
+
+    // ---- Styling ------------------------------------------------------------------------------
+
+    private string RootClasses => Orientation == ZenDirection.Vertical
+        ? "flex flex-col gap-6 md:flex-row"
+        : "flex flex-col gap-6";
+
+    private string ListClass => Orientation == ZenDirection.Vertical
+        ? "zen-stepper flex flex-col"
+        : "zen-stepper zen-stepper-horizontal flex items-start";
+
+    private string ItemClass(int index) => Orientation == ZenDirection.Vertical
+        ? "zen-step flex flex-col"
+        : "zen-step flex min-w-0 flex-1 items-center gap-2 last:flex-none";
+
+    private static string StateName(StepState state) => state switch
+    {
+        StepState.Complete => "complete",
+        StepState.Current => "current",
+        StepState.Error => "error",
+        _ => "upcoming",
+    };
+
+    private string TriggerClass(ZenStep step) => CssBuilder
+        .Default("flex min-w-0 items-center gap-2.5 rounded-zen-md px-1 py-1 text-start")
+        .AddClass("zen-focus transition-colors hover:bg-surface-hover", CanGoTo(_steps.IndexOf(step)) && _steps.IndexOf(step) != ActiveStepIndex)
+        .Build()!;
+
+    // A disabled step is dimmed with a dashed marker and the subtle text tone rather than with
+    // opacity. It is not a disabled control - it is text - so contrast rules still apply to it,
+    // and opacity-50 took the muted tone below 3:1 in both palettes.
+    private static string MarkerClass(StepState state, bool disabled) => disabled
+        ? "grid size-8 shrink-0 place-items-center rounded-full border border-dashed border-border bg-surface text-sm text-content-subtle"
+        : state switch
+    {
+        StepState.Complete =>
+            "grid size-8 shrink-0 place-items-center rounded-full bg-primary text-sm font-medium text-primary-content",
+        StepState.Current =>
+            "grid size-8 shrink-0 place-items-center rounded-full border-2 border-primary bg-surface text-sm font-semibold text-primary-strong",
+        StepState.Error =>
+            "grid size-8 shrink-0 place-items-center rounded-full bg-danger text-sm font-semibold text-danger-content",
+        _ =>
+            "grid size-8 shrink-0 place-items-center rounded-full border border-border bg-surface text-sm text-content-muted",
+    };
+
+    private static string TitleClass(StepState state) => state switch
+    {
+        StepState.Current => "text-sm font-semibold text-content",
+        StepState.Error => "text-sm font-medium text-danger-strong",
+        StepState.Complete => "text-sm font-medium text-content",
+        _ => "text-sm text-content-muted",
+    };
+
+    /// <summary>
+    /// The connector to the next step, tinted once the step it leaves is complete - so the line
+    /// fills in as the user advances.
+    /// </summary>
+    private string LineClass(StepState state)
+    {
+        var colour = state == StepState.Complete ? "bg-primary" : "bg-border";
+
+        return Orientation == ZenDirection.Vertical
+            ? $"zen-step-line ms-[1.25rem] my-1 min-h-4 w-px {colour}"
+            : $"zen-step-line h-px min-w-4 flex-1 {colour}";
+    }
+}
