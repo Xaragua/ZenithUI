@@ -602,3 +602,21 @@ public enum ZenLayoutElement
     /// <summary><c>&lt;li&gt;</c>, an item of a <see cref="Ul"/> or <see cref="Ol"/>.</summary>
     Li,
 }
+
+/// <summary>When a <c>ZenLookup</c> writes the row the user picked into its value.</summary>
+public enum ZenLookupCommit
+{
+    /// <summary>
+    /// On the pick itself: a click or Enter selects the row and closes the panel. The default,
+    /// and the way ZenCombobox behaves.
+    /// </summary>
+    Immediate,
+
+    /// <summary>
+    /// On a Confirm button. A click or Enter only marks the row; the panel stays open until the
+    /// user confirms, and closing it any other way discards the choice. For picks that are
+    /// expensive to undo - binding a contract to a vendor, say - where one stray click should
+    /// not be enough.
+    /// </summary>
+    Confirm,
+}

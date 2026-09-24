@@ -596,6 +596,18 @@
 }
 
 /*
+ * ZenLookup's panel runs its table edge to edge, with no padding of its own. The table's pager is
+ * a sibling of the table's scroll box, which the lookup cannot put a class on, so the pager is
+ * reached from the wrapper instead.
+ */
+@layer components {
+  .zen-lookup-grid > nav {
+    margin-block-end: 0.5rem;
+    padding-inline: 0.75rem;
+  }
+}
+
+/*
  * ZenTable's stacked layout on a narrow screen.
  *
  * Below the `md` breakpoint each row becomes a card and each cell becomes a labelled line. The
