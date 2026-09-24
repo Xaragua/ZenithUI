@@ -58,12 +58,27 @@ jobs:
           # A .nupkg is a zip; static web assets live under staticwebassets/.
           # If the Tailwind target silently no-ops, the package still builds and still restores -
           # consumers just get an unstyled library. Catch that here rather than in their app.
-          if ! unzip -l "$package" | grep -q 'zenith.css'; then
-            echo "::error::zenith.css is missing from $package - the Tailwind build did not run."
-            unzip -l "$package"
-            exit 1
-          fi
-          echo "Found zenith.css in $package"
+          #
+          # The path is matched exactly. rc.1.1 shipped zenith.css under content/wwwroot/ instead,
+          # a looser grep passed it, and _content/ZenithUI/zenith.css 404'd in every consuming app:
+          # a stylesheet generated after evaluation was never discovered as a static web asset.
+          for sheet in zenith.css zenith.nopreflight.css; do
+            if ! unzip -l "$package" | grep -qE "[[:space:]]staticwebassets/${sheet//./\\.}$"; then
+              echo "::error::staticwebassets/$sheet is missing from $package - it will not be served at _content/ZenithUI/$sheet."
+              unzip -l "$package"
+              exit 1
+            fi
+            if unzip -l "$package" | grep -qE "[[:space:]]content(Files/[^ ]*)?/wwwroot/${sheet//./\\.}$"; then
+              echo "::error::$sheet was packed as a content file - static web asset discovery missed it."
+              unzip -l "$package"
+              exit 1
+            fi
+            if ! unzip -p "$package" build/Microsoft.AspNetCore.StaticWebAssetEndpoints.props | grep -q "Include=\"_content/ZenithUI/$sheet\""; then
+              echo "::error::No _content/ZenithUI/$sheet endpoint is declared in $package."
+              exit 1
+            fi
+            echo "Found $sheet as a static web asset in $package"
+          done
 
           # The consumer @theme and the targets file that delivers it. Without either, an app
           # running its own Tailwind restores a package that builds fine and compiles none of
