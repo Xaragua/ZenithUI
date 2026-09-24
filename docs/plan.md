@@ -257,7 +257,8 @@ first paint.
 The requested set, plus the primitives the rest depend on.
 
 **Primitives** — `ZenIcon` (slot-based, so no icon font is forced on consumers), `ZenButton`,
-`ZenBadge`, `ZenSpinner`, `ZenSkeleton`, `ZenPopover`, `ZenField`, `ZenIndicator`, `ZenProgress`.
+`ZenBadge`, `ZenSpinner`, `ZenSkeleton`, `ZenPopover`, `ZenField`, `ZenIndicator`, `ZenProgress`,
+`ZenText` (added after `1.0.0-rc.1`).
 
 **Inputs** — `ZenTextInput`, `ZenTextArea`, `ZenDateInput`, `ZenDatePicker` + `ZenCalendar`,
 `ZenNumberInput<TValue>`, `ZenCurrencyInput` (culture-aware, **formats on blur in C#** — no JS
@@ -547,6 +548,7 @@ Recorded because each changed the design rather than merely the code.
 | `ZenDatePicker`'s panel became a `ZenPopover` | The plan had it as "an absolutely positioned panel… ZenPopover will supersede this", and M3 never came back for it. `ZenCard` is `overflow-hidden`, so the calendar clipped inside the container date pickers most often sit in — a shipped bug that no test could see and every screenshot could. |
 | The combobox popover panel **is** the listbox | A scrolling wrapper between the panel and the options made `aria-controls` name a roleless element, detached the options from the listbox claiming them, and pointed `scrollItemIntoView` at a node the accessibility tree does not contain. `ZenPopover` gained a `PanelId` parameter because a parent cannot read a child's generated id in the pass that creates it. |
 | That file carries the library's **whole candidate list**, not just `@theme` | `@theme` alone fixes only half the problem. The other half is cascade order, and the only way two stylesheets can stop disagreeing about `lg:hidden` is for both to emit it. The list comes from `@tailwindcss/oxide` — Tailwind's own scanner — so it cannot drift from what the library was built with. |
+| `ZenText`, not in the original inventory, and its element is **not** its variant | Every heading in the demo was hand-rolled Tailwind, and a consumer without Tailwind could not reach the type scale at all. The element is a separate `As` parameter because tying look to level makes people skip heading levels to get a size — the heading-order failure the M6 audit found in the demo. |
 
 ### The cascade-order trap a precompiled component library walks into
 
