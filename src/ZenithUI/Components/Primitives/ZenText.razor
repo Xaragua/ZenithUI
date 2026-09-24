@@ -1,0 +1,186 @@
+@namespace ZenithUI
+
+@inherits ZenComponentBase
+
+@*
+    Typography. The library's type scale as an API, so a consumer who does not run Tailwind can
+    still reach every size in it.
+
+    The variant and the element are separate parameters on purpose. The element is the document
+    outline and the variant is the look, and a component that tied them together would make people
+    skip a heading level to get a size - which is the heading-order failure the M6 audit found in
+    the demo. Variant picks a sensible element; As overrides it.
+
+    Razor cannot take a tag name from a variable, so the root is written with the render tree
+    builder. Every class below is a literal in a switch arm, where Tailwind's scanner can see it.
+*@
+
+@RenderRoot
+
+@code {
+    /// <summary>The text.</summary>
+    [Parameter]
+    public RenderFragment? ChildContent { get; set; }
+
+    /// <summary>The visual style. <see cref="ZenTextVariant.Body"/> by default.</summary>
+    [Parameter]
+    public ZenTextVariant Variant { get; set; } = ZenTextVariant.Body;
+
+    /// <summary>
+    /// The element to render. When unset it follows <see cref="Variant"/>: a heading variant renders
+    /// the matching heading, <see cref="ZenTextVariant.Display"/> an <c>h1</c>, the caption and
+    /// overline a <c>span</c>, and everything else a <c>p</c>.
+    /// </summary>
+    /// <remarks>
+    /// Choose the heading level from the document outline, not from the size you want - that is
+    /// what <see cref="Variant"/> is for.
+    /// </remarks>
+    [Parameter]
+    public ZenTextElement? As { get; set; }
+
+    /// <summary>
+    /// Horizontal alignment, in logical terms so it follows the writing direction. When unset no
+    /// alignment class is emitted and the text inherits its container's.
+    /// </summary>
+    [Parameter]
+    public ZenAlign? Align { get; set; }
+
+    /// <summary>
+    /// Colour role. When unset it follows <see cref="Variant"/>: muted for the lead, caption and
+    /// overline, the default content colour for everything else.
+    /// </summary>
+    [Parameter]
+    public ZenTextTone? Tone { get; set; }
+
+    /// <summary>Font weight. When unset it follows <see cref="Variant"/>.</summary>
+    [Parameter]
+    public ZenTextWeight? Weight { get; set; }
+
+    /// <summary>Clip to a single line with an ellipsis.</summary>
+    [Parameter]
+    public bool Truncate { get; set; }
+
+    private bool IsHeading => Variant is >= ZenTextVariant.Display and <= ZenTextVariant.H6;
+
+    private RenderFragment RenderRoot => builder =>
+    {
+        builder.OpenElement(0, TagName);
+        builder.AddMultipleAttributes(1, AttributesWithoutClass);
+        builder.AddAttribute(2, "class", RootClass(TextClass));
+        builder.AddAttribute(3, "style", Style);
+        // Only an id the caller chose - a heading is a common aria-labelledby target, but a
+        // generated id nothing points at is noise in every paragraph on the page.
+        builder.AddAttribute(4, "id", Id == GeneratedId ? null : Id);
+        builder.AddContent(5, ChildContent);
+        builder.CloseElement();
+    };
+
+    private string TagName => (As ?? DefaultElement) switch
+    {
+        ZenTextElement.H1 => "h1",
+        ZenTextElement.H2 => "h2",
+        ZenTextElement.H3 => "h3",
+        ZenTextElement.H4 => "h4",
+        ZenTextElement.H5 => "h5",
+        ZenTextElement.H6 => "h6",
+        ZenTextElement.Span => "span",
+        ZenTextElement.Div => "div",
+        ZenTextElement.Label => "label",
+        ZenTextElement.Strong => "strong",
+        ZenTextElement.Em => "em",
+        ZenTextElement.Small => "small",
+        ZenTextElement.Blockquote => "blockquote",
+        _ => "p",
+    };
+
+    private ZenTextElement DefaultElement => Variant switch
+    {
+        ZenTextVariant.Display or ZenTextVariant.H1 => ZenTextElement.H1,
+        ZenTextVariant.H2 => ZenTextElement.H2,
+        ZenTextVariant.H3 => ZenTextElement.H3,
+        ZenTextVariant.H4 => ZenTextElement.H4,
+        ZenTextVariant.H5 => ZenTextElement.H5,
+        ZenTextVariant.H6 => ZenTextElement.H6,
+        ZenTextVariant.Caption or ZenTextVariant.Overline => ZenTextElement.Span,
+        _ => ZenTextElement.P,
+    };
+
+    private string TextClass => CssBuilder
+        .Default(SizeClass)
+        .AddClass(WeightClass)
+        .AddClass(ToneClass)
+        .AddClass(AlignClass)
+        // Balance evens out the lines of a short multi-line heading; pretty only stops a lone
+        // word ending a paragraph, which is the cheaper algorithm and the right one for long text.
+        // Neither with Truncate: `text-wrap` is a shorthand that resets text-wrap-mode to `wrap`,
+        // undoing truncate's nowrap - the text then wraps and the overflow clips its descenders.
+        .AddClass(IsHeading ? "text-balance" : "text-pretty", !Truncate)
+        .AddClass("truncate", Truncate)
+        .Build()!;
+
+    // Size, leading and tracking. Weight and colour are separate so they can be overridden
+    // without two competing classes on the element.
+    private string SizeClass => Variant switch
+    {
+        ZenTextVariant.Display => "text-4xl sm:text-5xl tracking-tight",
+        ZenTextVariant.H1 => "text-3xl tracking-tight",
+        ZenTextVariant.H2 => "text-2xl tracking-tight",
+        ZenTextVariant.H3 => "text-xl",
+        ZenTextVariant.H4 => "text-lg",
+        ZenTextVariant.H5 => "text-base",
+        ZenTextVariant.H6 => "text-sm",
+        ZenTextVariant.Lead => "text-lg",
+        ZenTextVariant.Small => "text-sm",
+        ZenTextVariant.Caption => "text-xs",
+        ZenTextVariant.Overline => "text-xs uppercase tracking-wider",
+        _ => "text-base",
+    };
+
+    private string? WeightClass => (Weight ?? DefaultWeight) switch
+    {
+        ZenTextWeight.Medium => "font-medium",
+        ZenTextWeight.Semibold => "font-semibold",
+        ZenTextWeight.Bold => "font-bold",
+        // Regular emits nothing unless asked for, so body text inherits the page's weight rather
+        // than resetting a bold container.
+        _ => Weight is ZenTextWeight.Regular ? "font-normal" : null,
+    };
+
+    private ZenTextWeight DefaultWeight => Variant switch
+    {
+        ZenTextVariant.Display or ZenTextVariant.H1 => ZenTextWeight.Bold,
+        ZenTextVariant.H2 or ZenTextVariant.H3 or ZenTextVariant.H4
+            or ZenTextVariant.H5 or ZenTextVariant.H6 or ZenTextVariant.Overline => ZenTextWeight.Semibold,
+        _ => ZenTextWeight.Regular,
+    };
+
+    private string? ToneClass => (Tone ?? DefaultTone) switch
+    {
+        ZenTextTone.Muted => "text-content-muted",
+        ZenTextTone.Subtle => "text-content-subtle",
+        ZenTextTone.Inverted => "text-content-inverted",
+        ZenTextTone.Inherit => null,
+        ZenTextTone.Primary => "text-primary-strong",
+        ZenTextTone.Secondary => "text-secondary-strong",
+        ZenTextTone.Accent => "text-accent-strong",
+        ZenTextTone.Success => "text-success-strong",
+        ZenTextTone.Warning => "text-warning-strong",
+        ZenTextTone.Danger => "text-danger-strong",
+        ZenTextTone.Info => "text-info-strong",
+        _ => "text-content",
+    };
+
+    private ZenTextTone DefaultTone => Variant switch
+    {
+        ZenTextVariant.Lead or ZenTextVariant.Caption or ZenTextVariant.Overline => ZenTextTone.Muted,
+        _ => ZenTextTone.Default,
+    };
+
+    private string? AlignClass => Align switch
+    {
+        ZenAlign.Start => "text-start",
+        ZenAlign.Center => "text-center",
+        ZenAlign.End => "text-end",
+        _ => null,
+    };
+}

@@ -1,0 +1,144 @@
+@page "/typography"
+
+@*
+    No render mode. ZenText has no behaviour, so this whole page is static SSR - and the header
+    below is written with the component it documents.
+*@
+
+<PageTitle>Typography &middot; ZenithUI</PageTitle>
+
+<header class="max-w-3xl">
+    <ZenText Variant="ZenTextVariant.Overline" Tone="ZenTextTone.Primary">Primitives</ZenText>
+    <ZenText Variant="ZenTextVariant.H1" Class="mt-1">Typography</ZenText>
+    <ZenText Variant="ZenTextVariant.Lead" Class="mt-3">
+        <code>ZenText</code> is the type scale as an API. The variant sets the look and the element
+        sets the outline, independently &mdash; so a heading sits at the level the document needs
+        and still looks the size the design wants.
+    </ZenText>
+</header>
+
+<!-- ---------------------------------------------------------------- Scale -->
+<section class="mt-10">
+    <ZenText Variant="ZenTextVariant.H4" As="ZenTextElement.H2">The scale</ZenText>
+
+    @* Every sample below is a <p>, not a heading. Rendering six real headings here to show their
+       size would put a second h1 and a run of skipped levels into this page's outline - the exact
+       mistake the As parameter exists to prevent. *@
+    <ZenCard Class="mt-4">
+        <dl class="divide-y divide-border">
+            @foreach (var variant in Variants)
+            {
+                <div class="grid gap-1 py-3 sm:grid-cols-[8rem_1fr] sm:items-baseline sm:gap-4">
+                    <dt>
+                        <ZenText Variant="ZenTextVariant.Caption" As="ZenTextElement.Span">
+                            <code>@variant</code> &middot; @DefaultTag(variant)
+                        </ZenText>
+                    </dt>
+                    @* min-w-0: a grid item will not shrink below its content by default,
+                       and a nowrap line is as wide as its whole text. *@
+                    <dd class="min-w-0">
+                        <ZenText Variant="variant" As="ZenTextElement.P" Truncate="true">
+                            The quick brown fox jumps over the lazy dog
+                        </ZenText>
+                    </dd>
+                </div>
+            }
+        </dl>
+    </ZenCard>
+</section>
+
+<!-- ---------------------------------------------------------------- Element vs look -->
+<section class="mt-10">
+    <ZenText Variant="ZenTextVariant.H4" As="ZenTextElement.H2">The element and the look are separate</ZenText>
+
+    <div class="mt-4 grid gap-4 md:grid-cols-2">
+        <ZenCard Title="Sized for its container" TitleLevel="3">
+            <ZenText Variant="ZenTextVariant.H5" As="ZenTextElement.H4">A small h4 inside a card</ZenText>
+            <ZenText Variant="ZenTextVariant.Small" Tone="ZenTextTone.Muted" Class="mt-1">
+                <code>Variant="H5" As="H4"</code>. The outline stays h2 &rarr; h3 &rarr; h4 with
+                nothing skipped, while the text is sized for the space it sits in.
+            </ZenText>
+        </ZenCard>
+
+        <ZenCard Title="A quotation" TitleLevel="3">
+            <ZenText As="ZenTextElement.Blockquote" Variant="ZenTextVariant.Lead"
+                     Class="border-s-2 border-border-strong ps-4 italic">
+                Colour alone must never carry the meaning.
+            </ZenText>
+            <ZenText Variant="ZenTextVariant.Caption" Class="mt-2 block">&mdash; the badge's own documentation</ZenText>
+        </ZenCard>
+    </div>
+</section>
+
+<!-- ---------------------------------------------------------------- Alignment -->
+<section class="mt-10">
+    <ZenText Variant="ZenTextVariant.H4" As="ZenTextElement.H2">Alignment</ZenText>
+    <ZenText Tone="ZenTextTone.Muted" Class="mt-1 max-w-3xl">
+        Logical, like every other alignment in the library: <code>End</code> is the right edge here
+        and the left edge on a right-to-left page. Unset means inherit.
+    </ZenText>
+
+    <ZenCard Class="mt-4">
+        <div class="space-y-3">
+            @foreach (var align in Alignments)
+            {
+                <ZenText Align="align" Class="rounded-zen-sm bg-surface-sunken px-3 py-2">
+                    <code>Align="@align"</code>
+                </ZenText>
+            }
+        </div>
+    </ZenCard>
+</section>
+
+<!-- ---------------------------------------------------------------- Tone & weight -->
+<section class="mt-10">
+    <ZenText Variant="ZenTextVariant.H4" As="ZenTextElement.H2">Tone and weight</ZenText>
+    <ZenText Tone="ZenTextTone.Muted" Class="mt-1 max-w-3xl">
+        Intent tones use the <code>-strong</code> token &mdash; the role the contrast audit checks as
+        a foreground &mdash; never the fill.
+    </ZenText>
+
+    <div class="mt-4 grid gap-4 md:grid-cols-2">
+        <ZenCard Title="Tones" TitleLevel="3">
+            <div class="space-y-1">
+                @foreach (var tone in Tones)
+                {
+                    <ZenText Tone="tone">@tone</ZenText>
+                }
+            </div>
+        </ZenCard>
+
+        <ZenCard Title="Weights" TitleLevel="3">
+            <div class="space-y-1">
+                @foreach (var weight in Weights)
+                {
+                    <ZenText Weight="weight">@weight</ZenText>
+                }
+            </div>
+        </ZenCard>
+    </div>
+</section>
+
+@code {
+    private static readonly ZenTextVariant[] Variants = Enum.GetValues<ZenTextVariant>();
+    private static readonly ZenAlign[] Alignments = Enum.GetValues<ZenAlign>();
+    private static readonly ZenTextWeight[] Weights = Enum.GetValues<ZenTextWeight>();
+
+    // Inverted and Inherit are left out: one needs an inverted surface to be legible, and the
+    // other has no colour of its own to show.
+    private static readonly ZenTextTone[] Tones = Enum.GetValues<ZenTextTone>()
+        .Where(t => t is not (ZenTextTone.Inverted or ZenTextTone.Inherit))
+        .ToArray();
+
+    private static string DefaultTag(ZenTextVariant variant) => variant switch
+    {
+        ZenTextVariant.Display or ZenTextVariant.H1 => "h1",
+        ZenTextVariant.H2 => "h2",
+        ZenTextVariant.H3 => "h3",
+        ZenTextVariant.H4 => "h4",
+        ZenTextVariant.H5 => "h5",
+        ZenTextVariant.H6 => "h6",
+        ZenTextVariant.Caption or ZenTextVariant.Overline => "span",
+        _ => "p",
+    };
+}

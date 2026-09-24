@@ -208,6 +208,7 @@ a palette fix is one edit rather than a guess-and-rerun loop:
 | **M4** ✅ | `ZenTable` + `ZenColumn` (sorting, paging, selection, hierarchy, detail rows, responsive collapse), `ZenEmptyState`, `ZenTree`, `ZenTimeline` |
 | **M5** ✅ | `ZenAppBar`, `ZenNavMenu` + `ZenNavLink` + `ZenNavGroup` (collapsible sections), `ZenSideNav` (off-canvas drawer needing no render mode), `ZenFooter`, `ZenAppShell` |
 | **M6** ✅ | The consumer `@theme` artifact, one public namespace, the getting-started / theming / accessibility docs, the axe sweep, and `1.0.0-rc.1` verified from a feed by a Blazor Web App and a standalone WebAssembly app |
+| **Unreleased** | `ZenText` — the type scale as a component: heading and body variants, a separate `As` element, logical alignment, token-backed tones |
 
 ## Documentation
 

@@ -4,6 +4,39 @@ All notable changes to ZenithUI are documented here. The format follows
 [Keep a Changelog](https://keepachangelog.com/en/1.1.0/) and the project adheres to
 [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [Unreleased]
+
+### Added — `ZenText`, typography
+
+The library had no type scale. Every heading was hand-rolled Tailwind, and a consumer not running
+Tailwind could not reach most of the size classes at all.
+
+- **`ZenText`** renders a run of text from twelve variants — `Display`, `H1`–`H6`, `Lead`, `Body`,
+  `Small`, `Caption`, `Overline` — each a set of literal classes the library's own build emits.
+- **The element is a separate parameter.** `Variant` is the look; `As` is the element, and when
+  unset it follows the variant (`H2` → `<h2>`, `Caption` → `<span>`, body → `<p>`). A heading sits
+  at the level the outline needs and looks the size the design needs, so nobody has to skip a
+  level to get a size.
+- **`Align`** takes the existing logical `ZenAlign` (`text-start` / `text-center` / `text-end`), so
+  a right-to-left page needs nothing re-specified. Unset emits no class and inherits.
+- **`Tone`** maps to `text-content*` or to an intent's `-strong` token — never the bare intent,
+  which is a fill. `Inherit` opts out of colour entirely, for text on a filled surface. Unset, it
+  follows the variant: muted for `Lead`, `Caption` and `Overline`.
+- **`Weight`** replaces the variant's weight rather than adding a second `font-*` class.
+- **`Truncate`** clips to one line with an ellipsis.
+- An explicit `Id` reaches the element, so a heading can be an `aria-labelledby` target; the
+  generated fallback id is not emitted.
+- New enums `ZenTextVariant`, `ZenTextElement`, `ZenTextTone`, `ZenTextWeight`. `ZenAlign`'s
+  documentation now covers text as well as table columns; its values are unchanged.
+- A `/typography` demo page, included in the accessibility sweep.
+
+### Fixed during `ZenText`
+
+- **A truncated heading wrapped anyway.** `text-balance` and `text-pretty` set the `text-wrap`
+  shorthand, which resets `text-wrap-mode` to `wrap` and cancels the `nowrap` from `truncate`. The
+  heading broke onto two lines and the overflow clipped its descenders. Every test passed, and the
+  demo showed it at once. The wrap classes are now left off when `Truncate` is set.
+
 ## [1.0.0-rc.1] — 2026-09-23
 
 Everything in the plan ships. The package is installed from a feed and verified in both a Blazor

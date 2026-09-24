@@ -266,12 +266,12 @@ public enum ZenToastPosition
 }
 
 /// <summary>
-/// Horizontal alignment of a table column's contents.
+/// Horizontal alignment of a table column's contents or of a block of text.
 /// </summary>
 /// <remarks>
 /// Logical rather than physical, so a right-to-left document does not need every numeric column
-/// re-specified. <see cref="End"/> is the correct choice for numbers in both directions: digits
-/// line up by place value only when they share a trailing edge.
+/// or centred heading re-specified. <see cref="End"/> is the correct choice for numbers in both
+/// directions: digits line up by place value only when they share a trailing edge.
 /// </remarks>
 public enum ZenAlign
 {
@@ -316,4 +316,155 @@ public enum ZenNavOrientation
 
     /// <summary>In a row. An app bar's section links.</summary>
     Horizontal,
+}
+
+/// <summary>The visual style of a run of text: its size, weight, leading and tracking.</summary>
+/// <remarks>
+/// A look, not an element. <c>ZenText</c> derives a sensible element from the variant, and its
+/// <c>As</c> parameter overrides that, so a heading can sit at the level the document outline
+/// needs while looking the size the design needs.
+/// </remarks>
+public enum ZenTextVariant
+{
+    /// <summary>Hero text. Larger than any heading; one per page at most.</summary>
+    Display,
+
+    /// <summary>A page title.</summary>
+    H1,
+
+    /// <summary>A major section title.</summary>
+    H2,
+
+    /// <summary>A subsection title.</summary>
+    H3,
+
+    /// <summary>A card or panel title.</summary>
+    H4,
+
+    /// <summary>A small group title.</summary>
+    H5,
+
+    /// <summary>The smallest heading, at body-small size.</summary>
+    H6,
+
+    /// <summary>An introductory paragraph, larger and quieter than body text.</summary>
+    Lead,
+
+    /// <summary>Running text. The default.</summary>
+    Body,
+
+    /// <summary>Secondary text at a smaller size.</summary>
+    Small,
+
+    /// <summary>A short annotation: a figure caption, a timestamp, a footnote.</summary>
+    Caption,
+
+    /// <summary>A small uppercase label that sits above a heading.</summary>
+    Overline,
+}
+
+/// <summary>The HTML element a <c>ZenText</c> renders.</summary>
+public enum ZenTextElement
+{
+    /// <summary><c>&lt;h1&gt;</c>.</summary>
+    H1,
+
+    /// <summary><c>&lt;h2&gt;</c>.</summary>
+    H2,
+
+    /// <summary><c>&lt;h3&gt;</c>.</summary>
+    H3,
+
+    /// <summary><c>&lt;h4&gt;</c>.</summary>
+    H4,
+
+    /// <summary><c>&lt;h5&gt;</c>.</summary>
+    H5,
+
+    /// <summary><c>&lt;h6&gt;</c>.</summary>
+    H6,
+
+    /// <summary><c>&lt;p&gt;</c>, a paragraph.</summary>
+    P,
+
+    /// <summary><c>&lt;span&gt;</c>, inline text with no meaning of its own.</summary>
+    Span,
+
+    /// <summary><c>&lt;div&gt;</c>, a block with no meaning of its own.</summary>
+    Div,
+
+    /// <summary><c>&lt;label&gt;</c>. Pair it with a <c>for</c> attribute.</summary>
+    Label,
+
+    /// <summary><c>&lt;strong&gt;</c>, text of strong importance.</summary>
+    Strong,
+
+    /// <summary><c>&lt;em&gt;</c>, stressed emphasis.</summary>
+    Em,
+
+    /// <summary><c>&lt;small&gt;</c>, side comments and fine print.</summary>
+    Small,
+
+    /// <summary><c>&lt;blockquote&gt;</c>, a quotation from another source.</summary>
+    Blockquote,
+}
+
+/// <summary>The colour role of a run of text.</summary>
+/// <remarks>
+/// The intent tones map to the <c>--zen-{intent}-strong</c> token, the one role the contrast audit
+/// guarantees as a foreground on every surface. Never the bare intent, which is a fill.
+/// </remarks>
+public enum ZenTextTone
+{
+    /// <summary>The primary content colour.</summary>
+    Default,
+
+    /// <summary>Secondary text: descriptions, supporting copy.</summary>
+    Muted,
+
+    /// <summary>Tertiary text: placeholders, meta information.</summary>
+    Subtle,
+
+    /// <summary>Text on an inverted surface.</summary>
+    Inverted,
+
+    /// <summary>No colour of its own; takes the colour of the surrounding element.</summary>
+    Inherit,
+
+    /// <summary>The primary intent, as text.</summary>
+    Primary,
+
+    /// <summary>The secondary intent, as text.</summary>
+    Secondary,
+
+    /// <summary>The accent intent, as text.</summary>
+    Accent,
+
+    /// <summary>The success intent, as text.</summary>
+    Success,
+
+    /// <summary>The warning intent, as text.</summary>
+    Warning,
+
+    /// <summary>The danger intent, as text.</summary>
+    Danger,
+
+    /// <summary>The info intent, as text.</summary>
+    Info,
+}
+
+/// <summary>Font weight of a run of text.</summary>
+public enum ZenTextWeight
+{
+    /// <summary>400.</summary>
+    Regular,
+
+    /// <summary>500.</summary>
+    Medium,
+
+    /// <summary>600.</summary>
+    Semibold,
+
+    /// <summary>700.</summary>
+    Bold,
 }
