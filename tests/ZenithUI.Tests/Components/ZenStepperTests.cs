@@ -98,6 +98,22 @@ public class ZenStepperTests : BunitContext
     }
 
     [Fact]
+    public void ChangingStep_MovesFocusToTheNewStepsHeading()
+    {
+        // Without it, Next leaves focus on a button that now belongs to a different step, and a
+        // screen reader user is not told that the content above it was replaced.
+        var module = JSInterop.SetupModule("./_content/ZenithUI/js/zen-dom.js");
+        module.SetupVoid("focusElement", _ => true).SetVoidResult();
+
+        var cut = Stepper(Three);
+        cut.FindAll("section button").Single(b => b.TextContent.Trim() == "Next").Click();
+
+        var heading = cut.Find($"#{cut.Find("section").GetAttribute("aria-labelledby")}");
+        heading.TextContent.Trim().ShouldBe("Profile");
+        module.VerifyInvoke("focusElement").Arguments[0].ShouldBe(heading.GetAttribute("id"));
+    }
+
+    [Fact]
     public void OnlyTheActiveStepsContent_IsRendered()
     {
         var cut = Stepper(Three);
