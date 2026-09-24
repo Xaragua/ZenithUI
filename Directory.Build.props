@@ -14,7 +14,7 @@
   <!-- Shared NuGet metadata. Individual projects opt in with <IsPackable>true</IsPackable>. -->
   <PropertyGroup>
     <IsPackable>false</IsPackable>
-    <Version>1.0.0-rc.1</Version>
+    <Version>1.0.0-rc.1.1</Version>
     <Authors>Enmanuel Gomez</Authors>
     <Company>Enmanuel Gomez</Company>
     <Product>ZenithUI</Product>
