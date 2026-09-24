@@ -343,6 +343,22 @@ public static class ZenStyles
         _ => "max-w-none",
     };
 
+    /// <summary>The space between the items of a flex or grid container.</summary>
+    /// <remarks>
+    /// <c>gap</c> rather than margins on the children: it spaces the items and never the outer
+    /// edge, it holds when a row wraps, and the children stay unaware of where they are placed.
+    /// </remarks>
+    public static string Gap(ZenSpace space) => space switch
+    {
+        ZenSpace.None => "gap-0",
+        ZenSpace.Xs => "gap-1",
+        ZenSpace.Sm => "gap-2",
+        ZenSpace.Lg => "gap-6",
+        ZenSpace.Xl => "gap-8",
+        ZenSpace.Xxl => "gap-12",
+        _ => "gap-4",
+    };
+
     /// <summary>Shadow for a surface raised above the page.</summary>
     /// <param name="elevation">How far above the page the surface sits.</param>
     /// <returns>A shadow utility, or <see langword="null"/> for <see cref="ZenElevation.None"/>.</returns>

@@ -1,0 +1,45 @@
+@namespace ZenithUI
+
+@inherits ZenComponentBase
+
+@*
+    A centred column with gutters. ZenAppShell already bounds its main region the same way; this is
+    for a page without the shell, a Flush shell, or a band that should be narrower than the page -
+    a settings form inside a wide dashboard. The widths are the shell's, from ZenStyles.ContentWidth,
+    so a container and a shell of the same MaxWidth line up exactly.
+*@
+
+@((RenderFragment)(builder => ZenLayout.RenderRoot(
+    builder, ZenLayout.TagName(As), AttributesWithoutClass, RootClass(ContainerClass), Style,
+    Id == GeneratedId ? null : Id, ChildContent)))
+
+@code {
+    /// <summary>The content.</summary>
+    [Parameter]
+    public RenderFragment? ChildContent { get; set; }
+
+    /// <summary>
+    /// How wide the column may grow before gutters take over. <see cref="ZenContentWidth.Medium"/>
+    /// by default.
+    /// </summary>
+    [Parameter]
+    public ZenContentWidth MaxWidth { get; set; } = ZenContentWidth.Medium;
+
+    /// <summary>
+    /// Inline padding that keeps the content off the screen edge on a phone. On by default; turn it
+    /// off when the container sits inside something that already pads, such as the shell's main
+    /// region.
+    /// </summary>
+    [Parameter]
+    public bool Gutters { get; set; } = true;
+
+    /// <summary>The element to render. A <c>div</c> by default.</summary>
+    [Parameter]
+    public ZenLayoutElement As { get; set; } = ZenLayoutElement.Div;
+
+    private string ContainerClass => CssBuilder
+        .Default("mx-auto w-full")
+        .AddClass(ZenStyles.ContentWidth(MaxWidth))
+        .AddClass("px-4 sm:px-6", Gutters)
+        .Build()!;
+}

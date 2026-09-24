@@ -1,6 +1,6 @@
 # ZenithUI — implementation plan
 
-> **Status:** M0 through M6 complete (2026-09-23), shipping as `1.0.0-rc.1.2`. The consumer-`@theme`
+> **Status:** M0 through M6 complete (2026-09-23), shipping as `1.0.0-rc.1.3`. The consumer-`@theme`
 > gap is closed, the package is verified from a feed by both a Blazor Web App and a standalone
 > WebAssembly app, and the accessibility sweep is clean across every page, both palettes and nine
 > interactive states. `1.0.0` follows whatever the release candidate turns up.
@@ -279,6 +279,44 @@ pattern).
 **Chrome & layout** — `ZenAppBar`, `ZenNavMenu` + `ZenNavLink` + `ZenNavGroup` (collapsible
 sections), `ZenSideNav` (off-canvas below `lg`), `ZenFooter`, `ZenAppShell`.
 
+**Page layout** (added in `1.0.0-rc.1.3`) — `ZenStack`, `ZenGrid` + `ZenGridItem`, `ZenContainer`,
+`ZenSpacer`.
+
+### Layout components exist because `zenith.css` is not Tailwind
+
+A consumer without Tailwind of their own could theme every component and still could not lay out a
+page. `zenith.css` holds only what the library's build scanned, so `md:grid-cols-3` in the
+consumer's markup works if some component happens to use it, and otherwise does nothing without any
+warning. A layout written that way can also break in a later release that stops using a class.
+
+The components follow `ZenText`'s pattern, which exists for the same reason:
+
+- **Enum-typed parameters, each mapped to a literal class in a switch arm**, where the scanner
+  sees it. `ZenSpace` (`None` … `Xxl` → `gap-0` … `gap-12`), `ZenDirection`, `ZenBreakpoint`,
+  `ZenCrossAlign`, `ZenJustify`, `ZenLayoutElement`. The widths reuse `ZenContentWidth` and
+  `ZenStyles.ContentWidth`, so a `ZenContainer` and a `ZenAppShell` of the same width line up.
+- **Responsive values are separate parameters** (`ColumnsMd="3"`), not a responsive struct. They
+  read naturally in Razor, IntelliSense lists them, and each maps to one switch.
+- **Column counts are 1–6 and 12.** Across the five breakpoints that is 35 classes, rather than 60
+  for every count up to 12, and it covers the counts people use. `MinItemWidth` handles everything else with **one** class,
+  `grid-cols-[repeat(auto-fill,minmax(min(var(--zen-grid-min),100%),1fr))]`, whose width comes
+  from a custom property, so any length costs nothing extra. The `min(…, 100%)` keeps a lone column
+  from overflowing a screen narrower than the minimum.
+- **An unset parameter emits no class**, so the component adds no rule the caller didn't ask for.
+- **Invalid combinations throw**: an unsupported count, `MinItemWidth` with `Columns`, `FullWidth`
+  with `Span`, `HorizontalFrom` on a horizontal stack. Otherwise each would be a class that silently
+  does nothing, the failure these components exist to remove.
+- **No role of their own.** `As` provides the element, as it does on `ZenText`.
+- **`ZenGridItem` always carries `min-w-0`.** A grid item will not shrink below its content by
+  default, so one long unbroken line would widen its column past the screen. The Typography demo
+  page hit this first.
+- **Out of scope:** padding and margin props, per-child grow, shrink and order, and arbitrary
+  lengths. A component for each utility would amount to a second, weaker Tailwind.
+
+`StylesheetCoverageTests` renders every value of every layout and typography parameter and looks
+up each emitted class as a selector in the built `zenith.css`. Before this, nothing checked that
+guarantee. The cost was 4.2 KB of minified CSS (62,199 → 66,396 bytes).
+
 ### The shell needs no render mode, and that constraint chose its design
 
 A shell lives in a layout. A layout can never be interactive, because `Body` is a `RenderFragment`
@@ -549,6 +587,7 @@ Recorded because each changed the design rather than merely the code.
 | The combobox popover panel **is** the listbox | A scrolling wrapper between the panel and the options made `aria-controls` name a roleless element, detached the options from the listbox claiming them, and pointed `scrollItemIntoView` at a node the accessibility tree does not contain. `ZenPopover` gained a `PanelId` parameter because a parent cannot read a child's generated id in the pass that creates it. |
 | That file carries the library's **whole candidate list**, not just `@theme` | `@theme` alone fixes only half the problem. The other half is cascade order, and the only way two stylesheets can stop disagreeing about `lg:hidden` is for both to emit it. The list comes from `@tailwindcss/oxide` — Tailwind's own scanner — so it cannot drift from what the library was built with. |
 | `ZenText`, not in the original inventory, and its element is **not** its variant | Every heading in the demo was hand-rolled Tailwind, and a consumer without Tailwind could not reach the type scale at all. The element is a separate `As` parameter because tying look to level makes people skip heading levels to get a size — the heading-order failure the M6 audit found in the demo. |
+| Layout components, not in the original inventory | The plan left page layout to Tailwind, which assumed every consumer runs it. One who does not can theme every component and cannot place any of them, because `zenith.css` has only the layout classes the library happens to use. See [the section above](#layout-components-exist-because-zenithcss-is-not-tailwind). |
 
 ### The cascade-order trap a precompiled component library walks into
 

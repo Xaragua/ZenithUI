@@ -468,3 +468,137 @@ public enum ZenTextWeight
     /// <summary>700.</summary>
     Bold,
 }
+
+/// <summary>The space between the items of a layout component.</summary>
+/// <remarks>
+/// A scale rather than a length, for the reason <see cref="ZenContentWidth"/> is one: a consumer
+/// who does not run Tailwind cannot add <c>gap-5</c> to a precompiled stylesheet, so every step
+/// here is a literal the library's own build emits. Separate from <see cref="ZenSize"/>, which
+/// sizes controls rather than the room between them.
+/// </remarks>
+public enum ZenSpace
+{
+    /// <summary>No space. Items touch.</summary>
+    None,
+
+    /// <summary>0.25rem. An icon and its label.</summary>
+    Xs,
+
+    /// <summary>0.5rem. A cluster of badges or small buttons.</summary>
+    Sm,
+
+    /// <summary>1rem. Cards in a grid, fields in a form. The default.</summary>
+    Md,
+
+    /// <summary>1.5rem. Groups within a section.</summary>
+    Lg,
+
+    /// <summary>2rem. Sections of a page.</summary>
+    Xl,
+
+    /// <summary>3rem. Major regions of a long page.</summary>
+    Xxl,
+}
+
+/// <summary>The axis a <c>ZenStack</c> lays its items out along.</summary>
+public enum ZenDirection
+{
+    /// <summary>Top to bottom. The default.</summary>
+    Vertical,
+
+    /// <summary>In a row, following the writing direction.</summary>
+    Horizontal,
+}
+
+/// <summary>
+/// A viewport width from which a responsive layout parameter applies. Tailwind's default
+/// breakpoints, so they line up with every responsive class inside the library.
+/// </summary>
+public enum ZenBreakpoint
+{
+    /// <summary>640px and wider.</summary>
+    Sm,
+
+    /// <summary>768px and wider.</summary>
+    Md,
+
+    /// <summary>1024px and wider.</summary>
+    Lg,
+
+    /// <summary>1280px and wider.</summary>
+    Xl,
+}
+
+/// <summary>How the items of a <c>ZenStack</c> line up across its axis.</summary>
+public enum ZenCrossAlign
+{
+    /// <summary>Each item fills the stack's cross axis. What a stack does when nothing is set.</summary>
+    Stretch,
+
+    /// <summary>Against the start edge.</summary>
+    Start,
+
+    /// <summary>Centred. An icon beside a line of text.</summary>
+    Center,
+
+    /// <summary>Against the end edge.</summary>
+    End,
+
+    /// <summary>On a shared text baseline. Labels and values of different sizes in a row.</summary>
+    Baseline,
+}
+
+/// <summary>How a <c>ZenStack</c> distributes spare room along its axis.</summary>
+public enum ZenJustify
+{
+    /// <summary>Packed at the start. What a stack does when nothing is set.</summary>
+    Start,
+
+    /// <summary>Packed in the middle.</summary>
+    Center,
+
+    /// <summary>Packed at the end. A row of dialog actions.</summary>
+    End,
+
+    /// <summary>The first item at the start, the last at the end, the rest spread between.</summary>
+    Between,
+}
+
+/// <summary>The HTML element a layout component renders.</summary>
+/// <remarks>
+/// A layout component has no role of its own, so the element is what carries the meaning. Pick
+/// the one that describes the content: a list of cards is a <see cref="Ul"/>, and then each item
+/// must be an <see cref="Li"/>.
+/// </remarks>
+public enum ZenLayoutElement
+{
+    /// <summary><c>&lt;div&gt;</c>, no meaning of its own. The default.</summary>
+    Div,
+
+    /// <summary><c>&lt;section&gt;</c>, a thematic group, usually with a heading.</summary>
+    Section,
+
+    /// <summary><c>&lt;article&gt;</c>, a self-contained piece that could stand alone.</summary>
+    Article,
+
+    /// <summary><c>&lt;header&gt;</c>, introductory content for its nearest section.</summary>
+    Header,
+
+    /// <summary><c>&lt;footer&gt;</c>, closing content for its nearest section.</summary>
+    Footer,
+
+    /// <summary><c>&lt;nav&gt;</c>, a navigation landmark. Give it an <c>aria-label</c>.</summary>
+    Nav,
+
+    /// <summary><c>&lt;aside&gt;</c>, content tangential to what surrounds it.</summary>
+    Aside,
+
+    /// <summary><c>&lt;ul&gt;</c>, an unordered list. Its items must be <see cref="Li"/>.</summary>
+    Ul,
+
+    /// <summary><c>&lt;ol&gt;</c>, an ordered list. Its items must be <see cref="Li"/>.</summary>
+    Ol,
+
+    /// <summary><c>&lt;li&gt;</c>, an item of a <see cref="Ul"/> or <see cref="Ol"/>.</summary>
+    Li,
+}

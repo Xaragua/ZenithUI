@@ -1,0 +1,12 @@
+@namespace ZenithUI
+
+@inherits ZenComponentBase
+
+@*
+    Takes up the spare room in a ZenStack, pushing everything after it to the far end - a toolbar
+    with a title at the start and its actions at the end. Purely visual, so it is hidden from
+    assistive technology. It must not sit directly inside a stack rendered as a list, where every
+    child has to be an <li>.
+*@
+
+<div class="@RootClass("flex-1")" style="@Style" aria-hidden="true" @attributes="AttributesWithoutClass"></div>

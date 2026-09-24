@@ -4,6 +4,46 @@ All notable changes to ZenithUI are documented here. The format follows
 [Keep a Changelog](https://keepachangelog.com/en/1.1.0/) and the project adheres to
 [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.0.0-rc.1.3] — 2026-09-24
+
+A revision of the release candidate. Additions only, no breaking changes: `1.0.0-rc.1.2` code
+builds unchanged against it.
+
+### Added — layout without Tailwind
+
+An app that did not run its own Tailwind could theme every component and could not lay out a page.
+`zenith.css` holds only the classes the library itself uses, so a hand-written `md:grid-cols-3`
+worked only if some component happened to use it, and otherwise did nothing without any warning.
+
+- **`ZenStack`**, a flex column or row. `Direction`, `Gap`, `Align`, `Justify`, `Wrap`, and
+  `HorizontalFrom`, which stacks on a phone and switches to a row from a breakpoint.
+- **`ZenGrid`**, sized either by `Columns` plus `ColumnsSm` … `ColumnsXl` (1–6 or 12) or by
+  `MinItemWidth`, which makes as many columns as fit at any CSS length with a single class.
+- **`ZenGridItem`**, a cell spanning columns per breakpoint (`Span`, `SpanSm` … `SpanXl`) or the
+  whole row (`FullWidth`). It always shrinks (`min-w-0`), so a long unbroken line cannot widen its
+  column past the screen.
+- **`ZenContainer`**, a centred column with gutters, at the same widths as `ZenAppShell`.
+- **`ZenSpacer`**, which pushes what follows it in a stack to the far end.
+- All four containers take **`As`** (`Section`, `Nav`, `Ul`, `Li`, …) for the element. A layout box has
+  no role of its own.
+- New enums `ZenSpace`, `ZenDirection`, `ZenBreakpoint`, `ZenCrossAlign`, `ZenJustify`,
+  `ZenLayoutElement`, and `ZenStyles.Gap`.
+- **Invalid combinations throw**: an unsupported column count or span, `MinItemWidth` with
+  `Columns`, `FullWidth` with `Span`, `HorizontalFrom` on a horizontal stack. Each would otherwise
+  be a class that silently did nothing.
+- A `/layout` demo page, included in the accessibility sweep. The home page's two grids now use the
+  components.
+- `zenith.css` grows by 4.2 KB minified (62,199 → 66,396 bytes).
+
+### Added — a test that the stylesheet keeps the components' promise
+
+`StylesheetCoverageTests` renders every value of every layout **and typography** parameter,
+collects the classes that come out, and looks each one up as a selector in the built `zenith.css`.
+Until now nothing checked that a class a component emits is actually in the shipped stylesheet. A
+class built at runtime, or an `@source` glob that stopped matching a folder, would have passed
+every other test. The test was checked by deleting one layout rule and one typography rule from
+its copy of the stylesheet: both tests failed and named the missing class.
+
 ## [1.0.0-rc.1.2] — 2026-09-24
 
 A packaging fix. No API changes. Every consumer of `1.0.0-rc.1.1` should upgrade.

@@ -35,7 +35,7 @@ const EDGE = process.env.ZENITH_BROWSER ??
 
 /** Every routable page in the demo. */
 const pages = [
-  "/", "/tokens", "/primitives", "/typography", "/forms", "/theming",
+  "/", "/tokens", "/primitives", "/typography", "/layout", "/forms", "/theming",
   "/overlays", "/data", "/shell", "/render-modes", "/reference",
 ];
 

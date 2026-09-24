@@ -1,0 +1,155 @@
+@namespace ZenithUI
+
+@inherits ZenComponentBase
+
+@*
+    One cell of a ZenGrid that spans more than one column - the wide chart on a dashboard. A plain
+    child of the grid needs no wrapper; this is only for an item that should span.
+
+    Spans are literal classes per breakpoint, limited to the counts ZenGrid accepts. FullWidth spans
+    every column whatever their number, which is the only span that makes sense in a grid sized by
+    MinItemWidth, where the count is not known.
+
+    min-w-0 on every item: a grid item will not shrink below its content by default, so one long
+    unbroken line - a truncated heading, a URL - would widen its whole column past the screen.
+*@
+
+@((RenderFragment)(builder => ZenLayout.RenderRoot(
+    builder, ZenLayout.TagName(As), AttributesWithoutClass, RootClass(ItemClass), Style,
+    Id == GeneratedId ? null : Id, ChildContent)))
+
+@code {
+    /// <summary>The item's content.</summary>
+    [Parameter]
+    public RenderFragment? ChildContent { get; set; }
+
+    /// <summary>Columns spanned at every width, until a breakpoint variant overrides it. 1 to 6, or 12.</summary>
+    [Parameter]
+    public int? Span { get; set; }
+
+    /// <summary>Columns spanned from 640px up. 1 to 6, or 12.</summary>
+    [Parameter]
+    public int? SpanSm { get; set; }
+
+    /// <summary>Columns spanned from 768px up. 1 to 6, or 12.</summary>
+    [Parameter]
+    public int? SpanMd { get; set; }
+
+    /// <summary>Columns spanned from 1024px up. 1 to 6, or 12.</summary>
+    [Parameter]
+    public int? SpanLg { get; set; }
+
+    /// <summary>Columns spanned from 1280px up. 1 to 6, or 12.</summary>
+    [Parameter]
+    public int? SpanXl { get; set; }
+
+    /// <summary>
+    /// Spans every column at every width. Cannot be combined with <see cref="Span"/> or its
+    /// breakpoint variants.
+    /// </summary>
+    [Parameter]
+    public bool FullWidth { get; set; }
+
+    /// <summary>
+    /// The element to render. A <c>div</c> by default; <see cref="ZenLayoutElement.Li"/> when the
+    /// grid is a list.
+    /// </summary>
+    [Parameter]
+    public ZenLayoutElement As { get; set; } = ZenLayoutElement.Div;
+
+    /// <inheritdoc />
+    protected override void OnParametersSet()
+    {
+        if (FullWidth && (Span ?? SpanSm ?? SpanMd ?? SpanLg ?? SpanXl) is not null)
+        {
+            throw new InvalidOperationException(
+                $"{nameof(ZenGridItem)}.{nameof(FullWidth)} already spans every column; remove {nameof(Span)} and its breakpoint variants.");
+        }
+
+        Validate(Span, nameof(Span));
+        Validate(SpanSm, nameof(SpanSm));
+        Validate(SpanMd, nameof(SpanMd));
+        Validate(SpanLg, nameof(SpanLg));
+        Validate(SpanXl, nameof(SpanXl));
+    }
+
+    private static void Validate(int? count, string parameter)
+    {
+        if (count is { } value && !ZenGrid.SupportedColumns.Contains(value))
+        {
+            throw new ArgumentOutOfRangeException(
+                parameter, value,
+                $"{nameof(ZenGridItem)}.{parameter} must be one of {string.Join(", ", ZenGrid.SupportedColumns)}.");
+        }
+    }
+
+    private string ItemClass => CssBuilder
+        .Default("min-w-0")
+        .AddClass("col-span-full", FullWidth)
+        .AddClass(BaseSpan(Span))
+        .AddClass(SmSpan(SpanSm))
+        .AddClass(MdSpan(SpanMd))
+        .AddClass(LgSpan(SpanLg))
+        .AddClass(XlSpan(SpanXl))
+        .Build()!;
+
+    private static string? BaseSpan(int? count) => count switch
+    {
+        1 => "col-span-1",
+        2 => "col-span-2",
+        3 => "col-span-3",
+        4 => "col-span-4",
+        5 => "col-span-5",
+        6 => "col-span-6",
+        12 => "col-span-12",
+        _ => null,
+    };
+
+    private static string? SmSpan(int? count) => count switch
+    {
+        1 => "sm:col-span-1",
+        2 => "sm:col-span-2",
+        3 => "sm:col-span-3",
+        4 => "sm:col-span-4",
+        5 => "sm:col-span-5",
+        6 => "sm:col-span-6",
+        12 => "sm:col-span-12",
+        _ => null,
+    };
+
+    private static string? MdSpan(int? count) => count switch
+    {
+        1 => "md:col-span-1",
+        2 => "md:col-span-2",
+        3 => "md:col-span-3",
+        4 => "md:col-span-4",
+        5 => "md:col-span-5",
+        6 => "md:col-span-6",
+        12 => "md:col-span-12",
+        _ => null,
+    };
+
+    private static string? LgSpan(int? count) => count switch
+    {
+        1 => "lg:col-span-1",
+        2 => "lg:col-span-2",
+        3 => "lg:col-span-3",
+        4 => "lg:col-span-4",
+        5 => "lg:col-span-5",
+        6 => "lg:col-span-6",
+        12 => "lg:col-span-12",
+        _ => null,
+    };
+
+    private static string? XlSpan(int? count) => count switch
+    {
+        1 => "xl:col-span-1",
+        2 => "xl:col-span-2",
+        3 => "xl:col-span-3",
+        4 => "xl:col-span-4",
+        5 => "xl:col-span-5",
+        6 => "xl:col-span-6",
+        12 => "xl:col-span-12",
+        _ => null,
+    };
+}

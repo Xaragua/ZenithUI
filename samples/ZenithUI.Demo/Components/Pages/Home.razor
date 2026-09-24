@@ -16,7 +16,7 @@
     </p>
 </section>
 
-<section class="mt-10 grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
+<ZenGrid As="ZenLayoutElement.Section" Columns="1" ColumnsSm="2" ColumnsLg="3" Class="mt-10">
     @foreach (var card in Foundations)
     {
         <article class="rounded-zen-lg border border-border bg-surface-raised p-5 shadow-zen-sm">
@@ -24,20 +24,20 @@
             <p class="mt-2 text-sm text-content-muted">@card.Body</p>
         </article>
     }
-</section>
+</ZenGrid>
 
 <section class="mt-10 rounded-zen-lg border border-border bg-surface-raised p-6 shadow-zen-sm">
     <h2 class="text-lg font-semibold">What ships in M0</h2>
 
-    <ul class="mt-4 grid gap-2 text-sm text-content-muted sm:grid-cols-2">
+    <ZenGrid As="ZenLayoutElement.Ul" Columns="1" ColumnsSm="2" Gap="ZenSpace.Sm" Class="mt-4 text-sm text-content-muted">
         @foreach (var item in Shipped)
         {
-            <li class="flex items-start gap-2">
+            <ZenStack As="ZenLayoutElement.Li" Direction="ZenDirection.Horizontal" Align="ZenCrossAlign.Start" Gap="ZenSpace.Sm">
                 <span class="mt-1.5 size-1.5 shrink-0 rounded-full bg-success" aria-hidden="true"></span>
                 <span>@item</span>
-            </li>
+            </ZenStack>
         }
-    </ul>
+    </ZenGrid>
 
     <p class="mt-6 text-sm text-content-subtle">
         Primitives, form controls, the hierarchical table, the tree and the app shell arrive in

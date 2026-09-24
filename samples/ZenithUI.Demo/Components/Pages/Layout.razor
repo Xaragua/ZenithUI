@@ -1,0 +1,169 @@
+@page "/layout"
+
+@*
+    No render mode: the layout components have no behaviour, so this page is static SSR.
+
+    Every arrangement on this page is made with the components it documents - no flex or grid
+    utility of the demo's own. The demo runs Tailwind and would compile those anyway, which would
+    hide exactly the failure these components exist to prevent; the only classes written by hand
+    here dress the sample tiles, not their layout.
+*@
+
+<PageTitle>Layout &middot; ZenithUI</PageTitle>
+
+<ZenStack Gap="ZenSpace.Xxl">
+    <ZenStack As="ZenLayoutElement.Header" Gap="ZenSpace.Sm" Class="max-w-3xl">
+        <ZenText Variant="ZenTextVariant.Overline" Tone="ZenTextTone.Primary">Primitives</ZenText>
+        <ZenText Variant="ZenTextVariant.H1">Layout</ZenText>
+        <ZenText Variant="ZenTextVariant.Lead">
+            Stacks, grids and a centred container, for laying out a page in an app that does not run
+            its own Tailwind. <code>zenith.css</code> holds only the classes the library emits, so a
+            hand-written <code>md:grid-cols-3</code> would do nothing there &mdash; every value these
+            components take is guaranteed to.
+        </ZenText>
+    </ZenStack>
+
+    <!-- ------------------------------------------------------------ Stack -->
+    <ZenStack As="ZenLayoutElement.Section" aria-labelledby="stack-heading">
+        <ZenText Variant="ZenTextVariant.H4" As="ZenTextElement.H2" Id="stack-heading">ZenStack</ZenText>
+
+        <ZenGrid Columns="1" ColumnsLg="2">
+            <ZenCard Title="Vertical, the default" TitleLevel="3">
+                <ZenStack Gap="ZenSpace.Sm">
+                    @Tile("One") @Tile("Two") @Tile("Three")
+                </ZenStack>
+            </ZenCard>
+
+            <ZenCard Title="A row, centred across" TitleLevel="3">
+                <ZenStack Direction="ZenDirection.Horizontal" Align="ZenCrossAlign.Center" Gap="ZenSpace.Sm">
+                    @Tile("Short")
+                    <span class="rounded-zen-sm bg-surface-sunken px-3 py-6 text-sm">Tall</span>
+                    @Tile("Short")
+                </ZenStack>
+            </ZenCard>
+
+            <ZenCard Title="Stacked on a phone, a row from md" TitleLevel="3">
+                <ZenStack Gap="ZenSpace.Sm" HorizontalFrom="ZenBreakpoint.Md">
+                    @Tile("Name") @Tile("Email") @Tile("Role")
+                </ZenStack>
+            </ZenCard>
+
+            <ZenCard Title="A toolbar, with a spacer" TitleLevel="3">
+                <ZenStack Direction="ZenDirection.Horizontal" Align="ZenCrossAlign.Center" Gap="ZenSpace.Sm" Wrap="true">
+                    <ZenText Weight="ZenTextWeight.Semibold" As="ZenTextElement.Span">Invoices</ZenText>
+                    <ZenBadge Intent="ZenIntent.Info" Variant="ZenVariant.Soft">12</ZenBadge>
+                    <ZenSpacer />
+                    <ZenButton Variant="ZenVariant.Outline" Size="ZenSize.Small">Export</ZenButton>
+                    <ZenButton Size="ZenSize.Small">New invoice</ZenButton>
+                </ZenStack>
+            </ZenCard>
+        </ZenGrid>
+    </ZenStack>
+
+    <!-- ------------------------------------------------------------ Grid -->
+    <ZenStack As="ZenLayoutElement.Section" aria-labelledby="grid-heading">
+        <ZenText Variant="ZenTextVariant.H4" As="ZenTextElement.H2" Id="grid-heading">ZenGrid</ZenText>
+        <ZenText Tone="ZenTextTone.Muted" Class="max-w-3xl">
+            Column counts per breakpoint, from 1 to 6 or 12 &mdash; anything else throws rather than
+            quietly doing nothing. Or <code>MinItemWidth</code>: as many columns as fit, none
+            narrower than the width you give.
+        </ZenText>
+
+        <ZenCard Title="Columns=&quot;1&quot; ColumnsSm=&quot;2&quot; ColumnsLg=&quot;4&quot;" TitleLevel="3">
+            <ZenGrid Columns="1" ColumnsSm="2" ColumnsLg="4" Gap="ZenSpace.Sm">
+                @for (var i = 1; i <= 8; i++)
+                {
+                    @Tile($"Item {i}")
+                }
+            </ZenGrid>
+        </ZenCard>
+
+        <ZenCard Title="MinItemWidth=&quot;12rem&quot;" TitleLevel="3">
+            <ZenGrid MinItemWidth="12rem" Gap="ZenSpace.Sm">
+                @for (var i = 1; i <= 7; i++)
+                {
+                    @Tile($"Item {i}")
+                }
+            </ZenGrid>
+        </ZenCard>
+    </ZenStack>
+
+    <!-- ------------------------------------------------------------ Grid items -->
+    <ZenStack As="ZenLayoutElement.Section" aria-labelledby="span-heading">
+        <ZenText Variant="ZenTextVariant.H4" As="ZenTextElement.H2" Id="span-heading">ZenGridItem</ZenText>
+        <ZenText Tone="ZenTextTone.Muted" Class="max-w-3xl">
+            A dashboard: the chart spans two of three columns from <code>lg</code>, and the notice
+            spans the full row. A plain child of the grid needs no wrapper.
+        </ZenText>
+
+        <ZenGrid Columns="1" ColumnsSm="2" ColumnsLg="3">
+            <ZenStatCard Label="Revenue" Value="$48,210" Delta="+12%" Trend="ZenTrend.Up" />
+            <ZenStatCard Label="Orders" Value="1,284" Delta="+4%" Trend="ZenTrend.Up" />
+            <ZenStatCard Label="Refunds" Value="23" Delta="-2" Trend="ZenTrend.Down" />
+
+            <ZenGridItem SpanSm="2">
+                <ZenCard Title="Revenue by week" TitleLevel="3" Class="h-full">
+                    <ZenText Tone="ZenTextTone.Muted">Span 2 &mdash; a chart would go here.</ZenText>
+                </ZenCard>
+            </ZenGridItem>
+            <ZenCard Title="Top customer" TitleLevel="3">
+                <ZenText Tone="ZenTextTone.Muted" Truncate="true">Northwind Traders International Holdings</ZenText>
+            </ZenCard>
+
+            <ZenGridItem FullWidth="true">
+                <ZenCard Title="Notice" TitleLevel="3">
+                    <ZenText Tone="ZenTextTone.Muted">FullWidth spans every column, whatever their number.</ZenText>
+                </ZenCard>
+            </ZenGridItem>
+        </ZenGrid>
+    </ZenStack>
+
+    <!-- ------------------------------------------------------------ Lists -->
+    <ZenStack As="ZenLayoutElement.Section" aria-labelledby="list-heading">
+        <ZenText Variant="ZenTextVariant.H4" As="ZenTextElement.H2" Id="list-heading">A grid that is a list</ZenText>
+        <ZenText Tone="ZenTextTone.Muted" Class="max-w-3xl">
+            <code>As="Ul"</code> on the grid, <code>As="Li"</code> on each item. A screen reader
+            announces how many there are.
+        </ZenText>
+
+        <ZenGrid As="ZenLayoutElement.Ul" MinItemWidth="14rem" Gap="ZenSpace.Sm">
+            @foreach (var name in Team)
+            {
+                <ZenGridItem As="ZenLayoutElement.Li">@Tile(name)</ZenGridItem>
+            }
+        </ZenGrid>
+    </ZenStack>
+
+    <!-- ------------------------------------------------------------ Container -->
+    <ZenStack As="ZenLayoutElement.Section" aria-labelledby="container-heading">
+        <ZenText Variant="ZenTextVariant.H4" As="ZenTextElement.H2" Id="container-heading">ZenContainer</ZenText>
+        <ZenText Tone="ZenTextTone.Muted" Class="max-w-3xl">
+            A centred column with gutters, at the shell's widths. For a page without
+            <code>ZenAppShell</code>, or a band narrower than the page around it.
+        </ZenText>
+
+        <ZenCard Flush="true">
+            <ZenStack Gap="ZenSpace.Sm" Class="py-4">
+                @foreach (var width in Widths)
+                {
+                    <ZenContainer MaxWidth="width">
+                        <div class="rounded-zen-sm bg-primary-soft px-3 py-2 text-sm text-primary-strong">
+                            MaxWidth="@width"
+                        </div>
+                    </ZenContainer>
+                }
+            </ZenStack>
+        </ZenCard>
+    </ZenStack>
+</ZenStack>
+
+@code {
+    private static readonly ZenContentWidth[] Widths =
+        [ZenContentWidth.Narrow, ZenContentWidth.Medium, ZenContentWidth.Wide];
+
+    private static readonly string[] Team =
+        ["Ada Lovelace", "Grace Hopper", "Alan Turing", "Katherine Johnson", "Edsger Dijkstra"];
+
+    private static RenderFragment Tile(string text) =>
+        @<span class="block rounded-zen-sm bg-surface-sunken px-3 py-2 text-sm">@text</span>;
+}

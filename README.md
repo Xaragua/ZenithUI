@@ -3,7 +3,7 @@
 A TailwindCSS component library for Blazor. Render-mode agnostic, themed entirely through CSS
 custom properties, with first-class light and dark palettes.
 
-> **Status: M6 — `1.0.0-rc.1.2`.** Every component in the plan ships: tokens and theming, primitives,
+> **Status: M6 — `1.0.0-rc.1.3`.** Every component in the plan ships: tokens and theming, primitives,
 > the full form control set, the overlay family (modal + toast services, popover, combobox, list),
 > the data components (table, tree, timeline) and the application shell. The package is consumed
 > and verified from a feed by both a Blazor Web App and a standalone WebAssembly app, the
@@ -64,13 +64,14 @@ you'd set it up.
 `zenith.css` contains the utilities ZenithUI's own components use, plus the full semantic surface
 (`bg-primary`, `text-content-muted`, `rounded-zen-lg`, …) that `safelist.css` guarantees is always
 emitted. It cannot contain `grid` or `max-w-6xl` for *your* pages: Tailwind only emits a class it
-finds in a file it scanned, and the library's build never sees your `.razor` files.
+finds in a file it scanned, and the library's build never sees your `.razor` files. The layout
+components exist for exactly that gap: every value they take is a class the library's build emits.
 
 So:
 
 | Your app | What to do |
 | --- | --- |
-| No Tailwind of its own | Link `zenith.css`. Semantic utilities are all there. |
+| No Tailwind of its own | Link `zenith.css`. Semantic utilities are all there; lay pages out with `ZenStack`, `ZenGrid` and `ZenContainer` rather than utility classes. |
 | Runs Tailwind | Link `zenith.nopreflight.css`, and add one import to your own Tailwind entry point (below). |
 
 The package ships a flattened `zenith.theme.css` and an MSBuild target that copies it into your
@@ -210,6 +211,7 @@ a palette fix is one edit rather than a guess-and-rerun loop:
 | **M6** ✅ | The consumer `@theme` artifact, one public namespace, the getting-started / theming / accessibility docs, the axe sweep, and `1.0.0-rc.1` verified from a feed by a Blazor Web App and a standalone WebAssembly app |
 | **rc.1.1** ✅ | `ZenText` — the type scale as a component: heading and body variants, a separate `As` element, logical alignment, token-backed tones |
 | **rc.1.2** ✅ | Fix: `zenith.css` and `zenith.nopreflight.css` ship as static web assets again, so `_content/ZenithUI/zenith.css` resolves in consuming apps |
+| **rc.1.3** ✅ | Layout without Tailwind: `ZenStack`, `ZenGrid` + `ZenGridItem`, `ZenContainer`, `ZenSpacer`, and a test that every class they emit is in `zenith.css` |
 
 ## Documentation
 
