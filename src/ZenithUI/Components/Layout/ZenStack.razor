@@ -1,0 +1,110 @@
+@namespace ZenithUI
+
+@inherits ZenComponentBase
+
+@*
+    A flex container: a column, or a row. It covers most layout needs, and it exists so that an app
+    which does not run Tailwind can still lay a page out - zenith.css holds only the classes the
+    library itself emits, so a consumer's own `flex gap-4 md:flex-row` would silently do nothing.
+
+    Every class below is a literal in a switch arm, where Tailwind's scanner can see it. An unset
+    parameter emits nothing, so the stack adds no rule the caller did not ask for.
+*@
+
+@((RenderFragment)(builder => ZenLayout.RenderRoot(
+    builder, ZenLayout.TagName(As), AttributesWithoutClass, RootClass(StackClass), Style,
+    Id == GeneratedId ? null : Id, ChildContent)))
+
+@code {
+    /// <summary>The items.</summary>
+    [Parameter]
+    public RenderFragment? ChildContent { get; set; }
+
+    /// <summary>The axis the items are laid out along. <see cref="ZenDirection.Vertical"/> by default.</summary>
+    [Parameter]
+    public ZenDirection Direction { get; set; } = ZenDirection.Vertical;
+
+    /// <summary>
+    /// Stacks the items vertically on narrow screens and switches to a row from this breakpoint
+    /// up. Requires <see cref="Direction"/> to be <see cref="ZenDirection.Vertical"/>, which is the
+    /// small-screen half of the pair.
+    /// </summary>
+    [Parameter]
+    public ZenBreakpoint? HorizontalFrom { get; set; }
+
+    /// <summary>The space between items. <see cref="ZenSpace.Md"/> by default.</summary>
+    [Parameter]
+    public ZenSpace Gap { get; set; } = ZenSpace.Md;
+
+    /// <summary>
+    /// How the items line up across the axis. When unset no class is emitted and they stretch.
+    /// </summary>
+    [Parameter]
+    public ZenCrossAlign? Align { get; set; }
+
+    /// <summary>
+    /// How spare room along the axis is distributed. When unset no class is emitted and the items
+    /// pack at the start.
+    /// </summary>
+    [Parameter]
+    public ZenJustify? Justify { get; set; }
+
+    /// <summary>Lets the items wrap onto further lines instead of overflowing.</summary>
+    [Parameter]
+    public bool Wrap { get; set; }
+
+    /// <summary>The element to render. A <c>div</c> by default.</summary>
+    [Parameter]
+    public ZenLayoutElement As { get; set; } = ZenLayoutElement.Div;
+
+    /// <inheritdoc />
+    protected override void OnParametersSet()
+    {
+        // Thrown rather than ignored: a horizontal stack that "switches to a row" at md is a
+        // contradiction, and quietly picking one reading is the silent no-op these components
+        // exist to remove.
+        if (HorizontalFrom is not null && Direction != ZenDirection.Vertical)
+        {
+            throw new InvalidOperationException(
+                $"{nameof(ZenStack)}.{nameof(HorizontalFrom)} stacks the items vertically below the breakpoint, " +
+                $"so it requires {nameof(Direction)}=\"{nameof(ZenDirection.Vertical)}\".");
+        }
+    }
+
+    private string StackClass => CssBuilder
+        .Default(Direction == ZenDirection.Horizontal ? "flex flex-row" : "flex flex-col")
+        .AddClass(HorizontalClass)
+        .AddClass(ZenStyles.Gap(Gap))
+        .AddClass(AlignClass)
+        .AddClass(JustifyClass)
+        .AddClass("flex-wrap", Wrap)
+        .Build()!;
+
+    private string? HorizontalClass => HorizontalFrom switch
+    {
+        ZenBreakpoint.Sm => "sm:flex-row",
+        ZenBreakpoint.Md => "md:flex-row",
+        ZenBreakpoint.Lg => "lg:flex-row",
+        ZenBreakpoint.Xl => "xl:flex-row",
+        _ => null,
+    };
+
+    private string? AlignClass => Align switch
+    {
+        ZenCrossAlign.Stretch => "items-stretch",
+        ZenCrossAlign.Start => "items-start",
+        ZenCrossAlign.Center => "items-center",
+        ZenCrossAlign.End => "items-end",
+        ZenCrossAlign.Baseline => "items-baseline",
+        _ => null,
+    };
+
+    private string? JustifyClass => Justify switch
+    {
+        ZenJustify.Start => "justify-start",
+        ZenJustify.Center => "justify-center",
+        ZenJustify.End => "justify-end",
+        ZenJustify.Between => "justify-between",
+        _ => null,
+    };
+}

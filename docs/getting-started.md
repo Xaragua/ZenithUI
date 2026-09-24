@@ -8,6 +8,7 @@ called out are ones a scratch app actually hit, not ones imagined for the docume
 - [Blazor Web App](#blazor-web-app-server-or-webassembly-interactivity)
 - [Standalone WebAssembly](#standalone-webassembly)
 - [Static SSR, no interactivity at all](#static-ssr-no-interactivity-at-all)
+- [Laying out a page without Tailwind](#laying-out-a-page-without-tailwind)
 - [If your app runs its own Tailwind](#if-your-app-runs-its-own-tailwind)
 - [Things that bite](#things-that-bite)
 
@@ -106,6 +107,66 @@ What needs a render mode, because the behaviour is an event handler: sorting and
 expanding a tree, opening a modal or raising a toast from a service, live search debouncing, and the
 theme toggle's own click. Add `@rendermode` per page or per component when you want those — nothing
 in the markup changes.
+
+## Laying out a page without Tailwind
+
+`zenith.css` is not the whole of Tailwind. It holds the classes ZenithUI's own components use, plus
+the semantic surface (`bg-surface`, `text-content-muted`, `rounded-zen-md`, …). A layout class you
+write in your own markup, such as `md:grid-cols-3`, `gap-5` or `max-w-4xl`, works only if some
+component happens to use that exact class. Nothing warns you when it doesn't: the class does
+nothing, and a later release that stops using it can break your layout without any change on your
+side.
+
+The layout components cover that gap. Every value they accept is a class the library's own build
+emits, and a test checks that each one is present in `zenith.css`:
+
+```razor
+<ZenContainer MaxWidth="ZenContentWidth.Wide">
+    <ZenStack Gap="ZenSpace.Xl">
+        @* A toolbar: title at the start, actions pushed to the end. *@
+        <ZenStack Direction="ZenDirection.Horizontal" Align="ZenCrossAlign.Center">
+            <ZenText Variant="ZenTextVariant.H1">Dashboard</ZenText>
+            <ZenSpacer />
+            <ZenButton>New</ZenButton>
+        </ZenStack>
+
+        @* One column on a phone, two from sm, four from lg. *@
+        <ZenGrid Columns="1" ColumnsSm="2" ColumnsLg="4">
+            <ZenStatCard Label="Revenue" Value="$48,210" />
+            <ZenStatCard Label="Orders" Value="1,284" />
+            <ZenStatCard Label="Refunds" Value="23" />
+            <ZenStatCard Label="Customers" Value="912" />
+            <ZenGridItem SpanSm="2" SpanLg="3">
+                <ZenCard Title="Revenue by week">…</ZenCard>
+            </ZenGridItem>
+            <ZenCard Title="Top customer">…</ZenCard>
+        </ZenGrid>
+
+        @* As many columns as fit, none narrower than 16rem. *@
+        <ZenGrid MinItemWidth="16rem">…</ZenGrid>
+    </ZenStack>
+</ZenContainer>
+```
+
+| Component | What it is |
+| --- | --- |
+| `ZenStack` | A flex column or row. `Gap`, `Align`, `Justify`, `Wrap`, and `HorizontalFrom` to stack on a phone and switch to a row from a breakpoint. |
+| `ZenGrid` | A grid. Either `Columns` plus `ColumnsSm` … `ColumnsXl` (1–6 or 12), or `MinItemWidth` for as many columns as fit. |
+| `ZenGridItem` | A grid cell that spans columns: `Span` plus `SpanSm` … `SpanXl`, or `FullWidth`. A plain child of the grid needs no wrapper. |
+| `ZenContainer` | A centred column with gutters, at the same widths as `ZenAppShell`'s `MaxWidth`. For pages without the shell. |
+| `ZenSpacer` | Fills the spare room in a stack, pushing what follows it to the far end. |
+
+Every one of them takes `As`, which sets the element (`Section`, `Nav`, `Ul`, `Li`, …) because a
+layout box has no role of its own. A grid rendered as a `Ul` needs its items to be `Li`, either with
+`ZenGridItem As="ZenLayoutElement.Li"` or with plain `<li>` elements.
+
+An unsupported value, such as `Columns="7"` or `MinItemWidth` combined with `Columns`, throws when the
+component renders. That is deliberate: it replaces a class that would otherwise do nothing, with no
+warning.
+
+For anything these don't cover, run your own Tailwind (next section). Padding, margins and
+arbitrary sizes are deliberately left out: a component for each utility would amount to a second,
+weaker Tailwind.
 
 ## If your app runs its own Tailwind
 

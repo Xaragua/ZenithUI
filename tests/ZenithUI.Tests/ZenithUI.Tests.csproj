@@ -47,6 +47,14 @@
              Link="Tailwind\%(Filename)%(Extension)"
              CopyToOutputDirectory="PreserveNewest" />
 
+    <!--
+      The built stylesheet, generated the same way. StylesheetCoverageTests checks that every class
+      the layout and typography components emit has a rule in it.
+    -->
+    <Content Include="..\..\src\ZenithUI\wwwroot\zenith.css"
+             Link="Stylesheet\%(Filename)%(Extension)"
+             CopyToOutputDirectory="PreserveNewest" />
+
     <!-- The two copies of the anti-flash initialiser - see ThemeInitScriptTests. -->
     <Content Include="..\..\src\ZenithUI\Components\Theming\ZenThemeScript.razor"
              Link="Theming\%(Filename)%(Extension)"

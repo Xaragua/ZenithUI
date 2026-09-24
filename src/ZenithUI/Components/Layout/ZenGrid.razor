@@ -1,0 +1,177 @@
+@namespace ZenithUI
+
+@inherits ZenComponentBase
+
+@*
+    A CSS grid, with two ways to size its columns:
+
+    - Explicitly, per breakpoint: Columns="1" ColumnsSm="2" ColumnsLg="3". Each count is a literal
+      class below, which limits the counts to the ones listed - 1 to 6, and 12.
+    - By fit: MinItemWidth="16rem" makes as many columns as fit at that width. It is one literal
+      class whose width arrives through a custom property, so it takes any length without growing
+      the stylesheet. The min(..., 100%) keeps a single column from overflowing a screen narrower
+      than the minimum.
+
+    The two are exclusive, and an unsupported count throws: a count that silently emitted no class
+    is exactly the failure these components exist to remove.
+*@
+
+@((RenderFragment)(builder => ZenLayout.RenderRoot(
+    builder, ZenLayout.TagName(As), AttributesWithoutClass, RootClass(GridClass), GridStyle,
+    Id == GeneratedId ? null : Id, ChildContent)))
+
+@code {
+    /// <summary>The counts <see cref="Columns"/> and its breakpoint variants accept.</summary>
+    internal static readonly IReadOnlyList<int> SupportedColumns = [1, 2, 3, 4, 5, 6, 12];
+
+    /// <summary>The items. Wrap one in <see cref="ZenGridItem"/> to make it span several columns.</summary>
+    [Parameter]
+    public RenderFragment? ChildContent { get; set; }
+
+    /// <summary>
+    /// The column count at every width, until a breakpoint variant overrides it. 1 to 6, or 12.
+    /// When neither this nor <see cref="MinItemWidth"/> is set the grid has a single column.
+    /// </summary>
+    [Parameter]
+    public int? Columns { get; set; }
+
+    /// <summary>The column count from 640px up. 1 to 6, or 12.</summary>
+    [Parameter]
+    public int? ColumnsSm { get; set; }
+
+    /// <summary>The column count from 768px up. 1 to 6, or 12.</summary>
+    [Parameter]
+    public int? ColumnsMd { get; set; }
+
+    /// <summary>The column count from 1024px up. 1 to 6, or 12.</summary>
+    [Parameter]
+    public int? ColumnsLg { get; set; }
+
+    /// <summary>The column count from 1280px up. 1 to 6, or 12.</summary>
+    [Parameter]
+    public int? ColumnsXl { get; set; }
+
+    /// <summary>
+    /// Makes as many columns as fit, none narrower than this CSS length (<c>"16rem"</c>,
+    /// <c>"240px"</c>). Cannot be combined with <see cref="Columns"/> or its breakpoint variants.
+    /// </summary>
+    [Parameter]
+    public string? MinItemWidth { get; set; }
+
+    /// <summary>The space between rows and columns. <see cref="ZenSpace.Md"/> by default.</summary>
+    [Parameter]
+    public ZenSpace Gap { get; set; } = ZenSpace.Md;
+
+    /// <summary>The element to render. A <c>div</c> by default.</summary>
+    [Parameter]
+    public ZenLayoutElement As { get; set; } = ZenLayoutElement.Div;
+
+    private bool HasColumns =>
+        Columns is not null || ColumnsSm is not null || ColumnsMd is not null
+        || ColumnsLg is not null || ColumnsXl is not null;
+
+    /// <inheritdoc />
+    protected override void OnParametersSet()
+    {
+        if (!string.IsNullOrWhiteSpace(MinItemWidth) && HasColumns)
+        {
+            throw new InvalidOperationException(
+                $"{nameof(ZenGrid)} sizes its columns either by {nameof(MinItemWidth)} or by {nameof(Columns)}, not both.");
+        }
+
+        Validate(Columns, nameof(Columns));
+        Validate(ColumnsSm, nameof(ColumnsSm));
+        Validate(ColumnsMd, nameof(ColumnsMd));
+        Validate(ColumnsLg, nameof(ColumnsLg));
+        Validate(ColumnsXl, nameof(ColumnsXl));
+    }
+
+    private static void Validate(int? count, string parameter)
+    {
+        if (count is { } value && !SupportedColumns.Contains(value))
+        {
+            throw new ArgumentOutOfRangeException(
+                parameter, value,
+                $"{nameof(ZenGrid)}.{parameter} must be one of {string.Join(", ", SupportedColumns)}. " +
+                $"For another count, use {nameof(MinItemWidth)} or your own Tailwind build.");
+        }
+    }
+
+    private string GridClass => CssBuilder
+        .Default("grid")
+        .AddClass(
+            "grid-cols-[repeat(auto-fill,minmax(min(var(--zen-grid-min),100%),1fr))]",
+            !string.IsNullOrWhiteSpace(MinItemWidth))
+        .AddClass(BaseColumns(Columns))
+        .AddClass(SmColumns(ColumnsSm))
+        .AddClass(MdColumns(ColumnsMd))
+        .AddClass(LgColumns(ColumnsLg))
+        .AddClass(XlColumns(ColumnsXl))
+        .AddClass(ZenStyles.Gap(Gap))
+        .Build()!;
+
+    // The width is the caller's, merged ahead of their Style so they can still override it.
+    private string? GridStyle => string.IsNullOrWhiteSpace(MinItemWidth)
+        ? Style
+        : $"--zen-grid-min: {MinItemWidth};{Style}";
+
+    private static string? BaseColumns(int? count) => count switch
+    {
+        1 => "grid-cols-1",
+        2 => "grid-cols-2",
+        3 => "grid-cols-3",
+        4 => "grid-cols-4",
+        5 => "grid-cols-5",
+        6 => "grid-cols-6",
+        12 => "grid-cols-12",
+        _ => null,
+    };
+
+    private static string? SmColumns(int? count) => count switch
+    {
+        1 => "sm:grid-cols-1",
+        2 => "sm:grid-cols-2",
+        3 => "sm:grid-cols-3",
+        4 => "sm:grid-cols-4",
+        5 => "sm:grid-cols-5",
+        6 => "sm:grid-cols-6",
+        12 => "sm:grid-cols-12",
+        _ => null,
+    };
+
+    private static string? MdColumns(int? count) => count switch
+    {
+        1 => "md:grid-cols-1",
+        2 => "md:grid-cols-2",
+        3 => "md:grid-cols-3",
+        4 => "md:grid-cols-4",
+        5 => "md:grid-cols-5",
+        6 => "md:grid-cols-6",
+        12 => "md:grid-cols-12",
+        _ => null,
+    };
+
+    private static string? LgColumns(int? count) => count switch
+    {
+        1 => "lg:grid-cols-1",
+        2 => "lg:grid-cols-2",
+        3 => "lg:grid-cols-3",
+        4 => "lg:grid-cols-4",
+        5 => "lg:grid-cols-5",
+        6 => "lg:grid-cols-6",
+        12 => "lg:grid-cols-12",
+        _ => null,
+    };
+
+    private static string? XlColumns(int? count) => count switch
+    {
+        1 => "xl:grid-cols-1",
+        2 => "xl:grid-cols-2",
+        3 => "xl:grid-cols-3",
+        4 => "xl:grid-cols-4",
+        5 => "xl:grid-cols-5",
+        6 => "xl:grid-cols-6",
+        12 => "xl:grid-cols-12",
+        _ => null,
+    };
+}

@@ -114,7 +114,16 @@
     [Parameter]
     public RenderFragment? Header { get; set; }
 
-    /// <summary>Content pinned below the links - a user card, a version string.</summary>
+    /// <summary>
+    /// Content docked at the bottom of the nav: a second <c>ZenNavMenu</c> of links such as
+    /// Settings and Help, a user card, a version string.
+    /// </summary>
+    /// <remarks>
+    /// It sits outside the scrolling region and never scrolls with it. However long the links above
+    /// grow, it stays at the bottom of the rail and of the drawer, with a divider above it. Items
+    /// here belong to the same navigation landmark as the rest, so a menu placed here should pass
+    /// <c>Landmark="false"</c>, like the one in <see cref="ChildContent"/>.
+    /// </remarks>
     [Parameter]
     public RenderFragment? Footer { get; set; }
 

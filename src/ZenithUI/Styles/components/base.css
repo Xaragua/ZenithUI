@@ -18,6 +18,21 @@
   }
 
   /*
+   * No focus ring on a heading that was focused from code. Blazor's `FocusOnNavigate` gives the
+   * page's h1 `tabindex="-1"` and focuses it after every navigation, so a screen reader announces
+   * the new page. Browsers count focus on load as keyboard focus, so `:focus-visible` matches and
+   * the heading gets the default outline: a box around the title that nothing can activate.
+   *
+   * Scoped to headings with `tabindex="-1"`: they are outside the tab order and never interactive,
+   * so the ring carries no information. Anything a user can tab to keeps its ring. Under
+   * `.zen-root`, like every page-level rule here, so the library styles no document it was not
+   * invited into.
+   */
+  .zen-root :is(h1, h2, h3, h4, h5, h6)[tabindex="-1"]:focus {
+    outline: none;
+  }
+
+  /*
    * Theme transition. Applied by ZenThemeProvider only while a theme change is in flight, so
    * that switching palettes cross-fades instead of snapping, without making every unrelated
    * hover state sluggish. `prefers-reduced-motion` disables it entirely.
