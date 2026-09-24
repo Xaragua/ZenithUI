@@ -3,7 +3,7 @@
 A TailwindCSS component library for Blazor. Render-mode agnostic, themed entirely through CSS
 custom properties, with first-class light and dark palettes.
 
-> **Status: M6 — `1.0.0-rc.1`.** Every component in the plan ships: tokens and theming, primitives,
+> **Status: M6 — `1.0.0-rc.1.1`.** Every component in the plan ships: tokens and theming, primitives,
 > the full form control set, the overlay family (modal + toast services, popover, combobox, list),
 > the data components (table, tree, timeline) and the application shell. The package is consumed
 > and verified from a feed by both a Blazor Web App and a standalone WebAssembly app, the
@@ -208,7 +208,7 @@ a palette fix is one edit rather than a guess-and-rerun loop:
 | **M4** ✅ | `ZenTable` + `ZenColumn` (sorting, paging, selection, hierarchy, detail rows, responsive collapse), `ZenEmptyState`, `ZenTree`, `ZenTimeline` |
 | **M5** ✅ | `ZenAppBar`, `ZenNavMenu` + `ZenNavLink` + `ZenNavGroup` (collapsible sections), `ZenSideNav` (off-canvas drawer needing no render mode), `ZenFooter`, `ZenAppShell` |
 | **M6** ✅ | The consumer `@theme` artifact, one public namespace, the getting-started / theming / accessibility docs, the axe sweep, and `1.0.0-rc.1` verified from a feed by a Blazor Web App and a standalone WebAssembly app |
-| **Unreleased** | `ZenText` — the type scale as a component: heading and body variants, a separate `As` element, logical alignment, token-backed tones |
+| **rc.1.1** ✅ | `ZenText` — the type scale as a component: heading and body variants, a separate `As` element, logical alignment, token-backed tones |
 
 ## Documentation
 
