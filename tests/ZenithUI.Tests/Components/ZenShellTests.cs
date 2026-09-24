@@ -191,6 +191,27 @@ public class ZenShellTests : BunitContext
     }
 
     [Fact]
+    public void TheFooter_IsDockedOutsideTheScrollingLinks()
+    {
+        // Settings and Help at the bottom of the rail: they must not scroll away with a long list
+        // of links above them. That holds only while the footer is a sibling of the scrolling
+        // region rather than inside it, and does not shrink when the links overflow.
+        var cut = Render<ZenSideNav>(p => p
+            .AddChildContent("<a href=\"/orders\">Orders</a>")
+            .Add(x => x.Footer, "<a href=\"/settings\">Settings</a>"));
+
+        var regions = cut.Find("aside").Children.Where(e => e.TagName == "DIV").ToList();
+        var scrolling = regions.Single(e => e.ClassList.Contains("overflow-y-auto"));
+        var footer = regions[^1];
+
+        footer.ShouldNotBe(scrolling);
+        footer.ClassList.ShouldContain("shrink-0");
+        footer.QuerySelector("a")!.GetAttribute("href").ShouldBe("/settings");
+        scrolling.QuerySelector("a[href='/settings']").ShouldBeNull();
+        scrolling.ClassList.ShouldContain("flex-1", "the links must take the spare height, or the footer floats up under them.");
+    }
+
+    [Fact]
     public void AnExplicitId_OutranksTheShellCascade()
     {
         // The escape hatch for a nav the cascade cannot reach: one the consumer made an

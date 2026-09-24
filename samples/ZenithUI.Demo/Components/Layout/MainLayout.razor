@@ -36,7 +36,7 @@
                 <ZenNavMenu Orientation="ZenNavOrientation.Horizontal"
                             Label="Sections"
                             Class="ms-2 hidden lg:flex">
-                    @foreach (var link in NavLinks)
+                    @foreach (var link in NavLinks.Concat(DockedLinks))
                     {
                         <ZenNavLink Href="@link.Href" Text="@link.Label" />
                     }
@@ -80,8 +80,19 @@
                 </ZenNavMenu>
             </ChildContent>
 
+            @* Docked at the bottom: the footer sits outside the scrolling links, so these stay
+               put however long the list above grows. Same landmark as the links above, hence
+               Landmark="false" here too. *@
             <Footer>
-                <p class="px-3 text-xs text-content-subtle">Milestone M5</p>
+                <ZenNavMenu Landmark="false">
+                    @foreach (var link in DockedLinks)
+                    {
+                        <ZenNavLink Href="@link.Href" Text="@link.Label" Icon="@link.Icon" />
+                    }
+                    <ZenNavLink Href="https://github.com/Xaragua/ZenithUI" Text="Source on GitHub"
+                                Icon="@ZenIcons.Info" target="_blank" rel="noopener" />
+                </ZenNavMenu>
+                <p class="mt-2 px-3 text-xs text-content-subtle">Milestone M5</p>
             </Footer>
         </ZenSideNav>
     </SideNav>
@@ -137,6 +148,11 @@
         ("overlays", "Overlays", ZenIcons.Info),
         ("data", "Data", ZenIcons.Calendar),
         ("shell", "Shell", ZenIcons.Menu),
+    ];
+
+    // Docked at the bottom of the side nav. The app bar lists them with the rest.
+    private static readonly (string Href, string Label, string Icon)[] DockedLinks =
+    [
         ("render-modes", "Render modes", ZenIcons.Monitor),
     ];
 }

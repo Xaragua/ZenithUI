@@ -44,6 +44,14 @@ class built at runtime, or an `@source` glob that stopped matching a folder, wou
 every other test. The test was checked by deleting one layout rule and one typography rule from
 its copy of the stylesheet: both tests failed and named the missing class.
 
+### Documented — nav items docked at the bottom of the side nav
+
+`ZenSideNav`'s `Footer` could already hold nav items that stay at the bottom, but nothing said so.
+It sits outside the scrolling list of links, so a second `ZenNavMenu` placed there (Settings, Help,
+an account link) stays at the bottom of the rail and of the drawer however long the list above
+grows. Its documentation now says so, a test enforces the structure it depends on, the demo's side
+nav docks two items that way, and the Shell page explains the pattern.
+
 ### Fixed — a focus ring around every page title
 
 Blazor's `FocusOnNavigate` gives the page's `h1` `tabindex="-1"` and focuses it after each

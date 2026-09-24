@@ -206,6 +206,44 @@
     </div>
 </section>
 
+<!-- ------------------------------------------------------------------- Docked items -->
+<section class="mt-10">
+    <h2 class="text-lg font-semibold">Items docked at the bottom</h2>
+    <p class="mt-2 max-w-3xl text-sm text-content-muted">
+        Settings, Help, an account link: the items most apps keep at the foot of the side nav.
+        Put a second <code>ZenNavMenu</code> in <code>ZenSideNav</code>'s <code>Footer</code>. The
+        footer sits outside the scrolling list of links, so it stays at the bottom of the rail
+        and of the drawer however long that list grows.
+        <strong>The live one is in this page's side nav</strong>: <em>Render modes</em> and
+        <em>Source on GitHub</em> are docked there, above the milestone line.
+    </p>
+
+    <div class="mt-4 grid gap-4 lg:grid-cols-2">
+        <ZenCard Title="The markup" TitleLevel="3">
+            @* tabindex="0": on a phone the snippet scrolls sideways, and a keyboard user can only
+               scroll what can take focus. The sweep caught it. *@
+            <pre tabindex="0" role="region" aria-label="Docked footer markup"
+                 class="zen-focus overflow-x-auto rounded-zen-sm bg-surface-sunken p-3 text-xs"><code>@DockedMarkup</code></pre>
+        </ZenCard>
+
+        <ZenCard Title="What it gets right" TitleLevel="3">
+            <ul class="space-y-1.5 text-sm text-content-muted">
+                <li>A divider above it, and the same padding as the links, so icons line up</li>
+                <li>It never scrolls: the list above takes the spare height and scrolls on its own</li>
+                <li>
+                    One landmark: both menus pass <code>Landmark="false"</code> and sit inside the
+                    side nav's <code>&lt;aside&gt;</code>, so a screen reader finds one navigation
+                    region, not two
+                </li>
+                <li>
+                    <code>aria-current="page"</code> and the active style work exactly as they do
+                    above, because the links are ordinary <code>ZenNavLink</code>s
+                </li>
+            </ul>
+        </ZenCard>
+    </div>
+</section>
+
 <!-- ------------------------------------------------------------------- App bar -->
 <section class="mt-10">
     <h2 class="text-lg font-semibold">ZenAppBar</h2>
@@ -270,3 +308,25 @@
         avoid.
     </p>
 </section>
+
+@code {
+    // A string rather than markup inside the <pre>, so Razor renders the snippet instead of
+    // compiling it.
+    private const string DockedMarkup = """
+        <ZenSideNav>
+            <ChildContent>
+                <ZenNavMenu Landmark="false">
+                    <ZenNavLink Href="orders" Text="Orders" />
+                    <ZenNavLink Href="customers" Text="Customers" />
+                </ZenNavMenu>
+            </ChildContent>
+
+            <Footer>
+                <ZenNavMenu Landmark="false">
+                    <ZenNavLink Href="settings" Text="Settings" />
+                    <ZenNavLink Href="help" Text="Help" />
+                </ZenNavMenu>
+            </Footer>
+        </ZenSideNav>
+        """;
+}
