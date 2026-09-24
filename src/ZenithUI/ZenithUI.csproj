@@ -36,6 +36,9 @@
 
   <ItemGroup>
     <None Include="..\..\README.md" Pack="true" PackagePath="\" Visible="false" />
+    <!-- The icon paths in Core/ZenIcons.cs derive from Lucide, Feather and Heroicons, whose
+         licences ask for their notice to travel with every copy - so it ships in the package. -->
+    <None Include="..\..\THIRD-PARTY-NOTICES.txt" Pack="true" PackagePath="\" Visible="false" />
   </ItemGroup>
 
   <!--

@@ -15,6 +15,12 @@ namespace ZenithUI;
 /// For application icons, pass your own markup to <c>ZenIcon</c>'s <c>ChildContent</c>, or use any
 /// icon set you like. Nothing in the library assumes these.
 /// </para>
+/// <para>
+/// Several paths are taken from, or adapted from, open-source sets: Lucide (ISC), Feather (MIT)
+/// and Heroicons (MIT). Which icon comes from where, and each licence in full, is in
+/// <c>THIRD-PARTY-NOTICES.txt</c> at the repository root, which also ships in the package.
+/// Keep that file in step when an icon here is added or redrawn.
+/// </para>
 /// </remarks>
 public static class ZenIcons
 {
