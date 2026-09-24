@@ -4,6 +4,122 @@ All notable changes to ZenithUI are documented here. The format follows
 [Keep a Changelog](https://keepachangelog.com/en/1.1.0/) and the project adheres to
 [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.0.0-rc.1.4] — 2026-09-24
+
+Milestone M7: a table that scales to server-sized data, a picker built on it, and a wizard.
+Additions only, no breaking changes. `1.0.0-rc.1.3` code builds unchanged against it. One
+visible markup change: a table's pager is now named after its table (see Fixed).
+
+### Added — `ZenTable` reads from a server
+
+- **`ItemsProvider`**, as an alternative to `Items`. The table asks for one window of rows at a time,
+  either a page or whatever a virtualized body has scrolled to. The request is a
+  `ZenTableRequest` carrying `StartIndex`, `Count`, `SortName`, `SortDescending` and a
+  `CancellationToken`. The answer is a `ZenTableResult<TItem>` with the rows and the `TotalCount`,
+  and the pager is drawn from that total.
+- **`ZenColumn.SortName`**, the key sent to the server when the user sorts. Over a provider, only
+  columns with a `SortName` sort. A `Field` delegate cannot be translated into a query.
+- A request that is overtaken is cancelled, so a slow page 2 cannot land under a pager that says 3.
+- The same view is never fetched twice. A page change reaches the table both as an event and as a
+  bound parameter, and requests are keyed so it loads once.
+- Skeleton rows match the page they replace, so paging does not collapse the table.
+- **`RefreshDataAsync()`** reloads the current view, for data that changed on the server.
+
+### Added — `ZenTable` virtualization
+
+- **`Virtualize`** renders only the rows in view, through the framework's `<Virtualize>`, with
+  `<tr>` spacers so the markup stays a table. **`Height`** gives the table its own scroll box and
+  makes the header sticky. `ItemSize` and `OverscanCount` tune it.
+- `aria-rowcount` and `aria-rowindex` state the real size. Otherwise a screen reader counts the
+  twenty rows in the DOM and announces "row 3 of 20" in a table of ten thousand.
+- It works over `Items` and over `ItemsProvider`, and it groups, because group headers are rows in
+  the same flat list.
+- Under static SSR, and during prerender, the first 50 rows render as plain markup.
+- `Virtualize` together with `PageSize` throws: they are two answers to the same problem. The
+  stacked mobile layout is off while virtualizing, because it gives every row a different height.
+
+### Added — `ZenTable` grouping
+
+- **`GroupBy`** puts a header row before each group. The header is a `<th scope="rowgroup">`
+  spanning the table, so a screen reader announces the group for a cell below it.
+- Groups are ordered by key, nulls first. **`GroupDescending`** reverses them, and **`UngroupedText`**
+  names the null group. The column sort applies within each group.
+- **Collapsible** (`GroupsCollapsible`, `IsGroupInitiallyCollapsed`), with a disclosure button.
+- With `Selectable`, a **tri-state checkbox** selects the whole group. That is wider than select-all,
+  which stops at the page; the header states its row count, so the scope is visible before the
+  click.
+- **`GroupHeaderTemplate`**, `GroupText`.
+- Paging counts a collapsed group as one row. A group that crosses a page boundary repeats its
+  header on the next page.
+- `GroupBy` throws together with `ChildrenProvider` or `ItemsProvider`.
+
+### Added — `ZenLookup<TItem>`
+
+A search field whose suggestions are a table, for picking one record out of many by any of its
+columns. It follows the WAI-ARIA "combobox with grid popup" pattern.
+
+- The panel is a `ZenTable`, so it sorts, pages, virtualizes and reads from an `ItemsProvider`.
+  Columns are ordinary `ZenColumn`s.
+- **`PanelWidth`** sets the panel's own width. The panel is never narrower than the field and never
+  wider than the viewport.
+- Focus stays in the field. The arrow keys, PageUp/PageDown and Ctrl+Home/End move a cursor named
+  by `aria-activedescendant`. **Escape, a click outside, or Tab-ing away closes without changing
+  the value.**
+- **`Commit`**: `Immediate` picks on click or Enter. `Confirm` only marks the row, shows it in a
+  footer bar, and writes the value on Confirm (or Ctrl+Enter). Closing any other way discards it.
+- `SearchText` searches fields that are not displayed. The default searches every column's
+  displayed text. A provider receives the query as `ZenLookupRequest.Query`, debounced by
+  `SearchDebounceMilliseconds`.
+- `HeaderContent` and `FooterContent` slots, for filter chips and a "create new" link.
+
+### Added — `ZenStepper` + `ZenStep`
+
+A wizard: numbered steps, the active step's content, and Back / Next / Finish.
+
+- **`EditContext`** on a step blocks Next until it validates. **`OnLeaving`** runs after that and
+  can cancel, for a server-side check. Back never validates.
+- **`Linear`** (the default) only offers steps already reached. Turned off, every step is reachable.
+  **`Disabled`** steps are skipped. **`Optional`** and **`Error`** label a step.
+- **`Orientation`**: horizontal, or vertical beside the content. Below `md` a horizontal stepper
+  shows its markers alone.
+- **`NavigationTemplate`** replaces the buttons and is handed a `ZenStepperContext`.
+- It is deliberately **not a tab list**. The header is an `<ol>` in a `<nav>` with
+  `aria-current="step"`, and each step's state is stated in words. Focus moves to the new step's
+  heading on every change.
+- A `/stepper` demo page, in the nav and in the accessibility sweep.
+
+### Fixed
+
+- **A table's pager is named after its table**, as "Orders pagination". Every pager used to be a
+  `<nav aria-label="Pagination">`, so two paged tables on one page gave a screen reader two
+  identical landmarks. The accessibility sweep caught it as soon as the demo had two.
+- **The table's scroll wrapper is `relative`.** Without it, absolutely positioned content inside
+  rows (visually hidden text, a checkbox's mark) had its containing block outside the scroller and
+  stayed put while the rows scrolled. It was invisible, but it stretched the box `<Virtualize>`
+  measures, and the grouped virtualized table's scrollbar collapsed to a tenth of its length on the
+  first long jump.
+
+### Also
+
+- **Third-party notices for the built-in icons.** Several `ZenIcons` paths are identical to, or
+  adapted from, Lucide, Feather and Heroicons icons, and nothing credited them. Those licences are
+  permissive but ask for their notice to accompany every copy. `THIRD-PARTY-NOTICES.txt` now maps
+  each icon to its source, reproduces the three licences, and ships in the `.nupkg`.
+- `zen-dom.js` gains `scrollRowIntoView`. It keeps a row clear of a sticky header, and it scrolls to
+  where a virtualized row *will* be when that row does not exist yet.
+- `StylesheetCoverageTests` now renders every state of the new components.
+- **The accessibility sweep is clean:** 13 pages in both palettes and 17 interactive states, eight
+  of them new. Besides the pager landmarks above, it found that the disabled step's opacity fade
+  failed contrast; the step now uses a subtle text token and a dashed marker instead. See
+  [`docs/accessibility.md`](accessibility.md#the-m7-audit).
+- **The sweep no longer hangs.** A few minutes into a run, its page went hidden. That throttled the
+  timers to once a minute and stopped animation frames, so async state drives never finished and a
+  virtualized table never loaded. The browser now runs with background throttling off, the page is
+  brought to the front before every navigation, and every evaluation has a 60-second deadline, so a
+  stuck state fails instead of hanging.
+- `zenith.css` grows by 0.8 KB minified (66,396 → 67,201 bytes). The new components are built almost
+  entirely from utilities the library already emitted.
+
 ## [1.0.0-rc.1.3] — 2026-09-24
 
 A revision of the release candidate. Additions only, no breaking changes: `1.0.0-rc.1.2` code
