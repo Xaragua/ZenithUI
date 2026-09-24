@@ -119,6 +119,113 @@
     </p>
 </section>
 
+<!-- ---------------------------------------------------------------- Grouping -->
+<section class="mt-12">
+    <h2 class="text-lg font-semibold">ZenTable, grouped</h2>
+    <p class="mt-2 max-w-3xl text-sm text-content-muted">
+        <code>GroupBy</code> puts a header row before each group. It is a
+        <code>&lt;th scope="rowgroup"&gt;</code>, so a screen reader reading a cell announces the
+        group it sits in, the way it announces the column. <strong>Collapse a group</strong> with
+        its chevron, and <strong>tick a group's box</strong> to select all of its rows &mdash; the
+        header says how many that is before you click. Sort a column and the order applies inside
+        each group; the groups keep their own order.
+    </p>
+
+    <div class="mt-4">
+        <ZenTable Items="_orders"
+                  TItem="Order"
+                  Label="Orders by status"
+                  GroupBy="@(o => o.Status)"
+                  IsGroupInitiallyCollapsed="@(key => key is OrderStatus.Delivered)"
+                  Selectable="true"
+                  RowText="@(o => o.Reference)"
+                  SelectedItems="_groupSelection"
+                  SelectedItemsChanged="@(s => _groupSelection = s)"
+                  Size="ZenSize.Small">
+            <Columns>
+                <ZenColumn TItem="Order" Title="Reference" Field="@(o => o.Reference)" Width="8rem" />
+                <ZenColumn TItem="Order" Title="Customer" Field="@(o => o.Customer)" />
+                <ZenColumn TItem="Order" Title="Placed" Field="@(o => o.Placed)" Format="d MMM yyyy" Width="9rem" />
+                <ZenColumn TItem="Order" Title="Amount" Field="@(o => o.Amount)" Format="C2" Align="ZenAlign.End" Width="9rem" />
+            </Columns>
+        </ZenTable>
+    </div>
+
+    <p class="mt-3 text-sm text-content-subtle">
+        Delivered starts collapsed through <code>IsGroupInitiallyCollapsed</code>.
+        @_groupSelection.Count selected.
+    </p>
+</section>
+
+<!-- ------------------------------------------------------------ Virtualized -->
+<section class="mt-12">
+    <h2 class="text-lg font-semibold">ZenTable, ten thousand rows</h2>
+    <p class="mt-2 max-w-3xl text-sm text-content-muted">
+        <code>Virtualize</code> renders only the rows in view &mdash; about twenty of these ten
+        thousand exist in the DOM at any moment. <code>Height</code> gives the table its own scroll
+        box with a sticky header. The spacers are <code>&lt;tr&gt;</code>s so the markup stays a
+        table, and <code>aria-rowcount</code> tells a screen reader the real size, which it would
+        otherwise take from the twenty rows it can see. It groups too: the headers are just more
+        rows in the same flat list.
+    </p>
+
+    <div class="mt-4">
+        <ZenTable Items="_shipments"
+                  TItem="Shipment"
+                  Label="Shipments"
+                  Virtualize="true"
+                  Height="24rem"
+                  ItemSize="37"
+                  GroupBy="@(_groupShipments ? ByCarrier : null)"
+                  Size="ZenSize.Small">
+            <Columns>
+                <ZenColumn TItem="Shipment" Title="Tracking" Field="@(s => s.Tracking)" Width="10rem" />
+                <ZenColumn TItem="Shipment" Title="Destination" Field="@(s => s.Destination)" />
+                <ZenColumn TItem="Shipment" Title="Carrier" Field="@(s => s.Carrier)" Width="9rem" />
+                <ZenColumn TItem="Shipment" Title="Weight" Field="@(s => s.WeightKg)" Format="N1" Align="ZenAlign.End" Width="8rem" />
+            </Columns>
+        </ZenTable>
+    </div>
+
+    <div class="mt-3">
+        <ZenToggle @bind-Value="_groupShipments" Label="Group by carrier" />
+    </div>
+</section>
+
+<!-- --------------------------------------------------------- Server-backed -->
+<section class="mt-12">
+    <h2 class="text-lg font-semibold">ZenTable, rows from a server</h2>
+    <p class="mt-2 max-w-3xl text-sm text-content-muted">
+        With an <code>ItemsProvider</code> the table asks for one page at a time and passes the
+        sort along as each column's <code>SortName</code>. The service here waits
+        @(CustomerService.LatencyMilliseconds)ms per request, so the skeleton rows are visible:
+        they match the page they replace, so paging does not collapse the table and push the page
+        around. A request that is overtaken &mdash; click Next twice quickly &mdash; is cancelled,
+        so a slow page 2 can never land under a pager that says 3.
+    </p>
+
+    <div class="mt-4">
+        <ZenTable ItemsProvider="_customers.QueryAsync"
+                  TItem="Customer"
+                  Label="Customers"
+                  PageSize="10"
+                  Size="ZenSize.Small">
+            <Columns>
+                <ZenColumn TItem="Customer" Title="Account" Field="@(c => c.Account)" SortName="account" Width="8rem" />
+                <ZenColumn TItem="Customer" Title="Name" Field="@(c => c.Name)" SortName="name" />
+                <ZenColumn TItem="Customer" Title="Country" Field="@(c => c.Country)" SortName="country" Width="9rem" />
+                <ZenColumn TItem="Customer" Title="Lifetime value" Field="@(c => c.LifetimeValue)" Format="C0" SortName="value" Align="ZenAlign.End" Width="10rem" />
+            </Columns>
+        </ZenTable>
+    </div>
+
+    <p class="mt-3 text-sm text-content-subtle">
+        Every column here has a <code>SortName</code>. A column without one is not sortable over a
+        provider, even with a <code>Field</code> &mdash; the server does the sorting, and it has no
+        name for that column.
+    </p>
+</section>
+
 <!-- ------------------------------------------------------------- Empty state -->
 <section class="mt-12">
     <h2 class="text-lg font-semibold">Nothing to show</h2>
@@ -326,6 +433,28 @@
     private readonly DateTimeOffset _now = DateTimeOffset.Now;
 
     private IReadOnlyCollection<Order> _selectedOrders = [];
+    private IReadOnlyCollection<Order> _groupSelection = [];
+    private bool _groupShipments;
+
+    private sealed record Shipment(string Tracking, string Destination, string Carrier, double WeightKg);
+
+    private static readonly string[] Cities =
+        ["Rotterdam", "Hamburg", "Lyon", "Milan", "Porto", "Gdansk", "Leeds", "Cork", "Aarhus", "Graz"];
+
+    private static readonly string[] Carriers = ["Northwind", "Contoso Freight", "Fabrikam Post", "Tailspin Air"];
+
+    /// <summary>Ten thousand rows, generated deterministically so every visit shows the same data.</summary>
+    private readonly List<Shipment> _shipments = [.. Enumerable.Range(1, 10_000).Select(i => new Shipment(
+        $"ZX{i * 7919 % 1_000_000:000000}",
+        Cities[i * 31 % Cities.Length],
+        Carriers[i * 17 % Carriers.Length],
+        Math.Round(0.4 + (i * 37 % 2_400) / 10.0, 1)))];
+
+    private readonly CustomerService _customers = new();
+
+    // Null when not grouping, rather than a lambda that returns null: any GroupBy at all turns
+    // grouping on, and every row would land in one "(None)" group.
+    private static readonly Func<Shipment, object?> ByCarrier = s => s.Carrier;
     private Node? _selectedNode;
 
     private readonly int[] _pageSizes = [5, 10, 25];

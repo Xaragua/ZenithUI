@@ -1,0 +1,298 @@
+@page "/stepper"
+@rendermode InteractiveServer
+@using System.ComponentModel.DataAnnotations
+
+@*
+    Interactive Server: a wizard is behaviour. Under static SSR ZenStepper still renders its header
+    and the active step, but Next has nothing to run - see the component's header comment for
+    driving a step from the URL instead.
+*@
+
+<PageTitle>Stepper &middot; ZenithUI</PageTitle>
+
+<ZenStack Gap="ZenSpace.Xxl">
+    <ZenStack As="ZenLayoutElement.Header" Gap="ZenSpace.Sm" Class="max-w-3xl">
+        <ZenText Variant="ZenTextVariant.Overline" Tone="ZenTextTone.Primary">Navigation</ZenText>
+        <ZenText Variant="ZenTextVariant.H1">Stepper</ZenText>
+        <ZenText Variant="ZenTextVariant.Lead">
+            A wizard: numbered steps, the active step's content, and Back, Next and Finish. Each step
+            can hold a form that must validate before Next lets the user through, and a hook that can
+            say no after checking with a server. It is deliberately not a tab list &mdash; tabs
+            promise every panel in any order, and a wizard exists to refuse that.
+        </ZenText>
+    </ZenStack>
+
+    <!-- ------------------------------------------------------------ Linear -->
+    <ZenStack As="ZenLayoutElement.Section" aria-labelledby="linear-heading">
+        <ZenText Variant="ZenTextVariant.H4" As="ZenTextElement.H2" Id="linear-heading">A linear wizard</ZenText>
+        <ZenText Tone="ZenTextTone.Muted" Class="max-w-3xl">
+            Try Next with the first step empty: the form validates and the wizard stays put. Name the
+            workspace <strong>acme</strong> and the step's <code>OnLeaving</code> hook &mdash; which
+            runs after the form is valid, and stands in for a server check &mdash; refuses it and
+            flags the step. Steps already reached become buttons in the header; the rest stay text
+            until you get there.
+        </ZenText>
+
+        <ZenCard>
+            @if (_finished)
+            {
+                <ZenStack Gap="ZenSpace.Md" Align="ZenCrossAlign.Start">
+                    <ZenText Variant="ZenTextVariant.H4" As="ZenTextElement.H3">Workspace created</ZenText>
+                    <ZenText Tone="ZenTextTone.Muted">
+                        @_signup.Workspace.Workspace is ready on the @_signup.Plan plan for @_signup.Account.Email.
+                    </ZenText>
+                    <ZenButton Variant="ZenVariant.Outline" OnClick="Restart">Start again</ZenButton>
+                </ZenStack>
+            }
+            else
+            {
+                <ZenStepper @bind-ActiveIndex="_step" OnFinish="FinishAsync" Label="Sign-up progress" TitleLevel="3">
+                    <ZenStep Title="Account" Description="Your sign-in" EditContext="_accountForm">
+                        <EditForm EditContext="_accountForm">
+                            <DataAnnotationsValidator />
+                            <div class="grid gap-4 sm:grid-cols-2">
+                                <ZenTextInput Label="Email" Type="email" Required="true" AutoComplete="email" @bind-Value="_signup.Account.Email" />
+                                <ZenTextInput Label="Password" Type="password" Required="true" AutoComplete="new-password"
+                                              HelpText="At least 8 characters." @bind-Value="_signup.Account.Password" />
+                            </div>
+                        </EditForm>
+                    </ZenStep>
+
+                    <ZenStep Title="Workspace"
+                             Description="Where your team works"
+                             EditContext="_workspaceForm"
+                             Error="@_workspaceError"
+                             OnLeaving="CheckWorkspaceAsync">
+                        <EditForm EditContext="_workspaceForm">
+                            <DataAnnotationsValidator />
+                            <div class="grid gap-4 sm:grid-cols-2">
+                                <ZenTextInput Label="Workspace name" Required="true" HelpText="Try “acme” to see a server-side refusal."
+                                              @bind-Value="_signup.Workspace.Workspace" />
+                                <ZenSelect TValue="string" Label="Team size" @bind-Value="_signup.Workspace.TeamSize">
+                                    <option value="1-10">1&ndash;10</option>
+                                    <option value="11-50">11&ndash;50</option>
+                                    <option value="51+">51 or more</option>
+                                </ZenSelect>
+                            </div>
+                        </EditForm>
+                    </ZenStep>
+
+                    <ZenStep Title="Invite" Description="Bring your team" Optional="true">
+                        <ZenTextArea Label="Email addresses"
+                                     HelpText="One per line. You can do this later."
+                                     @bind-Value="_signup.Invites" />
+                    </ZenStep>
+
+                    <ZenStep Title="Plan" Description="Pick a tier">
+                        <ZenRadioGroup TValue="string" Label="Plan" @bind-Value="_signup.Plan">
+                            <ZenRadio TValue="string" Value="@("Starter")" Label="Starter" HelpText="Free for up to 3 people" />
+                            <ZenRadio TValue="string" Value="@("Team")" Label="Team" HelpText="$8 per person per month" />
+                            <ZenRadio TValue="string" Value="@("Business")" Label="Business" HelpText="SSO, audit log and priority support" />
+                        </ZenRadioGroup>
+                    </ZenStep>
+
+                    <ZenStep Title="Review">
+                        <dl class="grid gap-x-6 gap-y-2 text-sm sm:grid-cols-[auto_1fr]">
+                            <dt class="text-content-muted">Email</dt>
+                            <dd class="font-medium">@_signup.Account.Email</dd>
+                            <dt class="text-content-muted">Workspace</dt>
+                            <dd class="font-medium">@_signup.Workspace.Workspace (@_signup.Workspace.TeamSize)</dd>
+                            <dt class="text-content-muted">Invites</dt>
+                            <dd class="font-medium">@(string.IsNullOrWhiteSpace(_signup.Invites) ? "none" : _signup.Invites.Split('\n', StringSplitOptions.RemoveEmptyEntries).Length.ToString())</dd>
+                            <dt class="text-content-muted">Plan</dt>
+                            <dd class="font-medium">@_signup.Plan</dd>
+                        </dl>
+                    </ZenStep>
+                </ZenStepper>
+            }
+        </ZenCard>
+    </ZenStack>
+
+    <!-- ---------------------------------------------------------- Vertical -->
+    <ZenStack As="ZenLayoutElement.Section" aria-labelledby="vertical-heading">
+        <ZenText Variant="ZenTextVariant.H4" As="ZenTextElement.H2" Id="vertical-heading">Vertical, and free to jump</ZenText>
+        <ZenText Tone="ZenTextTone.Muted" Class="max-w-3xl">
+            <code>Orientation="ZenDirection.Vertical"</code> puts the steps beside the content, and
+            <code>Linear="false"</code> makes every step reachable from the header &mdash; for a
+            settings flow whose steps do not depend on each other. The disabled step is skipped by
+            Next and Back and cannot be reached at all. Below 768px the list stacks above the content.
+        </ZenText>
+
+        <ZenCard>
+            <ZenStepper Orientation="ZenDirection.Vertical"
+                        Linear="false"
+                        Label="Project setup"
+                        TitleLevel="3"
+                        FinishText="Save settings"
+                        OnFinish="@(() => _settingsSaved = true)">
+                <ZenStep Title="General" Description="Name and visibility">
+                    <ZenStack Gap="ZenSpace.Md">
+                        <ZenTextInput Label="Project name" @bind-Value="_project" />
+                        <ZenToggle Label="Visible to the whole organisation" @bind-Value="_public" />
+                    </ZenStack>
+                </ZenStep>
+
+                <ZenStep Title="Integrations" Description="Connect your tools">
+                    <ZenStack Gap="ZenSpace.Sm">
+                        <ZenCheckbox Label="GitHub" @bind-Value="_github" />
+                        <ZenCheckbox Label="Slack" @bind-Value="_slack" />
+                    </ZenStack>
+                </ZenStep>
+
+                <ZenStep Title="Billing" Description="Owners only" Disabled="true" />
+
+                <ZenStep Title="Notifications" Description="What reaches you">
+                    <ZenToggle Label="Email me a weekly summary" @bind-Value="_weekly" />
+                    @if (_settingsSaved)
+                    {
+                        <ZenText Tone="ZenTextTone.Muted" Class="mt-3" role="status">Settings saved.</ZenText>
+                    }
+                </ZenStep>
+            </ZenStepper>
+        </ZenCard>
+    </ZenStack>
+
+    <!-- ------------------------------------------------ Custom navigation -->
+    <ZenStack As="ZenLayoutElement.Section" aria-labelledby="custom-heading">
+        <ZenText Variant="ZenTextVariant.H4" As="ZenTextElement.H2" Id="custom-heading">Your own buttons</ZenText>
+        <ZenText Tone="ZenTextTone.Muted" Class="max-w-3xl">
+            <code>NavigationTemplate</code> replaces the built-in Back and Next, and is handed what
+            it needs to call. Here the buttons sit on one side with a step counter on the other, and
+            the step titles are hidden with <code>ShowStepTitle="false"</code> &mdash; still in the
+            markup for screen readers, since the title is what names each step's region.
+        </ZenText>
+
+        <ZenCard>
+            <ZenStepper Label="Survey progress" TitleLevel="3" ShowStepTitle="false">
+                <NavigationTemplate>
+                    <div class="mt-6 flex items-center justify-between gap-3">
+                        <ZenText Variant="ZenTextVariant.Caption" Tone="ZenTextTone.Muted">
+                            Question @(context.Index + 1) of @context.Count
+                        </ZenText>
+                        <div class="flex gap-2">
+                            <ZenButton Variant="ZenVariant.Ghost" Disabled="@(!context.CanGoBack)" OnClick="context.BackAsync">Previous</ZenButton>
+                            <ZenButton Intent="ZenIntent.Primary" OnClick="context.NextAsync">@(context.IsLast ? "Submit" : "Continue")</ZenButton>
+                        </div>
+                    </div>
+                </NavigationTemplate>
+                <ChildContent>
+                    <ZenStep Title="Experience">
+                        <ZenRadioGroup TValue="string" Label="How long have you used Blazor?" @bind-Value="_experience">
+                            <ZenRadio TValue="string" Value="@("new")" Label="Less than a year" />
+                            <ZenRadio TValue="string" Value="@("some")" Label="One to three years" />
+                            <ZenRadio TValue="string" Value="@("lots")" Label="More than three years" />
+                        </ZenRadioGroup>
+                    </ZenStep>
+                    <ZenStep Title="Render modes">
+                        <ZenCheckbox Label="Static SSR" @bind-Value="_usesStatic" />
+                        <ZenCheckbox Label="Interactive Server" @bind-Value="_usesServer" />
+                        <ZenCheckbox Label="WebAssembly" @bind-Value="_usesWasm" />
+                    </ZenStep>
+                    <ZenStep Title="Anything else">
+                        <ZenTextArea Label="Comments" @bind-Value="_comments" />
+                    </ZenStep>
+                </ChildContent>
+            </ZenStepper>
+        </ZenCard>
+    </ZenStack>
+</ZenStack>
+
+@code {
+    // One model per validated step. DataAnnotationsValidator checks every property of the model
+    // it is given, so a single model shared by two steps would block Next on step one over a
+    // workspace name nobody has been asked for yet.
+    private sealed class AccountModel
+    {
+        [Required(ErrorMessage = "Enter an email address.")]
+        [EmailAddress(ErrorMessage = "That does not look like an email address.")]
+        public string? Email { get; set; }
+
+        [Required(ErrorMessage = "Choose a password.")]
+        [MinLength(8, ErrorMessage = "Use at least 8 characters.")]
+        public string? Password { get; set; }
+    }
+
+    private sealed class WorkspaceModel
+    {
+        [Required(ErrorMessage = "Name your workspace.")]
+        public string? Workspace { get; set; }
+
+        public string? TeamSize { get; set; } = "1-10";
+    }
+
+    private sealed class SignupModel
+    {
+        public AccountModel Account { get; } = new();
+
+        public WorkspaceModel Workspace { get; } = new();
+
+        public string? Invites { get; set; }
+
+        public string? Plan { get; set; } = "Team";
+    }
+
+    private SignupModel _signup = new();
+    private EditContext _accountForm = default!;
+    private EditContext _workspaceForm = default!;
+    private string? _workspaceError;
+    private int _step;
+    private bool _finished;
+
+    private string? _project = "Atlas";
+    private bool _public = true;
+    private bool _github = true;
+    private bool _slack;
+    private bool _weekly = true;
+    private bool _settingsSaved;
+
+    private string? _experience;
+    private bool _usesStatic;
+    private bool _usesServer = true;
+    private bool _usesWasm;
+    private string? _comments;
+
+    protected override void OnInitialized() => CreateForms();
+
+    private void CreateForms()
+    {
+        _accountForm = new EditContext(_signup.Account);
+        _workspaceForm = new EditContext(_signup.Workspace);
+    }
+
+    /// <summary>
+    /// Stands in for a server-side availability check. Runs only once the form is valid.
+    /// </summary>
+    private async Task CheckWorkspaceAsync(ZenStepLeavingArgs args)
+    {
+        if (!args.IsForward)
+        {
+            return;
+        }
+
+        await Task.Delay(600);
+
+        if (string.Equals(_signup.Workspace.Workspace?.Trim(), "acme", StringComparison.OrdinalIgnoreCase))
+        {
+            _workspaceError = "“acme” is already taken. Choose another name.";
+            args.Cancel = true;
+            return;
+        }
+
+        _workspaceError = null;
+    }
+
+    private async Task FinishAsync()
+    {
+        await Task.Delay(300);
+        _finished = true;
+    }
+
+    private void Restart()
+    {
+        _signup = new SignupModel();
+        _workspaceError = null;
+        _step = 0;
+        _finished = false;
+        CreateForms();
+    }
+}

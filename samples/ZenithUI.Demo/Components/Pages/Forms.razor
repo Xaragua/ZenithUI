@@ -216,6 +216,82 @@
     </div>
 </section>
 
+<!-- ---------------------------------------------------------------- Lookup -->
+<section class="mt-12">
+    <h2 class="text-lg font-semibold">ZenLookup</h2>
+    <p class="mt-1 max-w-3xl text-sm text-content-muted">
+        A search field whose suggestions are a table, for picking one record out of many by any of
+        its columns. The panel is a <code>ZenTable</code>, so it sorts, pages and virtualizes, and
+        it is <strong>wider than the field</strong> when the columns need the room. Focus stays in
+        the text box: the arrow keys move a cursor through the rows, Enter picks, and
+        <strong>Escape or a click outside closes it without changing anything</strong>.
+    </p>
+
+    <div class="mt-4 grid gap-4 lg:grid-cols-2">
+        <ZenCard Title="Pick on click" TitleLevel="3" Subtitle="in memory, 10 vendors">
+            <ZenLookup TItem="Vendor"
+                       Items="VendorService.Featured"
+                       ItemText="@(v => v.Name)"
+                       SearchText="@(v => $"{v.Name} {v.LegalName} {v.Account} {v.Region}")"
+                       Label="Vendor"
+                       Placeholder="Search by name, legal name, account or region"
+                       HelpText="Try “7104”, “GmbH” or “Oregon”."
+                       @bind-Value="_vendor">
+                <Columns>
+                    <ZenColumn TItem="Vendor" Title="Vendor" Field="@(v => v.Name)">
+                        <CellTemplate>
+                            <span class="block font-medium text-content">@context.Name</span>
+                            <span class="block text-xs text-content-muted">@context.LegalName &middot; @context.Website</span>
+                        </CellTemplate>
+                    </ZenColumn>
+                    <ZenColumn TItem="Vendor" Title="Account" Field="@(v => v.Account)" Width="7rem" CellClass="font-mono text-xs" />
+                    <ZenColumn TItem="Vendor" Title="Category" Field="@(v => v.Category)" Width="9rem">
+                        <CellTemplate>
+                            <ZenBadge Intent="ZenIntent.Primary" Variant="ZenVariant.Soft">@context.Category</ZenBadge>
+                        </CellTemplate>
+                    </ZenColumn>
+                    <ZenColumn TItem="Vendor" Title="Monthly" Field="@(v => v.MonthlyVolume)" Format="C0" Align="ZenAlign.End" Width="7rem" />
+                </Columns>
+            </ZenLookup>
+
+            <p class="mt-3 text-sm text-content-muted">
+                Bound: <span class="font-medium text-content">@(_vendor is null ? "—" : $"{_vendor.Name} ({_vendor.Account})")</span>
+            </p>
+        </ZenCard>
+
+        <ZenCard Title="Confirm to bind" TitleLevel="3" Subtitle="server-side, 5,010 vendors, virtualized">
+            <ZenLookup TItem="Vendor"
+                       ItemsProvider="_vendors.SearchAsync"
+                       ItemText="@(v => v.Name)"
+                       Commit="ZenLookupCommit.Confirm"
+                       Virtualize="true"
+                       ItemSize="37"
+                       Label="Contract vendor"
+                       Placeholder="Search the vendor directory"
+                       HelpText="Enter marks a row; Confirm (or Ctrl+Enter) binds it."
+                       ConfirmText="@("Confirm & bind vendor")"
+                       @bind-Value="_contractVendor">
+                <Columns>
+                    <ZenColumn TItem="Vendor" Title="Vendor" Field="@(v => v.Name)" SortName="name" />
+                    <ZenColumn TItem="Vendor" Title="Account" Field="@(v => v.Account)" SortName="account" Width="7rem" CellClass="font-mono text-xs" />
+                    <ZenColumn TItem="Vendor" Title="Region" Field="@(v => v.Region)" Width="12rem" />
+                    <ZenColumn TItem="Vendor" Title="Monthly" Field="@(v => v.MonthlyVolume)" Format="C0" SortName="volume" Align="ZenAlign.End" Width="7rem" />
+                </Columns>
+            </ZenLookup>
+
+            <p class="mt-3 text-sm text-content-muted">
+                Bound: <span class="font-medium text-content">@(_contractVendor is null ? "—" : $"{_contractVendor.Name} ({_contractVendor.Account})")</span>
+            </p>
+        </ZenCard>
+    </div>
+
+    <p class="mt-3 max-w-3xl text-sm text-content-subtle">
+        The right-hand one asks the server for each window as you scroll, with the typed text in
+        <code>ZenLookupRequest.Query</code>. Its Confirm mode is for picks that are costly to undo:
+        a click only marks the row, and closing the panel any way other than Confirm discards it.
+    </p>
+</section>
+
 <!-- --------------------------------------------------- Progress & indicator -->
 <section class="mt-12 grid gap-4 md:grid-cols-2">
     <ZenCard Title="ZenProgress" TitleLevel="2">
@@ -293,6 +369,9 @@
     }
 
     private SignupModel _model = new();
+    private Vendor? _vendor;
+    private Vendor? _contractVendor;
+    private readonly VendorService _vendors = new();
     private ZenForm? _form;
     private bool _submitted;
 
