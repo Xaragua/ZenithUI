@@ -83,16 +83,32 @@
         .AddClass("w-auto", !FullWidth)
         .Build()!;
 
+    /// <summary>
+    /// <c>field-sizing: content</c> sizes the box to its text and ignores <c>rows</c> entirely, so
+    /// an empty auto-grow field collapses to a single line. The floor is put back as a min-height
+    /// of <see cref="Rows"/> lines plus the vertical padding and border - <c>lh</c> is supported
+    /// everywhere <c>field-sizing</c> is, and where it is not, <c>rows</c> already does the job.
+    /// </summary>
+    private string? MinHeight => AutoGrow
+        ? FormattableString.Invariant($"min-height:calc({Rows}lh + {BlockPadding} * 2 + 2px)")
+        : null;
+
+    // Mirrors the py-* in ZenStyles.TextAreaSize.
+    private string BlockPadding => Size switch
+    {
+        ZenSize.Small => "0.375rem",
+        ZenSize.Large => "0.75rem",
+        _ => "0.5rem",
+    };
+
     private string? CombinedStyle
     {
         get
         {
-            if (MaxHeight is null)
-            {
-                return Style;
-            }
+            var parts = new[] { MinHeight, MaxHeight is null ? null : $"max-height:{MaxHeight}", Style };
+            var style = string.Join(';', parts.Where(p => !string.IsNullOrEmpty(p)));
 
-            return Style is null ? $"max-height:{MaxHeight}" : $"max-height:{MaxHeight};{Style}";
+            return style.Length == 0 ? null : style;
         }
     }
 

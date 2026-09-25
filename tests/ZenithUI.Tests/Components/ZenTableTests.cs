@@ -587,4 +587,56 @@ public class ZenTableTests : BunitContext
 
             extra?.Invoke(p);
         });
+
+    // ---- Interactive cells --------------------------------------------------------------------
+
+    private static RenderFragment ActionColumn(bool interactive, Action<Order> onDelete) => builder =>
+    {
+        builder.OpenComponent<ZenColumn<Order>>(0);
+        builder.AddComponentParameter(1, nameof(ZenColumn<Order>.Title), "Actions");
+        builder.AddComponentParameter(2, nameof(ZenColumn<Order>.Interactive), interactive);
+        builder.AddComponentParameter(3, nameof(ZenColumn<Order>.CellTemplate), (RenderFragment<Order>)(order => b =>
+        {
+            b.OpenElement(0, "button");
+            b.AddAttribute(1, "type", "button");
+            b.AddAttribute(2, "class", "delete");
+            b.AddAttribute(3, "onclick", EventCallback.Factory.Create<MouseEventArgs>(new object(), () => onDelete(order)));
+            b.AddContent(4, "Delete");
+            b.CloseElement();
+        }));
+        builder.CloseComponent();
+    };
+
+    [Fact]
+    public void AnInteractiveCell_KeepsItsClicksFromTheRow()
+    {
+        // A Delete button that also opens the row it deletes. The button's handler runs, and the
+        // click must stop at the cell rather than bubbling on to OnRowClick.
+        var opened = new List<string>();
+        var deleted = new List<string>();
+
+        var cut = Table(p => p
+            .Add(x => x.Columns, ActionColumn(interactive: true, o => deleted.Add(o.Id)))
+            .Add(x => x.OnRowClick, (Order o) => opened.Add(o.Id)));
+
+        cut.FindAll("button.delete")[0].Click();
+
+        deleted.ShouldBe(["A-3"]);
+        opened.ShouldBeEmpty();
+    }
+
+    [Fact]
+    public void AnOrdinaryCell_StillOpensItsRow()
+    {
+        // The guard is opt-in: a plain column's click is exactly what OnRowClick is listening for.
+        var opened = new List<string>();
+
+        var cut = Table(p => p
+            .Add(x => x.Columns, ActionColumn(interactive: false, _ => { }))
+            .Add(x => x.OnRowClick, (Order o) => opened.Add(o.Id)));
+
+        cut.FindAll("button.delete")[0].Click();
+
+        opened.ShouldBe(["A-3"]);
+    }
 }

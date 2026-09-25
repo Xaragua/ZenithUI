@@ -70,6 +70,13 @@ else
     [Parameter]
     public bool Landmark { get; set; } = true;
 
+    /// <summary>
+    /// Icon size for every link and group in the menu. Each can still set its own
+    /// <c>IconSize</c>, which wins. Left unset, links use <see cref="ZenSize.Small"/>.
+    /// </summary>
+    [Parameter]
+    public ZenSize? IconSize { get; set; }
+
     private bool IsLandmark => Landmark;
 
     private string TitleId => SubId("title");
@@ -97,7 +104,7 @@ else
             builder.AddAttribute(
                 seq++,
                 "class",
-                "px-3 pb-1.5 pt-3 text-xs font-semibold uppercase tracking-wide text-content-subtle");
+                "zen-nav-title px-3 pb-1.5 pt-3 text-xs font-semibold uppercase tracking-wide text-content-subtle");
             builder.AddContent(seq++, Title);
             builder.CloseElement();
         }
@@ -111,7 +118,7 @@ else
         builder.AddComponentParameter(
             seq++,
             nameof(CascadingValue<ZenNavContext>.Value),
-            new ZenNavContext(Orientation, InList: true));
+            new ZenNavContext(Orientation, InList: true, IconSize));
         builder.AddComponentParameter(
             seq++,
             nameof(CascadingValue<ZenNavContext>.ChildContent),

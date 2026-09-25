@@ -67,6 +67,15 @@
     <Content Include="..\..\src\ZenithUI\wwwroot\ZenithUI.lib.module.js"
              Link="Theming\%(Filename)%(Extension)"
              CopyToOutputDirectory="PreserveNewest" />
+
+    <!-- The collapsed side nav's pre-paint script and the module it must agree with - see
+         SideNavScriptTests. -->
+    <Content Include="..\..\src\ZenithUI\Components\Chrome\ZenSideNav.razor"
+             Link="Theming\%(Filename)%(Extension)"
+             CopyToOutputDirectory="PreserveNewest" />
+    <Content Include="..\..\src\ZenithUI\wwwroot\js\zen-sidenav.js"
+             Link="Theming\%(Filename)%(Extension)"
+             CopyToOutputDirectory="PreserveNewest" />
   </ItemGroup>
 
   <ItemGroup>

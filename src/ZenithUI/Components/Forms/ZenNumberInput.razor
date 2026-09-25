@@ -127,59 +127,18 @@
     private void HandleWheel(WheelEventArgs args) => _blurOnNextRender = true;
 
     private bool _blurOnNextRender;
-    private IJSObjectReference? _dom;
-
-    [Inject]
-    private IJSRuntime JS { get; set; } = default!;
 
     protected override async Task OnAfterRenderAsync(bool firstRender)
     {
+        await base.OnAfterRenderAsync(firstRender);
+
         if (!_blurOnNextRender || !RendererInfo.IsInteractive)
         {
             return;
         }
 
         _blurOnNextRender = false;
-
-        try
-        {
-            _dom ??= await JS.InvokeAsync<IJSObjectReference>(
-                "import", "./_content/ZenithUI/js/zen-dom.js");
-
-            await _dom.InvokeVoidAsync("blurElement", Id);
-        }
-        catch (JSDisconnectedException)
-        {
-            // The wheel guard is a nicety; a dropped circuit is not worth surfacing for it.
-        }
-        catch (OperationCanceledException)
-        {
-        }
-    }
-
-    protected override void DisposeCore()
-    {
-        base.DisposeCore();
-        _ = DisposeModuleAsync();
-    }
-
-    private async Task DisposeModuleAsync()
-    {
-        if (_dom is null)
-        {
-            return;
-        }
-
-        try
-        {
-            await _dom.DisposeAsync();
-        }
-        catch (JSDisconnectedException)
-        {
-        }
-        catch (OperationCanceledException)
-        {
-        }
+        await InvokeDomAsync("blurElement", Id);
     }
 
     private string WrapperClass => CssBuilder

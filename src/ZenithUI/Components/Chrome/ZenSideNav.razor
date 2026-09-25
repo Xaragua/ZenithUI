@@ -33,6 +33,27 @@
     work; all of it is missing from the popover API.
 *@
 
+@if (Collapsible)
+{
+    @* Restores a collapsed rail before the first paint of a full page load, so a user who
+       collapsed it does not watch it spring open and shut again on every page. Inline and ahead
+       of the <aside> for the same reason ZenThemeScript is inline in <head>: anything loaded or
+       deferred runs after the paint it exists to get right. Enhanced navigation does not run it -
+       ZenithUI.lib.module.js re-applies the attribute on `enhancedload` instead. The key and
+       attribute must match wwwroot/js/zen-sidenav.js. *@
+    <script>
+        (function () {
+            try {
+                if (localStorage.getItem('zen-sidenav') === 'collapsed') {
+                    document.documentElement.setAttribute('data-zen-sidenav', 'collapsed');
+                }
+            } catch (e) {
+                // Storage unavailable: the rail starts expanded, which is what it would do anyway.
+            }
+        })();
+    </script>
+}
+
 <aside id="@NavId"
        popover="auto"
        class="@RootClass(NavClass)"
@@ -72,6 +93,27 @@
     {
         <div class="shrink-0 border-t border-border p-3">
             @Footer
+        </div>
+    }
+
+    @if (Collapsible)
+    {
+        @* Rail only: .zen-sidenav-collapse is display:none below `lg`, where the nav is a drawer
+           and has the whole width it needs. No display utility on the wrapper, for the reason in
+           the comment above .zen-sidenav.
+
+           Both labels are rendered and CSS hides the one that does not apply. display:none also
+           removes it from the accessible name, so the button is named correctly from the first
+           paint of a static page - no script has to rewrite it. *@
+        <div class="zen-sidenav-collapse shrink-0 border-t border-border p-3">
+            <button type="button"
+                    class="zen-focus flex w-full items-center gap-2.5 rounded-zen-md px-3 py-2 text-sm text-content-muted transition-colors hover:bg-surface-sunken hover:text-content"
+                    aria-controls="@NavId"
+                    data-zen-sidenav-toggle>
+                <ZenIcon Path="@ZenIcons.ChevronLeft" Size="ZenSize.Small" class="zen-sidenav-collapse-icon" />
+                <span class="zen-nav-label zen-sidenav-collapse-text min-w-0 truncate">@CollapseText</span>
+                <span class="zen-nav-label zen-sidenav-expand-text min-w-0 truncate">@ExpandText</span>
+            </button>
         </div>
     }
 </aside>
@@ -164,6 +206,35 @@
     public bool CloseOnNavigate { get; set; } = true;
 
     /// <summary>
+    /// Adds a button at the foot of the rail that shrinks it to a column of icons, with each
+    /// label shown as a tooltip on hover or keyboard focus.
+    /// </summary>
+    /// <remarks>
+    /// <para>
+    /// Works without a render mode, like the drawer: the state is an attribute on
+    /// <c>&lt;html&gt;</c> flipped by <c>zen-sidenav.js</c>, which ZenithUI loads automatically,
+    /// and it is remembered in <c>localStorage</c> across pages and visits.
+    /// </para>
+    /// <para>
+    /// Only the rail collapses. Below <c>lg</c> the nav is a drawer and always shows its labels.
+    /// A link with no icon shows its first letter, and clicking a <c>ZenNavGroup</c> in a
+    /// collapsed rail expands the rail with that section open. Anything else in
+    /// <see cref="Footer"/> that should not squeeze into the narrow column can carry the class
+    /// <c>zen-sidenav-expanded-only</c>.
+    /// </para>
+    /// </remarks>
+    [Parameter]
+    public bool Collapsible { get; set; }
+
+    /// <summary>Label of the collapse button while the rail is expanded.</summary>
+    [Parameter]
+    public string CollapseText { get; set; } = "Collapse navigation";
+
+    /// <summary>Label of the collapse button while the rail is collapsed.</summary>
+    [Parameter]
+    public string ExpandText { get; set; } = "Expand navigation";
+
+    /// <summary>
     /// The element id the app bar's menu button targets.
     /// </summary>
     /// <remarks>
@@ -186,7 +257,7 @@
     /// because <c>display</c> has to be stated somewhere a consumer's own Tailwind build cannot
     /// outrank by accident. See the comment above the rule.
     /// </remarks>
-    private string NavClass => "zen-sidenav";
+    private string NavClass => Collapsible ? "zen-sidenav zen-sidenav-collapsible" : "zen-sidenav";
 
     // ---- Progressive enhancement ---------------------------------------------------------------
 

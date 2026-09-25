@@ -1902,7 +1902,9 @@
                 <td id="@(first && Picker is not null ? CellId(row.Index) : null)"
                     class="@BodyCellClassFor(column)"
                     data-label="@column.Title"
-                    style="@(first && Hierarchical ? $"--zen-depth: {row.Depth}" : null)">
+                    style="@(first && Hierarchical ? $"--zen-depth: {row.Depth}" : null)"
+                    @onclick:stopPropagation="column.Interactive"
+                    @onkeydown:stopPropagation="column.Interactive">
                     @if (first && Hierarchical)
                     {
                         <div class="zen-indent flex items-center gap-1.5">

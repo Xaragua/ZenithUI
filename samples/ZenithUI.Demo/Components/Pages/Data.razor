@@ -119,6 +119,158 @@
     </p>
 </section>
 
+<!-- -------------------------------------------------------------- Row actions -->
+<section class="mt-12">
+    <h2 class="text-lg font-semibold">ZenTable, with row actions</h2>
+    <p class="mt-2 max-w-3xl text-sm text-content-muted">
+        A column can hold buttons as easily as values &mdash; it is a <code>CellTemplate</code>.
+        <strong>Click a row</strong> to open it, then <strong>click one of its buttons</strong>:
+        the button does its job and the row does not open as well. That is what
+        <code>Interactive="true"</code> on the column is for. A click or a key inside an
+        interactive cell belongs to the control in it, not to the row around it.
+    </p>
+
+    <div class="mt-4">
+        <ZenTable Items="_actionOrders"
+                  TItem="Order"
+                  Label="Orders with actions"
+                  RowText="@(o => o.Reference)"
+                  OnRowClick="@(o => _rowActionStatus = $"Opened {o.Reference}.")">
+            <Columns>
+                <ZenColumn TItem="Order" Title="Reference" Field="@(o => o.Reference)" Width="9rem" />
+                <ZenColumn TItem="Order" Title="Customer" Field="@(o => o.Customer)" />
+                <ZenColumn TItem="Order" Title="Amount" Field="@(o => o.Amount)" Format="C" Align="ZenAlign.End" />
+                <ZenColumn TItem="Order" Title="Status" SortBy="@(o => (int)o.Status)" Align="ZenAlign.Center">
+                    <CellTemplate>
+                        <ZenBadge Intent="@IntentFor(context.Status)">@context.Status.ToString()</ZenBadge>
+                    </CellTemplate>
+                </ZenColumn>
+
+                @* Icon-only buttons need a name, and "Delete" alone would be twenty identical
+                   announcements. The row's reference makes each one unique. *@
+                <ZenColumn TItem="Order" Title="Actions" Interactive="true" Align="ZenAlign.End" Width="1%" CellClass="whitespace-nowrap">
+                    <CellTemplate>
+                        <div class="inline-flex gap-1">
+                            <ZenButton Variant="ZenVariant.Ghost"
+                                       Size="ZenSize.Small"
+                                       IconOnly="true"
+                                       Icon="@CopyIcon"
+                                       AriaLabel="@($"Duplicate {context.Reference}")"
+                                       OnClick="@(() => DuplicateOrder(context))" />
+                            <ZenButton Variant="ZenVariant.Ghost"
+                                       Intent="ZenIntent.Danger"
+                                       Size="ZenSize.Small"
+                                       IconOnly="true"
+                                       Icon="@TrashIcon"
+                                       AriaLabel="@($"Delete {context.Reference}")"
+                                       OnClick="@(() => DeleteOrder(context))" />
+                        </div>
+                    </CellTemplate>
+                </ZenColumn>
+            </Columns>
+        </ZenTable>
+    </div>
+
+    <p class="mt-3 text-sm text-content-muted" aria-live="polite">
+        @(_rowActionStatus ?? "Nothing opened yet.")
+    </p>
+</section>
+
+<!-- ------------------------------------------------------------ Order entry -->
+<section class="mt-12">
+    <h2 class="text-lg font-semibold">ZenTable, as an order-entry grid</h2>
+    <p class="mt-2 max-w-3xl text-sm text-content-muted">
+        Cells can hold form controls too. The <strong>Article</strong> column hosts a
+        <code>ZenLookup</code>: search by SKU or name, pick a row, and the description, unit price
+        and tax fill in from the article. Quantity is a <code>ZenNumberInput</code>. Press
+        <strong>Add line</strong> for an empty row: focus lands in its article search, through the
+        lookup's <code>AutoFocus</code>, so you can type straight away. The lookup's
+        panel sits in the top layer, so the table's scroll container does not clip it.
+    </p>
+
+    <div class="mt-4">
+        <ZenTable Items="_salesLines" TItem="SalesLine" Label="Sales order lines" Hoverable="false">
+            <Columns>
+                <ZenColumn TItem="SalesLine" Title="Article" Interactive="true" Width="18rem">
+                    <CellTemplate Context="line">
+                        <ZenLookup TItem="Article"
+                                   Items="Articles"
+                                   ItemText="@(a => $"{a.Sku} · {a.Name}")"
+                                   SearchText="@(a => $"{a.Sku} {a.Name}")"
+                                   Size="ZenSize.Small"
+                                   Placeholder="Search articles"
+                                   PanelWidth="min(34rem, calc(100vw - 1rem))"
+                                   AutoFocus="@(line == _newLine)"
+                                   aria-label="@($"Article, line {LineNumber(line)}")"
+                                   Value="line.Article"
+                                   ValueChanged="@((Article? article) => line.Article = article)">
+                            <Columns>
+                                <ZenColumn TItem="Article" Title="SKU" Field="@(a => a.Sku)" Width="7rem" CellClass="font-mono text-xs" />
+                                <ZenColumn TItem="Article" Title="Article" Field="@(a => a.Name)" />
+                                <ZenColumn TItem="Article" Title="Price" Field="@(a => a.Price)" Format="C" Align="ZenAlign.End" Width="6rem" />
+                                <ZenColumn TItem="Article" Title="Tax" Field="@(a => a.TaxRate)" Format="P0" Align="ZenAlign.End" Width="4rem" />
+                            </Columns>
+                        </ZenLookup>
+                    </CellTemplate>
+                </ZenColumn>
+
+                @* Read-only columns derived from the chosen article. Sorting is off throughout:
+                   reordering lines under someone who is typing into them helps nobody. *@
+                <ZenColumn TItem="SalesLine" Title="Description" Field="@(l => l.Article?.Name)" Sortable="false" />
+                <ZenColumn TItem="SalesLine" Title="Qty" Interactive="true" Align="ZenAlign.End" Width="7rem">
+                    <CellTemplate Context="line">
+                        <ZenNumberInput TValue="int"
+                                        Size="ZenSize.Small"
+                                        Min="1"
+                                        AllowNegative="false"
+                                        AlignEnd="true"
+                                        aria-label="@($"Quantity, line {LineNumber(line)}")"
+                                        Value="line.Quantity"
+                                        ValueChanged="@((int quantity) => line.Quantity = quantity)" />
+                    </CellTemplate>
+                </ZenColumn>
+                <ZenColumn TItem="SalesLine" Title="Unit price" Field="@(l => l.Article?.Price)" Format="C" Align="ZenAlign.End" Width="7rem" Sortable="false" />
+                <ZenColumn TItem="SalesLine" Title="Tax" Align="ZenAlign.End" Width="7rem" Sortable="false">
+                    <CellTemplate Context="line">
+                        @if (line.Article is { } article)
+                        {
+                            <span class="block tabular-nums">@line.Tax.ToString("C")</span>
+                            <span class="block text-xs text-content-muted">@article.TaxRate.ToString("P0")</span>
+                        }
+                    </CellTemplate>
+                </ZenColumn>
+                <ZenColumn TItem="SalesLine" Title="Line total" Field="@(l => l.Article is null ? null : l.Net + l.Tax)" Format="C" Align="ZenAlign.End" Width="8rem" Sortable="false" CellClass="font-medium tabular-nums" />
+                <ZenColumn TItem="SalesLine" Title="Actions" Interactive="true" Align="ZenAlign.End" Width="1%">
+                    <CellTemplate Context="line">
+                        <ZenButton Variant="ZenVariant.Ghost"
+                                   Intent="ZenIntent.Danger"
+                                   Size="ZenSize.Small"
+                                   IconOnly="true"
+                                   Icon="@TrashIcon"
+                                   AriaLabel="@($"Remove line {LineNumber(line)}")"
+                                   OnClick="@(() => _salesLines.Remove(line))" />
+                    </CellTemplate>
+                </ZenColumn>
+            </Columns>
+        </ZenTable>
+    </div>
+
+    <div class="mt-3 flex flex-wrap items-start justify-between gap-4">
+        <ZenButton Variant="ZenVariant.Outline" Size="ZenSize.Small" Icon="@PlusIcon" OnClick="AddLine">
+            Add line
+        </ZenButton>
+
+        <dl class="grid grid-cols-[auto_8rem] gap-x-6 gap-y-1 text-sm tabular-nums">
+            <dt class="text-content-muted">Subtotal</dt>
+            <dd class="text-right">@_salesLines.Sum(l => l.Net).ToString("C")</dd>
+            <dt class="text-content-muted">Tax</dt>
+            <dd class="text-right">@_salesLines.Sum(l => l.Tax).ToString("C")</dd>
+            <dt class="font-semibold text-content">Total</dt>
+            <dd class="text-right font-semibold text-content">@_salesLines.Sum(l => l.Net + l.Tax).ToString("C")</dd>
+        </dl>
+    </div>
+</section>
+
 <!-- ---------------------------------------------------------------- Grouping -->
 <section class="mt-12">
     <h2 class="text-lg font-semibold">ZenTable, grouped</h2>
@@ -431,6 +583,84 @@
     }
 
     private readonly DateTimeOffset _now = DateTimeOffset.Now;
+
+    // Demo-only icons. ZenIcons deliberately carries just what the library's own components need,
+    // so an application brings its own - here, three paths on the same 24x24 stroked grid.
+    private const string PlusIcon = """<path d="M12 5v14M5 12h14" />""";
+    private const string TrashIcon = """<path d="M4 7h16M9 7V4h6v3M6 7l1 13h10l1-13M10 11v6M14 11v6" />""";
+    private const string CopyIcon = """<rect x="8" y="8" width="12" height="12" rx="2" /><path d="M16 8V6a2 2 0 0 0-2-2H6a2 2 0 0 0-2 2v8a2 2 0 0 0 2 2h2" />""";
+
+    // ---- Row actions
+
+    private string? _rowActionStatus;
+
+    // A copy of the orders, so deleting here does not empty the tables further down the page.
+    private List<Order> _actionOrders = [];
+
+    protected override void OnInitialized() => _actionOrders = [.. _orders.Take(5)];
+
+    private void DuplicateOrder(Order order)
+    {
+        var copy = order with { Reference = $"{order.Reference}-copy", Status = OrderStatus.Draft };
+        _actionOrders.Insert(_actionOrders.IndexOf(order) + 1, copy);
+        _rowActionStatus = $"Duplicated {order.Reference} as {copy.Reference}.";
+    }
+
+    private void DeleteOrder(Order order)
+    {
+        _actionOrders.Remove(order);
+        _rowActionStatus = $"Deleted {order.Reference}.";
+    }
+
+    // ---- Order entry
+
+    private sealed record Article(string Sku, string Name, decimal Price, decimal TaxRate);
+
+    private sealed class SalesLine
+    {
+        public Article? Article { get; set; }
+
+        public int Quantity { get; set; } = 1;
+
+        public decimal Net => Article is null ? 0 : Article.Price * Quantity;
+
+        public decimal Tax => Article is null ? 0 : Math.Round(Net * Article.TaxRate, 2);
+    }
+
+    private static readonly Article[] Articles =
+    [
+        new("PLT-200", "Euro pallet, heat treated", 24.00m, 0.20m),
+        new("WRP-050", "Stretch wrap, 500mm", 8.50m, 0.20m),
+        new("LBL-010", "Thermal labels, 1000/roll", 29.75m, 0.20m),
+        new("BOX-114", "Double-wall carton, 400mm", 4.45m, 0.20m),
+        new("SHF-900", "Gondola shelving bay", 289.00m, 0.20m),
+        new("SHF-901", "Shelf divider, 300mm", 3.75m, 0.20m),
+        new("FIT-004", "Installation kit", 12.00m, 0.20m),
+        new("TMB-070", "Softwood batten, 2.4m", 4.17m, 0.20m),
+        new("BRK-012", "Angle bracket, galvanised", 1.35m, 0.20m),
+        new("FIX-088", "M8 coach screw, box of 100", 4.55m, 0.20m),
+        new("BK-TRAIN", "Forklift safety handbook", 18.00m, 0.00m),
+        new("FD-COFFEE", "Coffee beans, 1kg (catering)", 16.40m, 0.05m),
+    ];
+
+    private readonly List<SalesLine> _salesLines =
+    [
+        new() { Article = Articles[0], Quantity = 40 },
+        new() { Article = Articles[10], Quantity = 2 },
+        new(),
+    ];
+
+    private int LineNumber(SalesLine line) => _salesLines.IndexOf(line) + 1;
+
+    // The line whose lookup should take focus. AutoFocus rather than a FocusAsync call, because
+    // the lookup does not exist until the render this click causes - there is nothing to call yet.
+    private SalesLine? _newLine;
+
+    private void AddLine()
+    {
+        _newLine = new SalesLine();
+        _salesLines.Add(_newLine);
+    }
 
     private IReadOnlyCollection<Order> _selectedOrders = [];
     private IReadOnlyCollection<Order> _groupSelection = [];

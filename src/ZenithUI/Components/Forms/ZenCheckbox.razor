@@ -111,14 +111,12 @@
     private void HandleToggle(ChangeEventArgs args) =>
         CurrentValue = args.Value is bool b && b;
 
-    [Inject]
-    private IJSRuntime JS { get; set; } = default!;
-
-    private IJSObjectReference? _dom;
     private bool _appliedIndeterminate;
 
     protected override async Task OnAfterRenderAsync(bool firstRender)
     {
+        await base.OnAfterRenderAsync(firstRender);
+
         // `indeterminate` is a DOM property with no attribute equivalent, so it cannot be set from
         // server-rendered markup at all. Skipped without an interactive renderer - which is
         // correct: a static render has no way to express it.
@@ -134,48 +132,8 @@
             return;
         }
 
-        try
-        {
-            _dom ??= await JS.InvokeAsync<IJSObjectReference>(
-                "import", "./_content/ZenithUI/js/zen-dom.js");
-
-            await _dom.InvokeVoidAsync("setIndeterminate", Id, Indeterminate);
-            _appliedIndeterminate = Indeterminate;
-        }
-        catch (JSDisconnectedException)
-        {
-        }
-        catch (OperationCanceledException)
-        {
-        }
-    }
-
-    protected override void DisposeCore()
-    {
-        base.DisposeCore();
-
-        // Fire and forget: IDisposable cannot await, and a module reference left to the circuit's
-        // own teardown is harmless.
-        _ = DisposeModuleAsync();
-    }
-
-    private async Task DisposeModuleAsync()
-    {
-        if (_dom is null)
-        {
-            return;
-        }
-
-        try
-        {
-            await _dom.DisposeAsync();
-        }
-        catch (JSDisconnectedException)
-        {
-        }
-        catch (OperationCanceledException)
-        {
-        }
+        await InvokeDomAsync("setIndeterminate", Id, Indeterminate);
+        _appliedIndeterminate = Indeterminate;
     }
 
     private string WrapperClass => CssBuilder

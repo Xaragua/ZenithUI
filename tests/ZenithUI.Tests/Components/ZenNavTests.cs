@@ -360,4 +360,102 @@ public class ZenNavTests : BunitContext
                     builder.CloseComponent();
                 }
             })));
+
+    // ---- Icon size ----------------------------------------------------------------------------
+
+    private static string IconClass(IRenderedComponent<IComponent> cut, string selector) =>
+        cut.Find($"{selector} svg").ClassList.Single(c => c.StartsWith("size-", StringComparison.Ordinal));
+
+    private static RenderFragment Link(string href, string text, ZenSize? size = null) => builder =>
+    {
+        builder.OpenComponent<ZenNavLink>(0);
+        builder.AddComponentParameter(1, nameof(ZenNavLink.Href), href);
+        builder.AddComponentParameter(2, nameof(ZenNavLink.Text), text);
+        builder.AddComponentParameter(3, nameof(ZenNavLink.Icon), ZenIcons.Inbox);
+        builder.AddComponentParameter(4, nameof(ZenNavLink.IconSize), size);
+        builder.CloseComponent();
+    };
+
+    [Fact]
+    public void ALinkIcon_IsSmallByDefault()
+    {
+        // The size every nav icon had before IconSize existed, so an upgrade changes nothing.
+        var cut = RenderLink("orders", p => p.Add(x => x.Icon, ZenIcons.Inbox));
+
+        cut.Find("svg").ClassList.ShouldContain("size-4");
+    }
+
+    [Theory]
+    [InlineData(ZenSize.Medium, "size-5")]
+    [InlineData(ZenSize.Large, "size-6")]
+    public void ALinkIcon_TakesItsOwnSize(ZenSize size, string expected)
+    {
+        var cut = RenderLink("orders", p => p.Add(x => x.Icon, ZenIcons.Inbox).Add(x => x.IconSize, size));
+
+        cut.Find("svg").ClassList.ShouldContain(expected);
+    }
+
+    [Fact]
+    public void AMenuSize_ReachesEveryLink_UnlessTheLinkStatesItsOwn()
+    {
+        var cut = Render<ZenNavMenu>(p => p
+            .Add(x => x.IconSize, ZenSize.Large)
+            .Add(x => x.ChildContent, (RenderFragment)(builder =>
+            {
+                builder.AddContent(0, Link("inbox", "Inbox"));
+                builder.AddContent(1, Link("trends", "Trends", ZenSize.Small));
+            })));
+
+        IconClass(cut, "a[href='inbox']").ShouldBe("size-6");
+        IconClass(cut, "a[href='trends']").ShouldBe("size-4");
+    }
+
+    [Fact]
+    public void AGroupSize_AppliesToItsHeadingAndTheLinksInside()
+    {
+        var cut = Render<ZenNavMenu>(p => p
+            .Add(x => x.IconSize, ZenSize.Small)
+            .Add(x => x.ChildContent, (RenderFragment)(builder =>
+            {
+                builder.OpenComponent<ZenNavGroup>(0);
+                builder.AddComponentParameter(1, nameof(ZenNavGroup.Text), "Reports");
+                builder.AddComponentParameter(2, nameof(ZenNavGroup.Icon), ZenIcons.TrendUp);
+                builder.AddComponentParameter(3, nameof(ZenNavGroup.IconSize), ZenSize.Medium);
+                builder.AddComponentParameter(4, nameof(ZenNavGroup.ChildContent), Link("reports/daily", "Daily"));
+                builder.CloseComponent();
+            })));
+
+        // The first svg in the summary is the group's icon; the chevron after it stays small.
+        cut.Find("summary svg").ClassList.ShouldContain("size-5");
+        IconClass(cut, "a[href='reports/daily']").ShouldBe("size-5");
+    }
+
+    // ---- Collapsed-rail hooks -----------------------------------------------------------------
+
+    [Fact]
+    public void ALinkLabel_IsMarkedForTheCollapsedRail()
+    {
+        // zen-nav-label is what the collapsed rail hides visually - keeping it as the accessible
+        // name - and what the tooltip reads. A label without it would stay on screen, squeezed
+        // into a column four rems wide.
+        var cut = RenderLink("orders");
+
+        cut.Find(".zen-nav-label").TextContent.ShouldBe("Orders");
+    }
+
+    [Fact]
+    public void ALinkWithNoIcon_HasALetterForTheCollapsedRail()
+    {
+        // Otherwise it would be an empty square once its label is hidden. aria-hidden, because
+        // the label is still the link's name and "O, Orders" helps nobody.
+        var initial = RenderLink("orders").Find(".zen-nav-initial");
+
+        initial.TextContent.ShouldBe("O");
+        initial.GetAttribute("aria-hidden").ShouldBe("true");
+    }
+
+    [Fact]
+    public void ALinkWithAnIcon_HasNoLetter() =>
+        RenderLink("orders", p => p.Add(x => x.Icon, ZenIcons.Inbox))
+            .FindAll(".zen-nav-initial").ShouldBeEmpty();
 }

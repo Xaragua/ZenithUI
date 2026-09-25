@@ -29,7 +29,7 @@ each one to a utility, so `bg-surface` compiles to `background-color: var(--zen-
 | Intents | `--zen-{primary,secondary,accent,success,warning,danger,info}` ×4 | see below |
 | Focus | `--zen-ring`, `--zen-ring-width` | `ring-ring`, and the `zen-focus*` utilities |
 | Shape | `--zen-radius-{sm,md,lg,xl}`, `--zen-shadow-{sm,md,lg}` | `rounded-zen-lg`, `shadow-zen-md` |
-| Layout | `--zen-appbar-height`, `--zen-sidenav-width`, `--zen-sidenav-width-collapsed` | `h-appbar`, `w-sidenav` |
+| Layout | `--zen-appbar-height`, `--zen-sidenav-width`, `--zen-sidenav-width-collapsed` (the rail with `ZenSideNav Collapsible`) | `h-appbar`, `w-sidenav` |
 
 Two layout properties are written by components rather than read from the palette:
 `--zen-sidenav-top` (set by `ZenAppShell`, because CSS gives an element no way to measure a sticky

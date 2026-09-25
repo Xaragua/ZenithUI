@@ -55,6 +55,13 @@ else
     [Parameter]
     public string? Icon { get; set; }
 
+    /// <summary>
+    /// Size of <see cref="Icon"/>. Defaults to the enclosing menu's <c>IconSize</c>, then to
+    /// <see cref="ZenSize.Small"/>.
+    /// </summary>
+    [Parameter]
+    public ZenSize? IconSize { get; set; }
+
     /// <summary>Trailing content - a count badge, a status dot, a chevron.</summary>
     [Parameter]
     public RenderFragment? Trailing { get; set; }
@@ -175,12 +182,23 @@ else
         {
             builder.OpenComponent<ZenIcon>(seq++);
             builder.AddComponentParameter(seq++, nameof(ZenIcon.Path), Icon);
-            builder.AddComponentParameter(seq++, nameof(ZenIcon.Size), ZenSize.Small);
+            builder.AddComponentParameter(seq++, nameof(ZenIcon.Size), EffectiveIconSize);
             builder.CloseComponent();
         }
+        else if (Initial is { } initial)
+        {
+            // Shown only in a collapsed side nav, where a link with no icon would otherwise be an
+            // empty square. aria-hidden: the real label is still in the link, visually hidden.
+            builder.OpenElement(seq++, "span");
+            builder.AddAttribute(seq++, "class", $"zen-nav-initial {ZenStyles.IconSize(EffectiveIconSize)}");
+            builder.AddAttribute(seq++, "aria-hidden", "true");
+            builder.AddContent(seq++, initial);
+            builder.CloseElement();
+        }
 
+        // zen-nav-label is what a collapsed side nav hides visually and what its tooltip reads.
         builder.OpenElement(seq++, "span");
-        builder.AddAttribute(seq++, "class", "min-w-0 truncate");
+        builder.AddAttribute(seq++, "class", "zen-nav-label min-w-0 truncate");
 
         if (ChildContent is not null)
         {
@@ -196,11 +214,19 @@ else
         if (Trailing is not null)
         {
             builder.OpenElement(seq++, "span");
-            builder.AddAttribute(seq++, "class", "ms-auto flex shrink-0 items-center gap-1");
+            builder.AddAttribute(seq++, "class", "zen-nav-trailing ms-auto flex shrink-0 items-center gap-1");
             builder.AddContent(seq++, Trailing);
             builder.CloseElement();
         }
     };
+
+    private ZenSize EffectiveIconSize => IconSize ?? NavMenu?.IconSize ?? ZenSize.Small;
+
+    /// <summary>The first letter of a plain-text label, for a link with no icon.</summary>
+    private string? Initial =>
+        ChildContent is null && !string.IsNullOrWhiteSpace(Text)
+            ? Text.Trim()[..1].ToUpper(CultureInfo.CurrentCulture)
+            : null;
 
     private string LinkClass => CssBuilder
         .Default("zen-focus flex items-center gap-2.5 rounded-zen-md px-3 text-sm transition-colors")

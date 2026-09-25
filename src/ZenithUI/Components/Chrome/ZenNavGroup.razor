@@ -64,6 +64,16 @@ else
     [Parameter]
     public string? Icon { get; set; }
 
+    /// <summary>
+    /// Size of <see cref="Icon"/>, and of the icons on the links inside the section unless they
+    /// state their own. Defaults to the enclosing menu's <c>IconSize</c>, then to
+    /// <see cref="ZenSize.Small"/>.
+    /// </summary>
+    [Parameter]
+    public ZenSize? IconSize { get; set; }
+
+    private ZenSize EffectiveIconSize => IconSize ?? NavMenu?.IconSize ?? ZenSize.Small;
+
     /// <summary>Content before the chevron - a count badge, a status dot.</summary>
     [Parameter]
     public RenderFragment? Trailing { get; set; }
@@ -169,7 +179,7 @@ else
         builder.AddComponentParameter(
             seq++,
             nameof(CascadingValue<ZenNavContext>.Value),
-            new ZenNavContext(ZenNavOrientation.Vertical, InList: true));
+            new ZenNavContext(ZenNavOrientation.Vertical, InList: true, IconSize ?? NavMenu?.IconSize));
         builder.AddComponentParameter(
             seq++,
             nameof(CascadingValue<ZenNavContext>.ChildContent),
@@ -188,19 +198,19 @@ else
         {
             builder.OpenComponent<ZenIcon>(seq++);
             builder.AddComponentParameter(seq++, nameof(ZenIcon.Path), Icon);
-            builder.AddComponentParameter(seq++, nameof(ZenIcon.Size), ZenSize.Small);
+            builder.AddComponentParameter(seq++, nameof(ZenIcon.Size), EffectiveIconSize);
             builder.CloseComponent();
         }
 
         builder.OpenElement(seq++, "span");
-        builder.AddAttribute(seq++, "class", "min-w-0 flex-1 truncate text-start");
+        builder.AddAttribute(seq++, "class", "zen-nav-label min-w-0 flex-1 truncate text-start");
         builder.AddContent(seq++, TitleContent ?? (RenderFragment)(b => b.AddContent(0, Text)));
         builder.CloseElement();
 
         if (Trailing is not null)
         {
             builder.OpenElement(seq++, "span");
-            builder.AddAttribute(seq++, "class", "flex shrink-0 items-center gap-1");
+            builder.AddAttribute(seq++, "class", "zen-nav-trailing flex shrink-0 items-center gap-1");
             builder.AddContent(seq++, Trailing);
             builder.CloseElement();
         }

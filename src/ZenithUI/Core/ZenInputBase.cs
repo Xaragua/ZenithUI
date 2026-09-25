@@ -137,6 +137,22 @@ public abstract class ZenInputBase<TValue> : ZenComponentBase, IDisposable
     [Parameter]
     public int DebounceMilliseconds { get; set; }
 
+    /// <summary>
+    /// Move focus into the control when it first renders interactively.
+    /// </summary>
+    /// <remarks>
+    /// Declarative, because the usual reason to want it is a control that does not exist yet: a
+    /// line just added to an order-entry grid, whose field there is no reference to until the
+    /// render that creates it. The HTML <c>autofocus</c> attribute is no substitute - browsers
+    /// honour it only on page load, never on an element inserted afterwards.
+    /// <para>
+    /// Applied once, on the first render. Bind it to "this is the new one" rather than leaving it
+    /// on, or every existing field on a re-rendered page would compete for focus.
+    /// </para>
+    /// </remarks>
+    [Parameter]
+    public bool AutoFocus { get; set; }
+
     /// <summary>Extra classes for the surrounding field wrapper, as opposed to the control itself.</summary>
     /// <remarks>
     /// <see cref="ZenComponentBase.Class"/> lands on the control, because that is the element a
@@ -416,6 +432,57 @@ public abstract class ZenInputBase<TValue> : ZenComponentBase, IDisposable
         _subscribedEditContext = editContext;
     }
 
+    [Inject]
+    private IJSRuntime JSRuntime { get; set; } = default!;
+
+    private IJSObjectReference? _domModule;
+
+    /// <summary>
+    /// Moves focus to the control's input element, optionally selecting its text so typing
+    /// replaces it.
+    /// </summary>
+    /// <remarks>
+    /// A no-op without an interactive renderer, and when the element is not in the DOM - call it
+    /// once the control has rendered, or use <see cref="AutoFocus"/> for a control that is about
+    /// to.
+    /// </remarks>
+    /// <param name="selectAll">Select the current text as well.</param>
+    public Task FocusAsync(bool selectAll = false) =>
+        RendererInfo.IsInteractive ? InvokeDomAsync("focusElement", Id, selectAll) : Task.CompletedTask;
+
+    /// <summary>
+    /// Calls a function in <c>zen-dom.js</c>, importing it on first use. A dropped circuit or a
+    /// cancelled call is swallowed: every helper there is a DOM nicety, not worth an unhandled
+    /// interop error.
+    /// </summary>
+    /// <remarks>Only for use from <c>OnAfterRenderAsync</c>, behind <c>RendererInfo.IsInteractive</c>.</remarks>
+    protected async Task InvokeDomAsync(string identifier, params object?[] args)
+    {
+        try
+        {
+            _domModule ??= await JSRuntime.InvokeAsync<IJSObjectReference>(
+                "import", "./_content/ZenithUI/js/zen-dom.js");
+
+            await _domModule.InvokeVoidAsync(identifier, args);
+        }
+        catch (JSDisconnectedException)
+        {
+        }
+        catch (OperationCanceledException)
+        {
+        }
+    }
+
+    /// <inheritdoc />
+    /// <remarks>Overrides must call the base, or <see cref="AutoFocus"/> stops working.</remarks>
+    protected override async Task OnAfterRenderAsync(bool firstRender)
+    {
+        if (firstRender && AutoFocus)
+        {
+            await FocusAsync();
+        }
+    }
+
     /// <inheritdoc />
     public void Dispose()
     {
@@ -432,5 +499,28 @@ public abstract class ZenInputBase<TValue> : ZenComponentBase, IDisposable
         _debounceCts?.Cancel();
         _debounceCts?.Dispose();
         _debounceCts = null;
+
+        // Fire and forget: IDisposable cannot await, and a module reference left to the circuit's
+        // own teardown is harmless.
+        _ = DisposeDomModuleAsync();
+    }
+
+    private async Task DisposeDomModuleAsync()
+    {
+        if (_domModule is null)
+        {
+            return;
+        }
+
+        try
+        {
+            await _domModule.DisposeAsync();
+        }
+        catch (JSDisconnectedException)
+        {
+        }
+        catch (OperationCanceledException)
+        {
+        }
     }
 }

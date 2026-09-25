@@ -4,6 +4,49 @@ All notable changes to ZenithUI are documented here. The format follows
 [Keep a Changelog](https://keepachangelog.com/en/1.1.0/) and the project adheres to
 [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [Unreleased]
+
+### Added
+
+- **`ZenColumn.Interactive`**, for a column whose cells hold controls: row action buttons, an
+  input, a `ZenLookup`. Clicks and keys inside such a cell stop there. Without it, a row's Delete
+  button also raised `OnRowClick` for the row being deleted, and in a treegrid a space typed into a
+  cell's input toggled the row's selection.
+- **`AutoFocus` and `FocusAsync(selectAll)`** on every form control, through `ZenInputBase`.
+  `AutoFocus` covers a control that does not exist yet, such as the lookup on a line just added to
+  a grid. It applies once, on the first interactive render; the HTML `autofocus` attribute is
+  ignored on elements inserted after page load. `FocusAsync` is the imperative form for a control
+  already on screen.
+- **`IconSize`** on `ZenNavLink`, `ZenNavGroup` and `ZenNavMenu`. A menu's size reaches every
+  link and group inside it, a group's reaches its own links, and anything stating its own size
+  wins. The default is still `Small`, so existing navs look the same.
+- **`ZenSideNav Collapsible="true"`** adds a button at the foot of the rail that shrinks it to a
+  column of icons, `--zen-sidenav-width-collapsed` wide. It needs no render mode, like the drawer.
+  - The choice is remembered in `localStorage` and restored before first paint. It survives
+    enhanced navigation, which resets `<html>`'s attributes; `ZenithUI.lib.module.js` re-applies
+    the state, as it does for the theme.
+  - Each item's label is shown as a tooltip on hover and on keyboard focus, and Escape dismisses
+    it. The label stays in the link as visually hidden text, so screen readers hear it once.
+  - A link with no icon shows its first letter. Clicking a `ZenNavGroup` in a collapsed rail
+    expands the rail with that section open. Other `Footer` content can opt out with the class
+    `zen-sidenav-expanded-only`.
+  - Only the rail collapses. Below `lg` the nav is a drawer and always shows its labels.
+  - `CollapseText` and `ExpandText` set the button's two labels.
+- `ZenithUI.lib.module.js` now also exports `afterStarted`, so the side nav's listeners are
+  installed in a standalone WebAssembly app too.
+- The demo's Data page has two new tables: a table with per-row Duplicate and Delete buttons, and an
+  order-entry grid. In the grid, a `ZenLookup` in the Article column fills in the description,
+  price and tax, and there is a quantity field and a Remove button on each line.
+
+### Fixed
+
+- **`ZenTextArea` rendered one line tall** whatever `Rows` said, and only grew when the user pressed
+  Enter. `field-sizing: content` ignores `rows`, so auto-grow now sets a `min-height` of `Rows`
+  lines plus padding.
+- **`ZenCurrencyInput` appended to the value after a Tab** instead of replacing it. Swapping the
+  grouped text for bare digits on focus collapsed the selection the browser had made. The new text
+  is selected again after that render, unless the user has already typed.
+
 ## [1.0.0-rc.1.4] — 2026-09-24
 
 Milestone M7: a table that scales to server-sized data, a picker built on it, and a wizard.

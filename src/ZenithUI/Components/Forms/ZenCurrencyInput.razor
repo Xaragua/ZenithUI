@@ -114,6 +114,25 @@
         // Seed the editable text from the current value, unformatted. Without this the user would
         // start editing the grouped string and have to delete the separators themselves.
         _raw = CurrentValue?.ToString(EffectiveCulture);
+
+        // Swapping the text collapses the selection the browser made on Tab, and typing then
+        // appends to the value instead of replacing it. Restored once the new text is in the DOM.
+        _selectOnNextRender = true;
+    }
+
+    private bool _selectOnNextRender;
+
+    protected override async Task OnAfterRenderAsync(bool firstRender)
+    {
+        await base.OnAfterRenderAsync(firstRender);
+
+        if (!_selectOnNextRender || !RendererInfo.IsInteractive)
+        {
+            return;
+        }
+
+        _selectOnNextRender = false;
+        await InvokeDomAsync("selectIfFocused", Id, DisplayValue);
     }
 
     private void HandleBlur(FocusEventArgs args)

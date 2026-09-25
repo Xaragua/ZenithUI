@@ -124,6 +124,38 @@
     </div>
 </section>
 
+<!-- ------------------------------------------------------------ Icon sizes and collapse -->
+<section class="mt-10">
+    <h2 class="text-lg font-semibold">Icon sizes and the collapsed rail</h2>
+    <p class="mt-2 max-w-3xl text-sm text-content-muted">
+        <code>IconSize</code> on a <code>ZenNavMenu</code> applies to every link and group inside
+        it, and a single link or group can still set its own. <strong>Use the button at the foot
+        of the side nav</strong> (1024px and wider) to collapse the rail to its icons. Hover or tab
+        through them for their labels. The choice is remembered across pages and visits, and it
+        needs no render mode: the layout this page sits in is static.
+    </p>
+
+    <div class="mt-4 grid gap-4 md:grid-cols-3">
+        @foreach (var size in new[] { ZenSize.Small, ZenSize.Medium, ZenSize.Large })
+        {
+            <ZenCard Title="@($"IconSize=\"{size}\"")" TitleLevel="3">
+                <ZenNavMenu Landmark="false" IconSize="size">
+                    <ZenNavLink Href="/shell/inbox" Text="Inbox" Icon="@ZenIcons.Inbox" />
+                    <ZenNavLink Href="/shell/calendar" Text="Calendar" Icon="@ZenIcons.Calendar" />
+                    <ZenNavLink Href="/shell/trends" Text="Trends" Icon="@ZenIcons.TrendUp" />
+                </ZenNavMenu>
+            </ZenCard>
+        }
+    </div>
+
+    <p class="mt-3 max-w-3xl text-sm text-content-subtle">
+        In the collapsed rail each label stays in the link as visually hidden text, so a screen
+        reader still hears &ldquo;Forms, link&rdquo;. The tooltip is only the visible copy of it. A
+        link with no icon shows its first letter, and clicking a collapsible section expands the
+        rail with that section open. Below 1024px the nav is a drawer and always shows its labels.
+    </p>
+</section>
+
 <!-- ------------------------------------------------------------------- Nav groups -->
 <section class="mt-10">
     <h2 class="text-lg font-semibold">ZenNavGroup &mdash; collapsible sections</h2>
