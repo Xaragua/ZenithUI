@@ -78,6 +78,19 @@
     [Parameter]
     public string? Width { get; set; }
 
+    /// <summary>
+    /// The cells hold controls of their own - action buttons, an input, a <c>ZenLookup</c> - rather
+    /// than a value to read.
+    /// </summary>
+    /// <remarks>
+    /// Clicks and keys inside an interactive cell belong to the control, not the row. Without
+    /// this, pressing a row's Delete button also raises <c>OnRowClick</c> for that row (usually
+    /// opening the very record being deleted), and in a treegrid a space typed into a cell's input
+    /// toggles the row's selection instead of reaching the input. Both are stopped at the cell.
+    /// </remarks>
+    [Parameter]
+    public bool Interactive { get; set; }
+
     /// <summary>Extra classes for every cell in the column.</summary>
     [Parameter]
     public string? CellClass { get; set; }
