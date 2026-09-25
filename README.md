@@ -3,7 +3,7 @@
 A TailwindCSS component library for Blazor. Render-mode agnostic, themed entirely through CSS
 custom properties, with first-class light and dark palettes.
 
-> **Status: M7 — `1.0.0-rc.1.4`.** Every component in the plan ships: tokens and theming, primitives,
+> **Status: M7 — `1.0.0-rc.1.5`.** Every component in the plan ships: tokens and theming, primitives,
 > the full form control set, the overlay family (modal + toast services, popover, combobox, list),
 > the data components (table, tree, timeline) and the application shell. M7 adds a table that reads
 > from a server, virtualizes and groups, a lookup whose popup is that table, and a wizard stepper. The package is consumed

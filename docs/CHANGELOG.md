@@ -4,7 +4,11 @@ All notable changes to ZenithUI are documented here. The format follows
 [Keep a Changelog](https://keepachangelog.com/en/1.1.0/) and the project adheres to
 [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
-## [Unreleased]
+## [1.0.0-rc.1.5] — 2026-09-25
+
+Additions and fixes, no breaking changes. `1.0.0-rc.1.4` code builds unchanged against it. New
+parameters default to the old behaviour: nav icons stay `Small`, and a side nav collapses only
+when `Collapsible` is set.
 
 ### Added
 
