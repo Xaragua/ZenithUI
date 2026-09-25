@@ -886,6 +886,162 @@
   }
 }
 
+/*
+ * The collapsed rail: `ZenSideNav Collapsible="true"`.
+ *
+ * The state is `data-zen-sidenav="collapsed"` on <html>, flipped by zen-sidenav.js and restored
+ * before first paint by the inline script ZenSideNav renders. An attribute on the root rather
+ * than a class on the <aside> because the root is the one element the pre-paint script can reach
+ * before the <aside> exists - and it is how the theme already works, so enhanced navigation
+ * needs one fix for both.
+ *
+ * Every rule is gated on `lg`. Below it the nav is a drawer, and a drawer that opened as a column
+ * of unlabelled icons would be the collapsed state leaking into a layout that never asked for it.
+ */
+@layer components {
+  /* The toggle, its second label and a link's letter stand-in exist only for the collapsed rail. */
+  .zen-sidenav-collapse,
+  .zen-sidenav-expand-text,
+  .zen-nav-initial {
+    display: none;
+  }
+
+  .zen-nav-initial {
+    place-items: center;
+    border-radius: var(--zen-radius-sm);
+    background-color: var(--zen-surface-sunken);
+    font-size: 0.6875rem;
+    font-weight: 600;
+    line-height: 1;
+  }
+
+  .zen-sidenav-collapse-icon {
+    transition: transform 150ms ease;
+  }
+
+  [dir="rtl"] .zen-sidenav-collapse-icon {
+    transform: scaleX(-1);
+  }
+
+  /*
+   * The tooltip zen-sidenav.js shows beside an item in a collapsed rail. A manual popover in the
+   * top layer, because the rail scrolls - and `overflow-y: auto` clips sideways too, which is
+   * exactly where the tooltip has to go. The UA centres an open popover with `inset: 0` and
+   * `margin: auto`; both are undone so the script's coordinates apply.
+   *
+   * Content and surface swapped, so it reads as an overlay against either palette. The pair is
+   * the audited body-text pair with the roles reversed, and contrast is symmetric.
+   */
+  .zen-tooltip {
+    position: fixed;
+    inset: auto;
+    margin: 0;
+    padding: 0.3125rem 0.625rem;
+    border: none;
+    border-radius: var(--zen-radius-sm);
+    background-color: var(--zen-content);
+    color: var(--zen-surface);
+    box-shadow: var(--zen-shadow-md);
+    font-size: 0.8125rem;
+    line-height: 1.25rem;
+    white-space: nowrap;
+    overflow: visible;
+  }
+
+  @media (width >= 64rem) {
+    .zen-sidenav-collapsible {
+      transition: width 180ms ease;
+    }
+
+    .zen-sidenav-collapse {
+      display: block;
+    }
+  }
+
+  @media (prefers-reduced-motion: reduce) {
+    .zen-sidenav-collapsible,
+    .zen-sidenav-collapse-icon {
+      transition: none;
+    }
+  }
+}
+
+/*
+ * The collapsed state proper, in the utilities layer. The links it reshapes get their padding and
+ * gap from utilities, and the utilities layer outranks the components layer whatever the
+ * specificity - so these rules have to sit beside the utilities they override and win on
+ * specificity instead, which every selector here does against a single-class utility.
+ */
+@layer utilities {
+  @media (width >= 64rem) {
+    :root[data-zen-sidenav="collapsed"] .zen-sidenav-collapsible {
+      width: var(--zen-sidenav-width-collapsed);
+      overflow-x: hidden;
+    }
+
+    /* Each row becomes a centred icon. */
+    :root[data-zen-sidenav="collapsed"] .zen-sidenav-collapsible :is(a, [role="link"], summary, [data-zen-sidenav-toggle]) {
+      justify-content: center;
+      gap: 0;
+      padding-inline: 0;
+    }
+
+    /*
+     * Labels are hidden visually but stay in the accessibility tree: they are each link's
+     * accessible name, and the tooltip is aria-hidden precisely because this still speaks.
+     */
+    :root[data-zen-sidenav="collapsed"] .zen-sidenav-collapsible .zen-nav-label {
+      position: absolute;
+      width: 1px;
+      height: 1px;
+      padding: 0;
+      margin: -1px;
+      overflow: hidden;
+      clip-path: inset(50%);
+      white-space: nowrap;
+      border-width: 0;
+    }
+
+    :root[data-zen-sidenav="collapsed"] .zen-sidenav-collapsible .zen-sidenav-collapse-text {
+      display: none;
+    }
+
+    :root[data-zen-sidenav="collapsed"] .zen-sidenav-collapsible .zen-sidenav-expand-text {
+      display: inline;
+    }
+
+    :root[data-zen-sidenav="collapsed"] .zen-sidenav-collapse-icon {
+      transform: rotate(180deg);
+    }
+
+    [dir="rtl"]:root[data-zen-sidenav="collapsed"] .zen-sidenav-collapse-icon {
+      transform: none;
+    }
+
+    :root[data-zen-sidenav="collapsed"] .zen-sidenav-collapsible .zen-nav-initial {
+      display: grid;
+    }
+
+    /*
+     * Everything with no place in a column of icons: counts and chevrons, section titles, the
+     * links nested inside a group (clicking the group expands the rail to show them instead), and
+     * anything the caller marked zen-sidenav-expanded-only.
+     */
+    :root[data-zen-sidenav="collapsed"] .zen-sidenav-collapsible :is(.zen-nav-trailing, .zen-nav-chevron, .zen-nav-title, .zen-nav-group-items, .zen-sidenav-expanded-only) {
+      display: none;
+    }
+
+    /*
+     * A group's links are hidden, so its heading is the only place left to show that the current
+     * page is inside it. The same surface an active link gets.
+     */
+    :root[data-zen-sidenav="collapsed"] .zen-sidenav-collapsible .zen-nav-group:has([aria-current="page"]) > .zen-nav-summary {
+      background-color: var(--zen-surface-sunken);
+      color: var(--zen-content);
+    }
+  }
+}
+
 @layer components {
   /*
    * The shell's skip link.

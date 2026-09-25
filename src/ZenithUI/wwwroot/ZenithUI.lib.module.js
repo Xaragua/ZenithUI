@@ -27,6 +27,7 @@
  */
 
 import { applyStoredMode } from './js/zen-theme.js';
+import { applyStoredSideNav, installSideNav } from './js/zen-sidenav.js';
 
 /**
  * Blazor Web App startup hook.
@@ -34,8 +35,24 @@ import { applyStoredMode } from './js/zen-theme.js';
  * Static import above rather than a dynamic one inside the handler: the module has to be ready
  * before the first navigation, not fetched during it, or the first one still flashes.
  *
+ * The collapsed side nav has the same problem as the theme - its state is an attribute on <html>
+ * that every enhanced navigation resets - and the same fix. See zen-sidenav.js.
+ *
  * @param {{ addEventListener: (type: string, handler: () => void) => void }} blazor
  */
 export function afterWebStarted(blazor) {
-    blazor.addEventListener('enhancedload', applyStoredMode);
+    installSideNav();
+
+    blazor.addEventListener('enhancedload', () => {
+        applyStoredMode();
+        applyStoredSideNav();
+    });
+}
+
+/**
+ * Standalone WebAssembly startup hook. There is no enhanced navigation there, so only the side
+ * nav's document listeners need installing.
+ */
+export function afterStarted() {
+    installSideNav();
 }

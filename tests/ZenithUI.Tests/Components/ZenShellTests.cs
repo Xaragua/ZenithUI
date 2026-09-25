@@ -250,4 +250,49 @@ public class ZenShellTests : BunitContext
                 builder.CloseComponent();
             }))
             .AddChildContent("<p>Body</p>"));
+
+    // ---- Collapsible rail ---------------------------------------------------------------------
+
+    [Fact]
+    public void ACollapsibleNav_RestoresItsStateBeforeTheRailPaints()
+    {
+        // The inline script has to come before the <aside>: run after it, a user who collapsed
+        // the rail could watch it paint open and snap shut on every full page load.
+        var cut = Render<ZenSideNav>(p => p.Add(x => x.Collapsible, true));
+
+        var html = cut.Markup;
+        var script = html.IndexOf("<script>", StringComparison.Ordinal);
+
+        script.ShouldBeGreaterThanOrEqualTo(0);
+        script.ShouldBeLessThan(html.IndexOf("<aside", StringComparison.Ordinal));
+        cut.Find("aside").ClassList.ShouldContain("zen-sidenav-collapsible");
+    }
+
+    [Fact]
+    public void ACollapsibleNav_HasAToggleThatNeedsNoRenderMode()
+    {
+        // Rendered statically here: the toggle is a plain button that zen-sidenav.js finds by
+        // attribute, not an @onclick that would be dead in a layout.
+        var cut = Render<ZenSideNav>(p => p.Add(x => x.Collapsible, true));
+
+        var toggle = cut.Find("button[data-zen-sidenav-toggle]");
+
+        toggle.GetAttribute("type").ShouldBe("button");
+        toggle.GetAttribute("aria-controls").ShouldBe(cut.Find("aside").Id);
+
+        // Both labels, so CSS can pick the right one - and with it the accessible name - before
+        // any script has run.
+        toggle.QuerySelector(".zen-sidenav-collapse-text")!.TextContent.ShouldBe("Collapse navigation");
+        toggle.QuerySelector(".zen-sidenav-expand-text")!.TextContent.ShouldBe("Expand navigation");
+    }
+
+    [Fact]
+    public void ANavThatIsNotCollapsible_RendersNoneOfIt()
+    {
+        var cut = Render<ZenSideNav>();
+
+        cut.FindAll("script").ShouldBeEmpty();
+        cut.FindAll("[data-zen-sidenav-toggle]").ShouldBeEmpty();
+        cut.Find("aside").ClassList.ShouldNotContain("zen-sidenav-collapsible");
+    }
 }

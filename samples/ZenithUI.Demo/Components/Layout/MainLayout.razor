@@ -56,7 +56,9 @@
            button without one. Giving it InteractiveServer would add the focus trap and the scroll
            lock - see ZenSideNav's bindDrawer call - but the trade is a circuit per page, and the
            shell is meant to show the floor rather than the ceiling. *@
-        <ZenSideNav Label="Sections">
+        @* Collapsible adds the button at the foot of the rail. Still no render mode: the toggle,
+           the remembered state and the tooltips are zen-sidenav.js, which ZenithUI loads itself. *@
+        <ZenSideNav Label="Sections" Collapsible="true">
             <Header>
                 <span class="font-semibold tracking-tight">ZenithUI</span>
             </Header>
@@ -92,7 +94,7 @@
                     <ZenNavLink Href="https://github.com/Xaragua/ZenithUI" Text="Source on GitHub"
                                 Icon="@ZenIcons.Info" target="_blank" rel="noopener" />
                 </ZenNavMenu>
-                <p class="mt-2 px-3 text-xs text-content-subtle">Milestone M5</p>
+                <p class="zen-sidenav-expanded-only mt-2 px-3 text-xs text-content-subtle">Milestone M5</p>
             </Footer>
         </ZenSideNav>
     </SideNav>

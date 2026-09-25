@@ -41,4 +41,7 @@ public sealed record ZenShellContext(string NavId, string MainId);
 /// <c>&lt;li&gt;</c> with no list around it is invalid HTML and browsers recover from it
 /// inconsistently.
 /// </param>
-public sealed record ZenNavContext(ZenNavOrientation Orientation, bool InList);
+/// <param name="IconSize">
+/// The icon size the menu asked for, which a link or group uses unless it states its own.
+/// </param>
+public sealed record ZenNavContext(ZenNavOrientation Orientation, bool InList, ZenSize? IconSize = null);
