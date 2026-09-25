@@ -92,6 +92,28 @@ export function focusElement(id, select) {
 }
 
 /**
+ * Selects a text field's contents, but only while it still has focus and still holds the value the
+ * server just rendered into it.
+ *
+ * Used by ZenCurrencyInput, which swaps its grouped display text for bare digits when it gains
+ * focus. Writing a new value collapses the selection the browser made on Tab, so without this the
+ * user sees the old value highlighted and then has their typing appended to the new one.
+ *
+ * The value check is what makes this safe under latency: if the user has already typed before the
+ * render arrived, their text is left alone rather than being selected and replaced.
+ *
+ * @param {string} id Element id.
+ * @param {string} expected The value the server rendered.
+ */
+export function selectIfFocused(id, expected) {
+    const element = document.getElementById(id);
+
+    if (element && document.activeElement === element && element.value === (expected ?? '')) {
+        element.select();
+    }
+}
+
+/**
  * Scrolls a table row into view inside its scroll container, clear of a sticky header.
  *
  * Not `scrollIntoView`, which knows nothing about the sticky `<thead>` and happily parks the row

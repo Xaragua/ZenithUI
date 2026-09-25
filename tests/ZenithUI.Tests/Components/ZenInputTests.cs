@@ -235,6 +235,8 @@ public class ZenInputTests : BunitContext
     {
         // Nothing is rewritten under the caret while the user types - which is the whole reason
         // this control does not mask.
+        JSInterop.SetupModule("./_content/ZenithUI/js/zen-dom.js").SetupVoid("selectIfFocused", _ => true);
+
         var cut = Render<ZenCurrencyInput>(p => p
             .Add(x => x.Value, 1234.5m)
             .Add(x => x.Culture, CultureInfo.GetCultureInfo("en-US")));
@@ -242,6 +244,26 @@ public class ZenInputTests : BunitContext
         cut.Find("input").Focus();
 
         cut.Find("input").GetAttribute("value").ShouldBe("1234.5");
+    }
+
+    [Fact]
+    public void CurrencyInput_ReselectsTheBareDigitsAfterFocus()
+    {
+        // Swapping the text on focus collapses the selection the browser made on Tab, so typing
+        // appended to the old amount instead of replacing it. The new text is selected again, and
+        // the expected value is passed so a keystroke that beat the render is left alone.
+        var module = JSInterop.SetupModule("./_content/ZenithUI/js/zen-dom.js");
+        module.SetupVoid("selectIfFocused", _ => true).SetVoidResult();
+
+        var cut = Render<ZenCurrencyInput>(p => p
+            .Add(x => x.Value, 1234.5m)
+            .Add(x => x.Culture, CultureInfo.GetCultureInfo("en-US")));
+
+        cut.Find("input").Focus();
+
+        var call = module.VerifyInvoke("selectIfFocused");
+        call.Arguments[0].ShouldBe(cut.Find("input").Id);
+        call.Arguments[1].ShouldBe("1234.5");
     }
 
     // ---- Date -------------------------------------------------------------------------------
@@ -334,6 +356,79 @@ public class ZenInputTests : BunitContext
         // does nothing during prerender, so a textarea with content renders at one row until the
         // circuit connects.
         Render<ZenTextArea>().Find("textarea").ClassList.ShouldContain("field-sizing-content");
+
+    // ---- Focus ------------------------------------------------------------------------------
+
+    [Fact]
+    public void AutoFocus_FocusesTheInputOnFirstRender()
+    {
+        // The order-entry case: a line added to a grid, whose field has no reference to call
+        // FocusAsync on until the render that creates it.
+        var module = JSInterop.SetupModule("./_content/ZenithUI/js/zen-dom.js");
+        module.SetupVoid("focusElement", _ => true).SetVoidResult();
+
+        var cut = Render<ZenTextInput>(p => p.Add(x => x.AutoFocus, true));
+
+        module.VerifyInvoke("focusElement").Arguments[0].ShouldBe(cut.Find("input").Id);
+    }
+
+    [Fact]
+    public void AutoFocus_IsAppliedOnlyOnce()
+    {
+        // Left on, it must not pull focus back every time the page re-renders.
+        var module = JSInterop.SetupModule("./_content/ZenithUI/js/zen-dom.js");
+        module.SetupVoid("focusElement", _ => true).SetVoidResult();
+
+        var cut = Render<ZenTextInput>(p => p.Add(x => x.AutoFocus, true));
+        cut.Render(p => p.Add(x => x.Value, "changed"));
+
+        module.VerifyInvoke("focusElement", calledTimes: 1);
+    }
+
+    [Fact]
+    public void AutoFocus_ReachesControlsThatOverrideTheRenderHook()
+    {
+        // NumberInput has its own OnAfterRenderAsync. Forgetting to call the base there would
+        // silently disable AutoFocus for that one control.
+        var module = JSInterop.SetupModule("./_content/ZenithUI/js/zen-dom.js");
+        module.SetupVoid("focusElement", _ => true).SetVoidResult();
+
+        var cut = Render<ZenNumberInput<int>>(p => p.Add(x => x.AutoFocus, true));
+
+        module.VerifyInvoke("focusElement").Arguments[0].ShouldBe(cut.Find("input").Id);
+    }
+
+    [Fact]
+    public async Task FocusAsync_CanSelectTheText()
+    {
+        var module = JSInterop.SetupModule("./_content/ZenithUI/js/zen-dom.js");
+        module.SetupVoid("focusElement", _ => true).SetVoidResult();
+
+        var cut = Render<ZenTextInput>(p => p.Add(x => x.Value, "hello"));
+        await cut.InvokeAsync(() => cut.Instance.FocusAsync(selectAll: true));
+
+        var call = module.VerifyInvoke("focusElement");
+        call.Arguments[0].ShouldBe(cut.Find("input").Id);
+        call.Arguments[1].ShouldBe(true);
+    }
+
+    [Fact]
+    public void TextArea_AutoGrowKeepsItsRowsAsAFloor()
+    {
+        // field-sizing: content ignores rows, so without a min-height an empty auto-grow field
+        // rendered one line tall whatever Rows said, and only grew once the user pressed Enter.
+        var cut = Render<ZenTextArea>(p => p.Add(x => x.Rows, 4));
+
+        cut.Find("textarea").GetAttribute("style")!.ShouldContain("min-height:calc(4lh");
+    }
+
+    [Fact]
+    public void TextArea_FixedHeightLeavesSizingToRows()
+    {
+        var cut = Render<ZenTextArea>(p => p.Add(x => x.AutoGrow, false));
+
+        cut.Find("textarea").HasAttribute("style").ShouldBeFalse();
+    }
 
     [Fact]
     public void TextArea_CounterRequiresALimit()
