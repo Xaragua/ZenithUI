@@ -4,6 +4,18 @@ All notable changes to ZenithUI are documented here. The format follows
 [Keep a Changelog](https://keepachangelog.com/en/1.1.0/) and the project adheres to
 [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.0.0] — 2026-09-28
+
+The first stable release. It is `1.0.0-rc.1.5` promoted unchanged: no API, markup or stylesheet
+differences, so any release-candidate code builds against it as is. From here the public API
+follows Semantic Versioning, and a breaking change means `2.0.0`.
+
+Apps on a release candidate can move to the stable version:
+
+```bash
+dotnet add package ZenithUI --version 1.0.0
+```
+
 ## [1.0.0-rc.1.5] — 2026-09-25
 
 Additions and fixes, no breaking changes. `1.0.0-rc.1.4` code builds unchanged against it. New

@@ -1,9 +1,10 @@
 # ZenithUI — implementation plan
 
-> **Status:** M0 through M6 complete (2026-09-23), shipping as `1.0.0-rc.1.3`. The consumer-`@theme`
-> gap is closed, the package is verified from a feed by both a Blazor Web App and a standalone
-> WebAssembly app, and the accessibility sweep is clean across every page, both palettes and nine
-> interactive states. `1.0.0` follows whatever the release candidate turns up.
+> **Status:** M0 through M7 complete, shipped as `1.0.0` (2026-09-28), which is `1.0.0-rc.1.5`
+> promoted unchanged. The consumer-`@theme` gap is closed, the package is verified from a feed by
+> both a Blazor Web App and a standalone WebAssembly app, and the accessibility sweep is clean
+> across every page, both palettes and every interactive state. The public API now follows
+> Semantic Versioning.
 > This is the plan of record. It is kept current: where implementation contradicted the original
 > plan, the plan was corrected and the change noted under [Deviations](#deviations-from-the-original-plan).
 

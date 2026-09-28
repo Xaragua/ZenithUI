@@ -3,13 +3,12 @@
 A TailwindCSS component library for Blazor. Render-mode agnostic, themed entirely through CSS
 custom properties, with first-class light and dark palettes.
 
-> **Status: M7 — `1.0.0-rc.1.5`.** Every component in the plan ships: tokens and theming, primitives,
+> **Status: `1.0.0`, stable.** Every component in the plan ships: tokens and theming, primitives,
 > the full form control set, the overlay family (modal + toast services, popover, combobox, list),
 > the data components (table, tree, timeline) and the application shell. M7 adds a table that reads
 > from a server, virtualizes and groups, a lookup whose popup is that table, and a wizard stepper. The package is consumed
 > and verified from a feed by both a Blazor Web App and a standalone WebAssembly app, the
-> accessibility sweep is clean, and the API is frozen pending whatever a release candidate turns
-> up.
+> accessibility sweep is clean, and the public API follows Semantic Versioning from here on.
 
 ## Why another Blazor component library
 
@@ -214,6 +213,8 @@ a palette fix is one edit rather than a guess-and-rerun loop:
 | **rc.1.2** ✅ | Fix: `zenith.css` and `zenith.nopreflight.css` ship as static web assets again, so `_content/ZenithUI/zenith.css` resolves in consuming apps |
 | **rc.1.3** ✅ | Layout without Tailwind: `ZenStack`, `ZenGrid` + `ZenGridItem`, `ZenContainer`, `ZenSpacer`, and a test that every class they emit is in `zenith.css` |
 | **M7** ✅ `rc.1.4` | `ZenTable` `ItemsProvider` (server paging and sorting), virtualization and grouping; `ZenLookup<TItem>`, a search field whose popup is a table, with pick-on-click or confirm-to-commit; `ZenStepper` + `ZenStep`, a wizard with per-step validation |
+| **rc.1.5** ✅ | `ZenColumn.Interactive`, `AutoFocus` / `FocusAsync` on form controls, nav `IconSize`, and a collapsible icon-only `ZenSideNav` rail |
+| **1.0.0** ✅ | `rc.1.5` promoted to stable, unchanged |
 
 ## Documentation
 
