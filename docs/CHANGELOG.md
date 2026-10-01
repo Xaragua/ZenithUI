@@ -4,6 +4,82 @@ All notable changes to ZenithUI are documented here. The format follows
 [Keep a Changelog](https://keepachangelog.com/en/1.1.0/) and the project adheres to
 [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.1.0] — Unreleased
+
+Additions and one fix. Nothing is breaking: `1.0.0` code builds and renders unchanged, in English,
+with no new registration. New parameters default to the old behaviour.
+
+### Added
+
+- **Localization.** Every string the library renders comes from resources in the current UI
+  culture. That covers labels, accessible names, the table pager, stepper buttons and validation
+  messages. Ships `en-US` (default), `es-ES` and `es-DO`, which overrides only the strings where
+  Dominican usage differs and falls back to `es` for the rest. See
+  [`localization.md`](localization.md).
+  - Parameters that defaulted to English text now default to `null`, meaning "localized". They keep
+    their names and types, and a value you pass still wins.
+  - Register your own `IStringLocalizer<ZenStrings>` to override or add text app-wide;
+    `ZenStrings.Default` is the built-in one to fall back on.
+  - `AddZenithUI()` registers `IStringLocalizer<ZenStrings>`. It's closed, so an app calling
+    `AddLocalization()` doesn't get the framework's resolver, which would look for these resources
+    under the app's `ResourcesPath` and render key names.
+  - New package dependency: `Microsoft.Extensions.Localization.Abstractions`.
+- **`GroupFooterTemplate`** closes each group of a grouped `ZenTable` with a footer row. It comes in
+  two forms, and both can be set:
+  - `ZenTable.GroupFooterTemplate` mirrors `GroupHeaderTemplate`, as one cell spanning the table.
+  - `ZenColumn.GroupFooterTemplate` puts a cell under its own column, with that column's alignment:
+    the place for a subtotal.
+
+  Both receive the whole `ZenTableGroup<TItem>`, rows on other pages included. A footer follows
+  the group's last row, so a group running over a page boundary closes on the page where it ends.
+  A collapsed group shows none, and footers don't count toward paging, like headers.
+- **`ZenSplitButton`** and **`ZenMenuItem`**: a primary action beside a menu of related ones, as
+  two real buttons.
+  - The chevron implements the WAI-ARIA menu button pattern. Arrow keys move through the menu and
+    wrap, skipping disabled items. Home and End jump to the ends. Escape returns focus to the
+    chevron, and Tab closes the menu.
+  - Items can be links (`Href`) or carry an `Intent` for destructive actions.
+  - Under static rendering the primary action still works and the chevron is disabled, because the
+    menu needs a render mode to position.
+- **`ZenMessage`**: an inline status, like PrimeVue's Message or daisyUI's Alert. It takes Soft,
+  Outline, Solid and Ghost variants in every intent, and supports a title, actions and dismissal
+  (self-managed, or through `@bind-Visible`).
+  - It is *not* a live region by default, because a message present on page load should be read,
+    not announced. `Announce="true"` makes it `role="alert"` for danger and warning and
+    `role="status"` otherwise.
+- **`ZenIcons.ForIntent`**: the status glyph for an intent, shared by `ZenToast` and `ZenMessage`.
+- **`ZenStyles.JoinedStart` / `JoinedEnd`**: square the meeting corners of joined controls.
+
+### Fixed
+
+- **`ZenColumn Align="End"` (and `Center`) aligned the cells but not the header.** The header cell
+  carried a hardcoded `text-start` alongside the column's own class. Tailwind emits `.text-start`
+  after `.text-end` and `.text-center`, so at equal specificity it won. Alignment now comes only
+  from the column. An end-aligned sortable header also puts its sort indicator before the label,
+  so the label lines up with the numbers under it.
+
+### Found along the way
+
+Both of these were in this release's new code. Neither was visible to the unit tests, and both
+were found in the browser before the release, as CLAUDE.md predicts.
+
+- **Under WebAssembly every component threw `TypeInitializationException`.** `ZenStrings.Default`
+  was initialised before the resource name it read, and the WebAssembly runtime runs static
+  initialisers eagerly where the server's JIT had deferred them. The name is now a constant.
+  Found by the accessibility sweep, as the Blazor error bar on `/render-modes`.
+- **Opening the split button's menu did not move focus into it.** A parent's after-render runs
+  before its children's, so focus was sent to an item in a popover that was still
+  `display: none`. `ZenPopover` gained an internal `EnsureSyncedAsync`, which the owner awaits
+  before focusing. A test now pins the order.
+
+### Behaviour changes worth knowing
+
+- `ZenLookup.NoResultsDescription` and `ZenSpinner.Label`: `null` now means "the localized
+  default". To render nothing, pass `""`. That already worked for the spinner; it is new for the
+  lookup.
+- `ZenThemeToggle`'s "Switch to … theme" title lower-cases the label in the UI culture rather
+  than the invariant one.
+
 ## [1.0.0] — 2026-09-28
 
 The first stable release. It is `1.0.0-rc.1.5` promoted unchanged: no API, markup or stylesheet

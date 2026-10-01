@@ -182,6 +182,39 @@ states, at the same tag set.
 tests: the cursor keys, Escape discarding a pending row, and focus moving to the step heading. axe
 does not check keyboard operation. As with every pattern here, no screen reader has narrated them.
 
+## The 1.1.0 audit
+
+Six states were added for the release's new surfaces:
+
+- the split button's menu open
+- a message dismissed, with an announced message shown in its place
+- the grouped table's footers at 390 px
+- the data page and an invalid form submission in es-ES
+- the split button's menu in es-DO
+
+The Spanish states also check that `<html lang>` follows the culture. The first run found one
+failure, and it was not an accessibility bug.
+
+### Every WebAssembly component threw — *fixed*
+
+The Blazor error bar on `/render-modes` failed `region` in light mode and `color-contrast` in dark.
+Behind it was a `TypeInitializationException` in the WebAssembly island. The localizer's resource
+name was a static field read during static initialisation, before it was set. The server's JIT
+deferred that read and the WebAssembly runtime did not. The unit tests and both server-rendered
+modes were fine, so the sweep's WebAssembly card was the only place it could show.
+
+### Focus did not enter the split button's menu — *fixed*
+
+This was found by the screenshot pass rather than axe, which does not check focus. The menu opened
+with focus left on `<body>`, because the owner focused an item before its popover had been shown.
+bUnit cannot see this, since it has no layout and `focus()` on a hidden element is not an error.
+A unit test now pins the order of the two JavaScript calls.
+
+### Result
+
+Zero violations across all twenty-six page/palette combinations and all twenty-four interactive
+states. Every state reported reaching the condition it drives, not merely running.
+
 ## What the checks cannot see
 
 Stated plainly, because "passes axe" is routinely read as more than it is. Automated rules catch

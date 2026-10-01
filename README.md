@@ -25,6 +25,10 @@ custom properties, with first-class light and dark palettes.
   every component's ARIA contract has unit tests, and an axe-core sweep drives the running demo —
   every page in both palettes, plus the states that only exist after an interaction. See
   [`docs/accessibility.md`](https://github.com/Xaragua/ZenithUI/blob/main/docs/accessibility.md), including what those checks cannot see.
+- **Localized.** Every label, accessible name and validation message follows the UI culture.
+  English (`en-US`) is the default; Spanish (`es-ES`) and Dominican Spanish (`es-DO`) ship in the
+  box, and any string can be overridden per component or app-wide. See
+  [`docs/localization.md`](https://github.com/Xaragua/ZenithUI/blob/main/docs/localization.md).
 
 ## Getting started
 
@@ -227,6 +231,7 @@ repository root, because it is the GitHub landing page.
 | [`docs/theming.md`](https://github.com/Xaragua/ZenithUI/blob/main/docs/theming.md) | The token surface, the three-state light/dark model, rebranding, and what an app running its own Tailwind has to do |
 | [`docs/plan.md`](https://github.com/Xaragua/ZenithUI/blob/main/docs/plan.md) | The implementation plan of record — architecture, component inventory, milestones, and the design decisions behind them |
 | [`docs/accessibility.md`](https://github.com/Xaragua/ZenithUI/blob/main/docs/accessibility.md) | What the library guarantees, the three layers that verify it, the M6 and M7 audit findings, and what automated checks cannot see |
+| [`docs/localization.md`](https://github.com/Xaragua/ZenithUI/blob/main/docs/localization.md) | The cultures that ship, wiring a culture per hosting model, overriding the library's text, and adding a language |
 | [`docs/CHANGELOG.md`](https://github.com/Xaragua/ZenithUI/blob/main/docs/CHANGELOG.md) | What shipped, and what was fixed along the way |
 
 ## License
