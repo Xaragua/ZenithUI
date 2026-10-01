@@ -64,6 +64,135 @@
     </div>
 </section>
 
+<!-- ----------------------------------------------------------- Split button -->
+<section class="mt-12">
+    <h2 class="text-lg font-semibold">ZenSplitButton</h2>
+    <p class="mt-2 max-w-3xl text-sm text-content-muted">
+        A primary action and a menu of related ones, as two real buttons. The chevron is a menu
+        button: <strong>ArrowDown</strong> or <strong>Enter</strong> opens it on the first item,
+        <strong>ArrowUp</strong> on the last; the arrows move and wrap, skipping disabled items;
+        <strong>Escape</strong> closes it and returns focus to the chevron.
+    </p>
+
+    <div class="mt-4 space-y-4">
+        @foreach (var variant in Variants)
+        {
+            <ZenCard Title="@variant.ToString()" TitleLevel="3" Padding="ZenSize.Medium">
+                <div class="flex flex-wrap items-center gap-3">
+                    @foreach (var intent in SplitIntents)
+                    {
+                        <ZenSplitButton Intent="intent" Variant="variant" OnClick="@(() => _splitAction = $"{intent}: Save")">
+                            <ChildContent>Save</ChildContent>
+                            <MenuContent>
+                                <ZenMenuItem Icon="@ZenIcons.Check" OnClick="@(() => _splitAction = $"{intent}: Save as draft")">Save as draft</ZenMenuItem>
+                                <ZenMenuItem OnClick="@(() => _splitAction = $"{intent}: Save and close")">Save and close</ZenMenuItem>
+                                <ZenMenuItem Disabled="true">Save as template</ZenMenuItem>
+                                <ZenMenuItem Intent="ZenIntent.Danger" OnClick="@(() => _splitAction = $"{intent}: Discard changes")">Discard changes</ZenMenuItem>
+                            </MenuContent>
+                        </ZenSplitButton>
+                    }
+                </div>
+            </ZenCard>
+        }
+
+        <ZenCard Title="Sizes and state" TitleLevel="3">
+            <div class="flex flex-wrap items-center gap-3">
+                @foreach (var size in Sizes)
+                {
+                    <ZenSplitButton Intent="ZenIntent.Primary" Size="size" Icon="@ZenIcons.Check">
+                        <ChildContent>@size.ToString()</ChildContent>
+                        <MenuContent>
+                            <ZenMenuItem>Another action</ZenMenuItem>
+                        </MenuContent>
+                    </ZenSplitButton>
+                }
+
+                <ZenSplitButton Intent="ZenIntent.Primary" Disabled="true">
+                    <ChildContent>Disabled</ChildContent>
+                    <MenuContent><ZenMenuItem>Unreachable</ZenMenuItem></MenuContent>
+                </ZenSplitButton>
+
+                <ZenSplitButton Intent="ZenIntent.Primary" Loading="@_saving" OnClick="SimulateSaveAsync">
+                    <ChildContent>@(_saving ? "Saving" : "Load for 2s")</ChildContent>
+                    <MenuContent><ZenMenuItem>Blocked while loading</ZenMenuItem></MenuContent>
+                </ZenSplitButton>
+            </div>
+
+            <p class="mt-4 border-t border-border pt-4 text-sm text-content-muted" aria-live="polite">
+                Last action: @(_splitAction ?? "none yet")
+            </p>
+        </ZenCard>
+    </div>
+</section>
+
+<!-- ---------------------------------------------------------------- Message -->
+<section class="mt-12">
+    <h2 class="text-lg font-semibold">ZenMessage</h2>
+    <p class="mt-2 max-w-3xl text-sm text-content-muted">
+        An inline status that belongs to a place on the page. Not a live region unless
+        <code>Announce</code> is set: a message present when the page loads is read when the user
+        reaches it, not announced over the page.
+    </p>
+
+    <div class="mt-4 space-y-4">
+        @foreach (var variant in Variants)
+        {
+            <ZenCard Title="@variant.ToString()" TitleLevel="3" Padding="ZenSize.Medium">
+                <div class="grid gap-3 md:grid-cols-2">
+                    @foreach (var intent in Intents)
+                    {
+                        <ZenMessage Intent="intent" Variant="variant" Title="@($"{intent} message")">
+                            The quick brown fox jumps over the lazy dog.
+                        </ZenMessage>
+                    }
+                </div>
+            </ZenCard>
+        }
+
+        <ZenCard Title="Sizes, actions and dismissal" TitleLevel="3">
+            <div class="space-y-3">
+                @foreach (var size in Sizes)
+                {
+                    <ZenMessage Intent="ZenIntent.Info" Size="size">A @size.ToString().ToLowerInvariant() message, with no title.</ZenMessage>
+                }
+
+                <ZenMessage Intent="ZenIntent.Warning" Title="Your trial ends in three days">
+                    <ChildContent>Upgrade now to keep your projects and history.</ChildContent>
+                    <Actions>
+                        <ZenButton Size="ZenSize.Small" Intent="ZenIntent.Warning" Variant="ZenVariant.Solid">Upgrade</ZenButton>
+                        <ZenButton Size="ZenSize.Small" Variant="ZenVariant.Ghost">Remind me later</ZenButton>
+                    </Actions>
+                </ZenMessage>
+
+                <ZenMessage Intent="ZenIntent.Success" Dismissible="true" @bind-Visible="_messageVisible">
+                    Saved. This one can be dismissed &mdash; the page owns its visibility through
+                    <code>@@bind-Visible</code>.
+                </ZenMessage>
+
+                @if (!_messageVisible)
+                {
+                    <ZenButton Size="ZenSize.Small" Variant="ZenVariant.Outline" OnClick="@(() => _messageVisible = true)">Show it again</ZenButton>
+                }
+
+                <div class="border-t border-border pt-3">
+                    <ZenButton Size="ZenSize.Small" Intent="ZenIntent.Danger" Variant="ZenVariant.Soft" OnClick="@(() => _announced = !_announced)">
+                        @(_announced ? "Clear the error" : "Fail to save")
+                    </ZenButton>
+
+                    @* Rendered conditionally, not toggled: a live region present from the first paint
+                       announces nothing in most screen readers. *@
+                    @if (_announced)
+                    {
+                        <ZenMessage Intent="ZenIntent.Danger" Announce="true" Title="Could not save" class="mt-3">
+                            The server did not respond. Your changes are still here; try again.
+                        </ZenMessage>
+                    }
+                </div>
+            </div>
+        </ZenCard>
+    </div>
+</section>
+
 <!-- ----------------------------------------------------------------- Badges -->
 <section class="mt-12">
     <h2 class="text-lg font-semibold">ZenBadge</h2>
@@ -350,6 +479,16 @@
         .Build()!;
 
     private bool _saving;
+
+    // Every intent would be eight split buttons a row; four are enough to see the joins.
+    private static readonly ZenIntent[] SplitIntents =
+    [
+        ZenIntent.Neutral, ZenIntent.Primary, ZenIntent.Success, ZenIntent.Danger,
+    ];
+
+    private string? _splitAction;
+    private bool _messageVisible = true;
+    private bool _announced;
 
     private async Task SimulateSaveAsync()
     {

@@ -322,7 +322,7 @@ public abstract class ZenInputBase<TValue> : ZenComponentBase, IDisposable
         catch (Exception ex) when (ex is FormatException or InvalidCastException or OverflowException or ArgumentException)
         {
             result = default!;
-            validationErrorMessage = $"The {DisplayName} field is not valid.";
+            validationErrorMessage = Localize(ZenStringKeys.Validation_Invalid, DisplayName);
             return false;
         }
     }

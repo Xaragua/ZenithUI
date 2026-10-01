@@ -1,4 +1,5 @@
 @namespace ZenithUI
+@inject IServiceProvider ZenServices
 
 @*
     The body of IZenModalService.ConfirmAsync. Rendered inside the host's ZenModal like any other
@@ -21,13 +22,13 @@
     <ZenButton Variant="ZenVariant.Ghost"
                Id="@CancelId"
                OnClick="Cancel">
-        @Options.CancelText
+        @(Options.CancelText ?? ZenStrings.Resolve(ZenServices)[ZenStringKeys.Common_Cancel])
     </ZenButton>
 
     <ZenButton Intent="Options.ConfirmIntent"
                Id="@ConfirmId"
                OnClick="Confirm">
-        @Options.ConfirmText
+        @(Options.ConfirmText ?? ZenStrings.Resolve(ZenServices)[ZenStringKeys.Common_Confirm])
     </ZenButton>
 </div>
 

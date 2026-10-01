@@ -247,6 +247,15 @@ public static class ZenStyles
         _ => "size-9",
     };
 
+    /// <summary>
+    /// The leading control of a joined group - a split button's action - with square corners on
+    /// the side that meets its neighbour. Logical, so the join follows the writing direction.
+    /// </summary>
+    public const string JoinedStart = "rounded-e-none";
+
+    /// <summary>The trailing control of a joined group, square on the side that meets its neighbour.</summary>
+    public const string JoinedEnd = "rounded-s-none";
+
     /// <summary>Corner radius matching a control size.</summary>
     public static string ControlRadius(ZenSize size) => size switch
     {

@@ -30,7 +30,7 @@
     <CascadingValue Value="Context" IsFixed="true">
         @if (ShowSkipLink)
         {
-            <a class="zen-skip-link" href="#@MainId">@SkipLinkText</a>
+            <a class="zen-skip-link" href="#@MainId">@(SkipLinkText ?? Localize(ZenStringKeys.AppShell_SkipToContent))</a>
         }
 
         @Header
@@ -105,7 +105,7 @@
 
     /// <summary>Text of the skip link.</summary>
     [Parameter]
-    public string SkipLinkText { get; set; } = "Skip to main content";
+    public string? SkipLinkText { get; set; }
 
     /// <summary>
     /// Element id for <c>&lt;main&gt;</c>. Set it to give <c>FocusOnNavigate</c> a fixed target.

@@ -162,6 +162,22 @@ public partial class StylesheetCoverageTests : BunitContext
                 .Add(x => x.PageSize, 2)).Markup);
         }
 
+        // Group footers, both kinds, under an end-aligned sortable column.
+        Collect(classes, Render<ZenTable<Row>>(p => p
+            .Add(x => x.Items, rows)
+            .Add(x => x.Columns, (RenderFragment)(builder =>
+            {
+                builder.OpenComponent<ZenColumn<Row>>(0);
+                builder.AddComponentParameter(1, nameof(ZenColumn<Row>.Title), "Name");
+                builder.AddComponentParameter(2, nameof(ZenColumn<Row>.Field), (Func<Row, object?>)(r => r.Name));
+                builder.AddComponentParameter(3, nameof(ZenColumn<Row>.Align), ZenAlign.End);
+                builder.AddComponentParameter(4, nameof(ZenColumn<Row>.GroupFooterTemplate),
+                    (RenderFragment<ZenTableGroup<Row>>)(g => b => b.AddContent(0, g.Count)));
+                builder.CloseComponent();
+            }))
+            .Add(x => x.GroupBy, r => r.Group)
+            .Add(x => x.GroupFooterTemplate, g => b => b.AddContent(0, g.Text))).Markup);
+
         Collect(classes, Render<ZenTable<Row>>(p => p
             .Add(x => x.Items, rows)
             .Add(x => x.Columns, RowColumns)
@@ -184,6 +200,92 @@ public partial class StylesheetCoverageTests : BunitContext
 
         // Hooks for the component's own tests and for consumers' CSS, deliberately unstyled.
         classes.Remove("zen-table-group");
+        classes.Remove("zen-table-group-footer");
+
+        AssertAllPresent(classes);
+    }
+
+    [Fact]
+    public void MessageClasses_AreAllInTheStylesheet()
+    {
+        // ZenMessage composes its panel from intent x variant x size, so most of its classes only
+        // exist in one combination. Every combination is rendered, dismissible and with a title,
+        // so the close button and title styles are in the set too.
+        var classes = new SortedSet<string>(StringComparer.Ordinal);
+
+        foreach (var intent in Enum.GetValues<ZenIntent>())
+        {
+            foreach (var variant in Enum.GetValues<ZenVariant>())
+            {
+                foreach (var size in Enum.GetValues<ZenSize>())
+                {
+                    Collect(classes, Render<ZenMessage>(p => p
+                        .Add(x => x.Intent, intent)
+                        .Add(x => x.Variant, variant)
+                        .Add(x => x.Size, size)
+                        .Add(x => x.Title, "Title")
+                        .Add(x => x.Dismissible, true)
+                        .Add(x => x.ChildContent, "Body")
+                        .Add(x => x.Actions, "Action")).Markup);
+                }
+            }
+        }
+
+        classes.Remove("zen-message");
+
+        AssertAllPresent(classes);
+    }
+
+    [Fact]
+    public void SplitButtonClasses_AreAllInTheStylesheet()
+    {
+        // Rendered open, so the menu and both kinds of item - plain, danger, disabled, link - are
+        // in the markup alongside every intent, variant and size of the two buttons.
+        JSInterop.Mode = JSRuntimeMode.Loose;
+
+        var classes = new SortedSet<string>(StringComparer.Ordinal);
+
+        RenderFragment menu = b =>
+        {
+            b.OpenComponent<ZenMenuItem>(0);
+            b.AddComponentParameter(1, nameof(ZenMenuItem.Icon), ZenIcons.Check);
+            b.AddComponentParameter(2, nameof(ZenMenuItem.ChildContent), (RenderFragment)(c => c.AddContent(0, "One")));
+            b.CloseComponent();
+
+            b.OpenComponent<ZenMenuItem>(3);
+            b.AddComponentParameter(4, nameof(ZenMenuItem.Intent), ZenIntent.Danger);
+            b.AddComponentParameter(5, nameof(ZenMenuItem.ChildContent), (RenderFragment)(c => c.AddContent(0, "Delete")));
+            b.CloseComponent();
+
+            b.OpenComponent<ZenMenuItem>(6);
+            b.AddComponentParameter(7, nameof(ZenMenuItem.Disabled), true);
+            b.CloseComponent();
+
+            b.OpenComponent<ZenMenuItem>(8);
+            b.AddComponentParameter(9, nameof(ZenMenuItem.Href), "/x");
+            b.CloseComponent();
+        };
+
+        foreach (var intent in Enum.GetValues<ZenIntent>())
+        {
+            foreach (var variant in Enum.GetValues<ZenVariant>())
+            {
+                foreach (var size in Enum.GetValues<ZenSize>())
+                {
+                    var cut = Render<ZenSplitButton>(p => p
+                        .Add(x => x.Intent, intent)
+                        .Add(x => x.Variant, variant)
+                        .Add(x => x.Size, size)
+                        .Add(x => x.ChildContent, "Save")
+                        .Add(x => x.MenuContent, menu));
+
+                    cut.Find("[aria-haspopup=menu]").Click();
+                    Collect(classes, cut.Markup);
+                }
+            }
+        }
+
+        Collect(classes, Render<ZenSplitButton>(p => p.Add(x => x.FullWidth, true)).Markup);
 
         AssertAllPresent(classes);
     }

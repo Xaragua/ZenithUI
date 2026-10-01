@@ -41,15 +41,62 @@ public class ZenTableTests : BunitContext
     };
 
     private IRenderedComponent<ZenTable<Order>> Table(
-        Action<ComponentParameterCollectionBuilder<ZenTable<Order>>>? extra = null) =>
+        Action<ComponentParameterCollectionBuilder<ZenTable<Order>>>? extra = null,
+        RenderFragment? columns = null) =>
         Render<ZenTable<Order>>(p =>
         {
             p.Add(x => x.Items, Orders)
-                .Add(x => x.Columns, TwoColumns)
+                .Add(x => x.Columns, columns ?? TwoColumns)
                 .Add(x => x.Label, "Orders");
 
             extra?.Invoke(p);
         });
+
+    // ---- Alignment ----------------------------------------------------------------------------
+
+    private static readonly string[] AlignClasses = ["text-start", "text-center", "text-end", "text-left", "text-right"];
+
+    [Theory]
+    [InlineData(ZenAlign.Start, "text-start")]
+    [InlineData(ZenAlign.Center, "text-center")]
+    [InlineData(ZenAlign.End, "text-end")]
+    public void Align_GivesTheHeaderAndTheCellsExactlyOneAlignmentClass(ZenAlign align, string expected)
+    {
+        // The header used to carry a hardcoded text-start next to the column's own class. Tailwind
+        // emits .text-start after .text-end, so it won, and every right-aligned column had a
+        // left-aligned header. One alignment class per cell is the only arrangement that cannot
+        // depend on stylesheet order.
+        RenderFragment column = builder =>
+        {
+            builder.OpenComponent<ZenColumn<Order>>(0);
+            builder.AddComponentParameter(1, nameof(ZenColumn<Order>.Title), "Amount");
+            builder.AddComponentParameter(2, nameof(ZenColumn<Order>.Field), (Func<Order, object?>)(o => o.Amount));
+            builder.AddComponentParameter(3, nameof(ZenColumn<Order>.Align), align);
+            builder.CloseComponent();
+        };
+
+        var cut = Table(columns: column);
+
+        foreach (var cell in new[] { cut.Find("thead th"), cut.Find("tbody td") })
+        {
+            cell.ClassList.Where(AlignClasses.Contains).ShouldBe([expected]);
+        }
+    }
+
+    [Fact]
+    public void AnEndAlignedSortableHeader_PutsItsIndicatorBeforeTheLabel()
+    {
+        RenderFragment column = builder =>
+        {
+            builder.OpenComponent<ZenColumn<Order>>(0);
+            builder.AddComponentParameter(1, nameof(ZenColumn<Order>.Title), "Amount");
+            builder.AddComponentParameter(2, nameof(ZenColumn<Order>.Field), (Func<Order, object?>)(o => o.Amount));
+            builder.AddComponentParameter(3, nameof(ZenColumn<Order>.Align), ZenAlign.End);
+            builder.CloseComponent();
+        };
+
+        Table(columns: column).Find("thead th button").ClassList.ShouldContain("flex-row-reverse");
+    }
 
     // ---- Column collection --------------------------------------------------------------------
 
@@ -577,11 +624,12 @@ public class ZenTableTests : BunitContext
     ];
 
     private IRenderedComponent<ZenTable<Order>> HierarchyTable(
-        Action<ComponentParameterCollectionBuilder<ZenTable<Order>>>? extra = null) =>
+        Action<ComponentParameterCollectionBuilder<ZenTable<Order>>>? extra = null,
+        RenderFragment? columns = null) =>
         Render<ZenTable<Order>>(p =>
         {
             p.Add(x => x.Items, Nested)
-                .Add(x => x.Columns, TwoColumns)
+                .Add(x => x.Columns, columns ?? TwoColumns)
                 .Add(x => x.ChildrenProvider, o => o.Lines.Length == 0 ? null : o.Lines)
                 .Add(x => x.IsInitiallyExpanded, o => o.Id == "A-1");
 

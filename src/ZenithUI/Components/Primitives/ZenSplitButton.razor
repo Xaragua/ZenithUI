@@ -1,0 +1,317 @@
+@namespace ZenithUI
+@inherits ZenJsComponentBase
+
+@*
+    A button with a primary action and a menu of related ones: "Save" beside a chevron offering
+    "Save as draft" and "Save and close".
+
+    Two real buttons rather than one button with a click zone. They are two actions, and each
+    needs its own accessible name, its own focus stop and its own disabled state - a single control
+    cannot say "this half saves and that half opens a menu" to anyone who cannot see the halves.
+
+    THE MENU BUTTON PATTERN. The chevron carries aria-haspopup="menu" and aria-expanded, and names
+    the menu it controls only while the menu exists. Opening it - by click, Enter, Space or
+    ArrowDown - moves focus to the first item; ArrowUp opens on the last. Inside, the arrows move
+    between items and wrap, Home and End jump, Escape closes and puts focus back on the chevron,
+    and Tab closes and lets focus go where Tab takes it. Choosing an item closes the menu and
+    returns focus to the chevron, because the item that had it no longer exists.
+
+    The items are moved between with focus, not aria-activedescendant. Each item is a real
+    <button role="menuitem">, so Enter and Space activate it through the browser's own click
+    rather than through a key handler that has to know which item is "current".
+
+    STATIC RENDERING. The primary action is an ordinary button or link and works with no render
+    mode. The menu cannot - it is a ZenPopover, which needs JavaScript to position - so until the
+    renderer is interactive the chevron is disabled rather than present and dead. Where every
+    action must work without a render mode, render them as separate buttons.
+
+    Joined, not merged. A one-pixel gap separates the halves of a filled button, drawn by whatever
+    is behind it, so the divider is right on every surface and in both palettes without a colour of
+    its own. An outlined button overlaps its borders instead, so the line between the halves is one
+    border wide rather than two.
+*@
+
+<div id="@Id"
+     class="@RootClass(GroupClass)"
+     style="@Style"
+     @attributes="AttributesWithoutClass">
+    <ZenButton Intent="Intent"
+               Variant="Variant"
+               Size="Size"
+               Href="@Href"
+               Target="@Target"
+               ButtonType="@ButtonType"
+               Icon="@Icon"
+               Disabled="Disabled"
+               Loading="Loading"
+               FullWidth="FullWidth"
+               AriaLabel="@AriaLabel"
+               class="@ZenStyles.JoinedStart"
+               OnClick="OnClick">
+        @ChildContent
+    </ZenButton>
+
+    <ZenPopover @ref="_popover"
+                Open="_open"
+                OpenChanged="HandleOpenChangedAsync"
+                Placement="Placement"
+                Role="menu"
+                LabelledBy="@ToggleId"
+                PanelId="@MenuId"
+                CloseOnEscape="false"
+                Class="min-w-44">
+        <Anchor>
+            <ZenButton Id="@ToggleId"
+                       Intent="Intent"
+                       Variant="Variant"
+                       Size="Size"
+                       Icon="@ZenIcons.ChevronDown"
+                       IconOnly="true"
+                       AriaLabel="@(MenuLabel ?? Localize(ZenStringKeys.SplitButton_MoreOptions))"
+                       Disabled="@(Disabled || Loading || !RendererInfo.IsInteractive)"
+                       class="@ToggleClass"
+                       aria-haspopup="menu"
+                       aria-expanded="@(_open ? "true" : "false")"
+                       aria-controls="@(_open ? MenuId : null)"
+                       OnClick="ToggleAsync"
+                       @onkeydown="HandleToggleKeyDownAsync" />
+        </Anchor>
+        <ChildContent>
+            <CascadingValue Value="this" IsFixed="true">
+                @MenuContent
+            </CascadingValue>
+        </ChildContent>
+    </ZenPopover>
+</div>
+
+@code {
+    private readonly List<ZenMenuItem> _items = [];
+    private ZenPopover? _popover;
+    private bool _open;
+    private string? _focusNext;
+
+    /// <inheritdoc />
+    /// <remarks>Only to move focus between the chevron and the items.</remarks>
+    protected override string? ModulePath => "./_content/ZenithUI/js/zen-dom.js";
+
+    /// <summary>The primary action's label.</summary>
+    [Parameter]
+    public RenderFragment? ChildContent { get; set; }
+
+    /// <summary>The menu: <see cref="ZenMenuItem"/>s.</summary>
+    [Parameter]
+    public RenderFragment? MenuContent { get; set; }
+
+    /// <summary>Raised when the primary action is clicked.</summary>
+    [Parameter]
+    public EventCallback<MouseEventArgs> OnClick { get; set; }
+
+    /// <summary>Makes the primary action a link. The menu is unaffected.</summary>
+    [Parameter]
+    public string? Href { get; set; }
+
+    /// <summary>The primary link's target. Only meaningful with <see cref="Href"/>.</summary>
+    [Parameter]
+    public string? Target { get; set; }
+
+    /// <summary>
+    /// The primary button's <c>type</c>. Set <c>"submit"</c> for a split button that saves a
+    /// form; the chevron is always <c>type="button"</c>.
+    /// </summary>
+    [Parameter]
+    public string ButtonType { get; set; } = "button";
+
+    /// <summary>Semantic colour role.</summary>
+    [Parameter]
+    public ZenIntent Intent { get; set; } = ZenIntent.Neutral;
+
+    /// <summary>Visual weight.</summary>
+    [Parameter]
+    public ZenVariant Variant { get; set; } = ZenVariant.Solid;
+
+    /// <summary>Control size.</summary>
+    [Parameter]
+    public ZenSize Size { get; set; } = ZenSize.Medium;
+
+    /// <summary>Leading icon on the primary action.</summary>
+    [Parameter]
+    public string? Icon { get; set; }
+
+    /// <summary>Disables both halves.</summary>
+    [Parameter]
+    public bool Disabled { get; set; }
+
+    /// <summary>
+    /// Shows a spinner on the primary action and disables both halves - choosing another action
+    /// while the first is still running is how a form gets submitted twice.
+    /// </summary>
+    [Parameter]
+    public bool Loading { get; set; }
+
+    /// <summary>Stretches the group to its container, giving the extra width to the primary action.</summary>
+    [Parameter]
+    public bool FullWidth { get; set; }
+
+    /// <summary>The primary action's accessible name, when its content is not text.</summary>
+    [Parameter]
+    public string? AriaLabel { get; set; }
+
+    /// <summary>The chevron's accessible name. Defaults to a localized "More options".</summary>
+    [Parameter]
+    public string? MenuLabel { get; set; }
+
+    /// <summary>Where the menu opens. Defaults to below, aligned to the group's end.</summary>
+    [Parameter]
+    public ZenPlacement Placement { get; set; } = ZenPlacement.BottomEnd;
+
+    /// <summary>The chevron's id, which also names the menu.</summary>
+    private string ToggleId => SubId("toggle");
+
+    private string MenuId => SubId("menu");
+
+    // ---- Items --------------------------------------------------------------------------------
+
+    /// <summary>Called by a <see cref="ZenMenuItem"/> as it is created.</summary>
+    /// <remarks>
+    /// The menu's content is rendered only while it is open, so the items are created afresh, in
+    /// document order, every time it opens. That is the whole ordering mechanism.
+    /// </remarks>
+    internal void Register(ZenMenuItem item) => _items.Add(item);
+
+    internal void Unregister(ZenMenuItem item) => _items.Remove(item);
+
+    /// <summary>An item was chosen: close, and give focus back to the chevron.</summary>
+    internal Task ItemActivatedAsync() => CloseAsync(returnFocus: true);
+
+    /// <summary>The menu's keyboard contract, for the item that has focus.</summary>
+    internal Task HandleItemKeyDownAsync(ZenMenuItem item, KeyboardEventArgs args)
+    {
+        var enabled = _items.Where(i => !i.Disabled).ToList();
+        var index = enabled.IndexOf(item);
+
+        switch (args.Key)
+        {
+            case "ArrowDown":
+                FocusItem(enabled, index + 1);
+                break;
+
+            case "ArrowUp":
+                FocusItem(enabled, index - 1);
+                break;
+
+            case "Home":
+                FocusItem(enabled, 0);
+                break;
+
+            case "End":
+                FocusItem(enabled, enabled.Count - 1);
+                break;
+
+            case "Escape":
+                return CloseAsync(returnFocus: true);
+
+            case "Tab":
+                // Closed without moving focus: Tab is already taking it somewhere, and the menu
+                // is a sibling of the chevron, so that somewhere is what follows the group.
+                return CloseAsync(returnFocus: false);
+        }
+
+        return Task.CompletedTask;
+    }
+
+    private void FocusItem(List<ZenMenuItem> enabled, int index)
+    {
+        if (enabled.Count == 0)
+        {
+            return;
+        }
+
+        // Wraps at both ends: the menu is short, and stopping dead at the bottom forces a user
+        // who wanted the first item to walk back past everything.
+        _focusNext = enabled[((index % enabled.Count) + enabled.Count) % enabled.Count].Id;
+        StateHasChanged();
+    }
+
+    // ---- Opening and closing ------------------------------------------------------------------
+
+    private Task ToggleAsync() => _open ? CloseAsync(returnFocus: true) : OpenAsync(last: false);
+
+    private Task HandleToggleKeyDownAsync(KeyboardEventArgs args) => args.Key switch
+    {
+        // Enter and Space reach ToggleAsync through the button's own click.
+        "ArrowDown" when !_open => OpenAsync(last: false),
+        "ArrowUp" when !_open => OpenAsync(last: true),
+        _ => Task.CompletedTask,
+    };
+
+    private Task OpenAsync(bool last)
+    {
+        _open = true;
+        _focusNext = last ? FocusLast : FocusFirst;
+        return Task.CompletedTask;
+    }
+
+    private Task CloseAsync(bool returnFocus)
+    {
+        _open = false;
+        _focusNext = returnFocus ? ToggleId : null;
+        StateHasChanged();
+        return Task.CompletedTask;
+    }
+
+    /// <summary>The popover asks to close - a click outside. Focus is wherever the click put it.</summary>
+    private Task HandleOpenChangedAsync(bool open) => open ? Task.CompletedTask : CloseAsync(returnFocus: false);
+
+    // Sentinels, because the items that will take focus on opening do not exist until the render
+    // that opens the menu has run.
+    private const string FocusFirst = "\u0001first";
+    private const string FocusLast = "\u0001last";
+
+    /// <inheritdoc />
+    protected override async Task OnAfterRenderAsync(bool firstRender)
+    {
+        await base.OnAfterRenderAsync(firstRender);
+
+        if (_focusNext is null || !IsJsReady)
+        {
+            return;
+        }
+
+        var target = _focusNext switch
+        {
+            FocusFirst => _items.FirstOrDefault(i => !i.Disabled)?.Id,
+            FocusLast => _items.LastOrDefault(i => !i.Disabled)?.Id,
+            var id => id,
+        };
+
+        _focusNext = null;
+
+        if (target is null)
+        {
+            return;
+        }
+
+        // This after-render runs before the popover's own, which is what shows the panel. Focusing
+        // an item first lands on an element that is still display: none, and focus() ignores it -
+        // so the panel is shown here, before the focus call, in the order they are awaited.
+        if (_popover is not null)
+        {
+            await _popover.EnsureSyncedAsync();
+        }
+
+        await InvokeModuleVoidAsync("focusElement", target);
+    }
+
+    // ---- Styling ------------------------------------------------------------------------------
+
+    private string GroupClass => CssBuilder
+        .Default(FullWidth ? "flex w-full items-stretch" : "inline-flex items-stretch")
+        // A pixel of gap between filled halves is the divider; outlined halves overlap instead.
+        .AddClass(Variant == ZenVariant.Outline ? null : "gap-px")
+        .Build()!;
+
+    private string ToggleClass => CssBuilder
+        .Default(ZenStyles.JoinedEnd)
+        .AddClass("-ms-px", Variant == ZenVariant.Outline)
+        .Build()!;
+}

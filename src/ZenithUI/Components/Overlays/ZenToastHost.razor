@@ -1,6 +1,7 @@
 @namespace ZenithUI
 @implements IDisposable
 @inject IZenToastService Toasts
+@inject IServiceProvider ZenServices
 
 @*
     Renders whatever IZenToastService is showing. Place one in the layout, once:
@@ -22,7 +23,7 @@
         {
             @* Keyed by instance: without it Blazor diffs two toasts of the same shape
                positionally and reuses the wrong one's timer state when the stack shifts. *@
-            <ZenToast @key="toast" Instance="toast" CloseLabel="@CloseLabel" />
+            <ZenToast @key="toast" Instance="toast" CloseLabel="@(CloseLabel ?? ZenStrings.Resolve(ZenServices)[ZenStringKeys.Common_Dismiss])" />
         }
     </div>
 }
@@ -38,7 +39,7 @@
 
     /// <summary>Accessible name for each toast's dismiss button.</summary>
     [Parameter]
-    public string CloseLabel { get; set; } = "Dismiss";
+    public string? CloseLabel { get; set; }
 
     /// <summary>Extra CSS classes for the stack container.</summary>
     [Parameter]

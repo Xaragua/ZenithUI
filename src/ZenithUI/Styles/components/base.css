@@ -720,6 +720,20 @@
     .zen-table-stack th.zen-table-group-cell {
       display: block;
     }
+
+    /*
+     * Group footers. The spanning cell holds the caller's markup and is handed back to it, like a
+     * detail panel. In the per-column footer only the cells with a figure have a label; the rest
+     * are spacers that keep the columns aligned in the grid, and in a stack they would be blank
+     * lines with nothing to line up against.
+     */
+    .zen-table-stack td.zen-table-group-footer-cell {
+      display: block;
+    }
+
+    .zen-table-stack tr.zen-table-group-footer td:not([data-label]):not(.zen-table-group-footer-cell) {
+      display: none;
+    }
   }
 }
 

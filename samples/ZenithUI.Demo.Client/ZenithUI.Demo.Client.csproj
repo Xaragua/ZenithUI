@@ -5,6 +5,10 @@
     <StaticWebAssetProjectMode>Default</StaticWebAssetProjectMode>
     <BlazorDisableThrowNavigationException>true</BlazorDisableThrowNavigationException>
     <GenerateDocumentationFile>false</GenerateDocumentationFile>
+
+    <!-- The demo switches between en-US, es-ES and es-DO at startup (see Program.cs). Without the
+         full ICU data the runtime ships only the browser language's shard and throws on a change. -->
+    <BlazorWebAssemblyLoadAllGlobalizationData>true</BlazorWebAssemblyLoadAllGlobalizationData>
   </PropertyGroup>
 
   <ItemGroup>

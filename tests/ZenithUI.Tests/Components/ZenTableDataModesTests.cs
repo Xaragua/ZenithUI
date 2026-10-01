@@ -43,11 +43,12 @@ public class ZenTableDataModesTests : BunitContext
     };
 
     private IRenderedComponent<ZenTable<Vendor>> Grouped(
-        Action<ComponentParameterCollectionBuilder<ZenTable<Vendor>>>? extra = null) =>
+        Action<ComponentParameterCollectionBuilder<ZenTable<Vendor>>>? extra = null,
+        RenderFragment? columns = null) =>
         Render<ZenTable<Vendor>>(p =>
         {
             p.Add(x => x.Items, Vendors)
-                .Add(x => x.Columns, Columns())
+                .Add(x => x.Columns, columns ?? Columns())
                 .Add(x => x.GroupBy, v => v.Region)
                 .Add(x => x.Label, "Vendors");
 
@@ -171,6 +172,114 @@ public class ZenTableDataModesTests : BunitContext
         cut.Find("nav[aria-label='Vendors pagination'] p").TextContent.ShouldBe("1–4 of 4");
     }
 
+    // ---- Group footers ------------------------------------------------------------------------
+
+    /// <summary>Vendor and Volume, with a per-column subtotal under Volume.</summary>
+    private static RenderFragment FooterColumns => builder =>
+    {
+        builder.OpenComponent<ZenColumn<Vendor>>(0);
+        builder.AddComponentParameter(1, nameof(ZenColumn<Vendor>.Title), "Vendor");
+        builder.AddComponentParameter(2, nameof(ZenColumn<Vendor>.Field), (Func<Vendor, object?>)(v => v.Name));
+        builder.CloseComponent();
+
+        builder.OpenComponent<ZenColumn<Vendor>>(3);
+        builder.AddComponentParameter(4, nameof(ZenColumn<Vendor>.Title), "Volume");
+        builder.AddComponentParameter(5, nameof(ZenColumn<Vendor>.Field), (Func<Vendor, object?>)(v => v.Volume));
+        builder.AddComponentParameter(6, nameof(ZenColumn<Vendor>.Align), ZenAlign.End);
+        builder.AddComponentParameter(7, nameof(ZenColumn<Vendor>.GroupFooterTemplate),
+            (RenderFragment<ZenTableGroup<Vendor>>)(g => b => b.AddContent(0, $"Σ {g.Items.Sum(v => v.Volume)}")));
+        builder.CloseComponent();
+    };
+
+    private static RenderFragment<ZenTableGroup<Vendor>> SpanningFooter =>
+        g => b => b.AddContent(0, $"End of {g.Text}");
+
+    private static List<string> RowKinds(IRenderedComponent<ZenTable<Vendor>> cut) =>
+        cut.FindAll("tbody tr")
+            .Select(tr => tr.ClassList.Contains("zen-table-group") ? "#"
+                : tr.ClassList.Contains("zen-table-group-footer") ? "=" + tr.TextContent.Trim()
+                : tr.QuerySelector("td")!.TextContent.Trim())
+            .ToList();
+
+    [Fact]
+    public void GroupFooterTemplate_ClosesEachGroup_SpanningTheTable()
+    {
+        var cut = Grouped(p => p.Add(x => x.GroupFooterTemplate, SpanningFooter));
+
+        RowKinds(cut).ShouldBe(
+            ["#", "Hetzner", "OVH", "=End of EU", "#", "Cloudflare", "=End of Global", "#", "AWS", "Datadog", "=End of US"]);
+
+        var cell = cut.Find("tr.zen-table-group-footer td");
+        cell.GetAttribute("colspan").ShouldBe("2");
+        cell.ClassList.ShouldContain("zen-table-group-footer-cell");
+    }
+
+    [Fact]
+    public void ColumnGroupFooter_PutsEachFigureUnderItsColumn_WithThatColumnsAlignment()
+    {
+        var cut = Grouped(columns: FooterColumns);
+
+        var cells = cut.FindAll("tr.zen-table-group-footer")[0].QuerySelectorAll("td");
+
+        cells.Length.ShouldBe(2);
+        cells[0].TextContent.Trim().ShouldBeEmpty();
+        cells[0].HasAttribute("data-label").ShouldBeFalse();
+        cells[1].TextContent.Trim().ShouldBe("Σ 2100");
+        cells[1].ClassList.ShouldContain("text-end");
+        cells[1].GetAttribute("data-label").ShouldBe("Volume");
+    }
+
+    [Fact]
+    public void GroupFooters_Both_PerColumnRowComesFirst()
+    {
+        var cut = Grouped(p => p.Add(x => x.GroupFooterTemplate, SpanningFooter), FooterColumns);
+
+        var footers = cut.FindAll("tr.zen-table-group-footer");
+        footers.Count.ShouldBe(6);
+        footers[0].QuerySelectorAll("td").Length.ShouldBe(2);
+        footers[1].TextContent.Trim().ShouldBe("End of EU");
+    }
+
+    [Fact]
+    public void ColumnGroupFooter_LeavesBlankCellsForTheSelectionAndDetailColumns()
+    {
+        var cut = Grouped(
+            p => p
+                .Add(x => x.Selectable, true)
+                .Add(x => x.RowDetailTemplate, v => b => b.AddContent(0, v.Name))
+                .Add(x => x.GroupFooterTemplate, SpanningFooter),
+            FooterColumns);
+
+        cut.FindAll("tr.zen-table-group-footer")[0].QuerySelectorAll("td").Length.ShouldBe(4);
+        cut.FindAll("tr.zen-table-group-footer")[1].QuerySelector("td")!.GetAttribute("colspan").ShouldBe("4");
+    }
+
+    [Fact]
+    public void ACollapsedGroup_HasNoFooter()
+    {
+        var cut = Grouped(p => p
+            .Add(x => x.GroupFooterTemplate, SpanningFooter)
+            .Add(x => x.IsGroupInitiallyCollapsed, key => (string?)key == "EU"));
+
+        cut.Markup.ShouldNotContain("End of EU");
+        cut.Markup.ShouldContain("End of US");
+    }
+
+    [Fact]
+    public void AGroupRunningOverAPageBoundary_ClosesOnThePageWhereItEnds()
+    {
+        // Page size 2: page two holds Cloudflare and AWS, so Global ends there and US does not.
+        var cut = Grouped(p => p
+            .Add(x => x.GroupFooterTemplate, SpanningFooter)
+            .Add(x => x.PageSize, 2)
+            .Add(x => x.Page, 2));
+
+        RowKinds(cut).ShouldBe(["#", "Cloudflare", "=End of Global", "#", "AWS"]);
+
+        // Footers are not entries of their own, so the page still holds two rows of data.
+        cut.Find("nav[aria-label='Vendors pagination'] p").TextContent.ShouldBe("3–4 of 5");
+    }
+
     [Fact]
     public void ThePager_IsNamedAfterItsTable()
     {
@@ -233,7 +342,8 @@ public class ZenTableDataModesTests : BunitContext
 
     private IRenderedComponent<ZenTable<Vendor>> Provided(
         FakeServer server,
-        Action<ComponentParameterCollectionBuilder<ZenTable<Vendor>>>? extra = null) =>
+        Action<ComponentParameterCollectionBuilder<ZenTable<Vendor>>>? extra = null,
+        RenderFragment? columns = null) =>
         Render<ZenTable<Vendor>>(p =>
         {
             p.Add(x => x.ItemsProvider, server.Provide)
@@ -464,5 +574,19 @@ public class ZenTableDataModesTests : BunitContext
         // 500 rows + 2 group headers + the column header row.
         cut.Find("table").GetAttribute("aria-rowcount").ShouldBe("503");
         cut.Find("tr.zen-table-group").GetAttribute("aria-rowindex").ShouldBe("2");
+    }
+
+    [Fact]
+    public void VirtualizedAndGrouped_CountGroupFootersInTheRowCount()
+    {
+        var cut = Render<ZenTable<Vendor>>(p => p
+            .Add(x => x.Items, Many)
+            .Add(x => x.Columns, Columns())
+            .Add(x => x.GroupBy, v => v.Region)
+            .Add(x => x.GroupFooterTemplate, SpanningFooter)
+            .Add(x => x.Virtualize, true));
+
+        // 500 rows + 2 group headers + 2 group footers + the column header row.
+        cut.Find("table").GetAttribute("aria-rowcount").ShouldBe("505");
     }
 }

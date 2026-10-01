@@ -53,6 +53,10 @@
     way it associates cells with column headers. Groups collapse with a disclosure button, and
     select as a whole with a tri-state checkbox. Grouping and the treegrid are exclusive: both
     are ways of nesting rows, and a row cannot sit at two depths at once.
+
+    A group may also close with a footer row: one spanning cell from GroupFooterTemplate, one cell
+    per column from ZenColumn.GroupFooterTemplate, or both. Footers follow the group's last row and,
+    like headers, are not counted by paging.
 *@
 
 @{
@@ -96,18 +100,18 @@
                            name for the row-header association a screen reader builds from it. The
                            name is visually hidden: a visible "Details" above a column of chevrons
                            is a word doing no work. *@
-                        <th scope="col" class="@($"{HeaderCellClass} w-px")">
-                            <span class="zen-sr-only">Details</span>
+                        <th scope="col" class="@($"{HeaderCellClass} w-px text-start")">
+                            <span class="zen-sr-only">@Localize(ZenStringKeys.Table_Details)</span>
                         </th>
                     }
 
                     @if (Selectable)
                     {
-                        <th scope="col" class="@($"{HeaderCellClass} w-px")">
+                        <th scope="col" class="@($"{HeaderCellClass} w-px text-start")">
                             <ZenCheckbox Value="@AllOnPageSelected"
                                          ValueChanged="ToggleAllAsync"
                                          Indeterminate="@(SomeOnPageSelected && !AllOnPageSelected)"
-                                         aria-label="Select all rows on this page" />
+                                         aria-label="@Localize(ZenStringKeys.Table_SelectAllOnPage)" />
                         </th>
                     }
 
@@ -123,7 +127,7 @@
                             aria-sort="@AriaSortFor(column)">
                             @if (CanSort(column))
                             {
-                                <button type="button" class="@SortButtonClass" @onclick="@(() => ToggleSortAsync(column))">
+                                <button type="button" class="@SortButtonClassFor(column)" @onclick="@(() => ToggleSortAsync(column))">
                                     @HeaderContent(column)
 
                                     @* The indicator is present on every sortable column and only
@@ -173,7 +177,7 @@
                             }
                             else
                             {
-                                <ZenEmptyState Title="@EmptyText"
+                                <ZenEmptyState Title="@(EmptyText ?? Localize(ZenStringKeys.Common_NoData))"
                                                Description="@EmptyDescription"
                                                Icon="@EmptyIcon"
                                                Actions="EmptyActions" />
@@ -256,7 +260,7 @@
                        bug nobody would think to look for. This control edits the table's view,
                        not the user's data. *@
                     <label class="flex items-center gap-2 text-sm text-content-muted">
-                        <span>Rows per page</span>
+                        <span>@Localize(ZenStringKeys.Table_RowsPerPage)</span>
 
                         <select class="@PageSizeSelectClass"
                                 value="@EffectivePageSize"
@@ -277,7 +281,7 @@
                                Size="ZenSize.Small"
                                Icon="@ZenIcons.ChevronLeft"
                                IconOnly="true"
-                               AriaLabel="Previous page"
+                               AriaLabel="@Localize(ZenStringKeys.Table_PreviousPage)"
                                Disabled="@(CurrentPage <= 1)"
                                OnClick="@(() => GoToPageAsync(CurrentPage - 1))" />
 
@@ -292,7 +296,7 @@
                                        Size="ZenSize.Small"
                                        class="min-w-8 px-2 tabular-nums"
                                        aria-current="@(pageNumber == CurrentPage ? "page" : null)"
-                                       aria-label="@($"Page {pageNumber}")"
+                                       aria-label="@Localize(ZenStringKeys.Table_PageNumber, pageNumber)"
                                        OnClick="@(() => GoToPageAsync(pageNumber))">
                                 @pageNumber
                             </ZenButton>
@@ -310,7 +314,7 @@
                                Size="ZenSize.Small"
                                Icon="@ZenIcons.ChevronRight"
                                IconOnly="true"
-                               AriaLabel="Next page"
+                               AriaLabel="@Localize(ZenStringKeys.Table_NextPage)"
                                Disabled="@(CurrentPage >= PageCount)"
                                OnClick="@(() => GoToPageAsync(CurrentPage + 1))" />
                 </div>
@@ -335,6 +339,13 @@
 
     /// <summary>The header row that opens a group.</summary>
     private sealed record GroupRow(ZenTableGroup<TItem> Group, bool IsCollapsed, int Index)
+        : DisplayRow(Index);
+
+    /// <summary>
+    /// A row closing a group: one cell per column when <paramref name="Spanning"/> is false, one
+    /// cell across the table when it is true.
+    /// </summary>
+    private sealed record GroupFooterRow(ZenTableGroup<TItem> Group, bool Spanning, int Index)
         : DisplayRow(Index);
 
     /// <summary>The shape of the last provider request, so an unchanged view is not refetched.</summary>
@@ -526,7 +537,7 @@
 
     /// <summary>The header shown for rows whose key is null.</summary>
     [Parameter]
-    public string UngroupedText { get; set; } = "(None)";
+    public string? UngroupedText { get; set; }
 
     /// <summary>
     /// Custom content for a group header, replacing the name and count.
@@ -538,6 +549,20 @@
     /// </remarks>
     [Parameter]
     public RenderFragment<ZenTableGroup<TItem>>? GroupHeaderTemplate { get; set; }
+
+    /// <summary>
+    /// Content for a row closing each group, spanning the table - the mirror of
+    /// <see cref="GroupHeaderTemplate"/>.
+    /// </summary>
+    /// <remarks>
+    /// For figures that belong under a particular column, use
+    /// <see cref="ZenColumn{TItem}.GroupFooterTemplate"/> instead; both may be set, and the
+    /// per-column row comes first. A footer follows the group's last row, so a group running over
+    /// a page boundary shows it once, on the page where it ends. A collapsed group shows none:
+    /// its header already stands in for it.
+    /// </remarks>
+    [Parameter]
+    public RenderFragment<ZenTableGroup<TItem>>? GroupFooterTemplate { get; set; }
 
     /// <summary>Let the user collapse and expand groups.</summary>
     [Parameter]
@@ -567,7 +592,7 @@
 
     /// <summary>Headline for the empty state.</summary>
     [Parameter]
-    public string EmptyText { get; set; } = "No data";
+    public string? EmptyText { get; set; }
 
     /// <summary>
     /// A sentence below the headline explaining why the table is empty, or what to do next.
@@ -977,7 +1002,7 @@
     private void BuildGroupedRows(List<TItem> sorted, List<DisplayRow> into)
     {
         var groups = Groups(sorted);
-        var entries = new List<(ZenTableGroup<TItem> Group, bool Collapsed, TItem? Item)>(sorted.Count);
+        var entries = new List<(ZenTableGroup<TItem> Group, bool Collapsed, TItem? Item, bool Last)>(sorted.Count);
 
         foreach (var group in groups)
         {
@@ -985,19 +1010,19 @@
 
             if (collapsed)
             {
-                entries.Add((group, true, default));
+                entries.Add((group, true, default, false));
                 continue;
             }
 
-            foreach (var item in group.Items)
+            for (var i = 0; i < group.Items.Count; i++)
             {
-                entries.Add((group, false, item));
+                entries.Add((group, false, group.Items[i], i == group.Items.Count - 1));
             }
         }
 
         _pagingTotal = entries.Count;
 
-        IEnumerable<(ZenTableGroup<TItem> Group, bool Collapsed, TItem? Item)> window = entries;
+        IEnumerable<(ZenTableGroup<TItem> Group, bool Collapsed, TItem? Item, bool Last)> window = entries;
 
         if (EffectivePageSize > 0)
         {
@@ -1007,7 +1032,9 @@
 
         ZenTableGroup<TItem>? current = null;
 
-        foreach (var (group, collapsed, item) in window)
+        var columnFooters = _columns.Exists(c => c.GroupFooterTemplate is not null);
+
+        foreach (var (group, collapsed, item, last) in window)
         {
             if (!ReferenceEquals(group, current))
             {
@@ -1015,9 +1042,27 @@
                 current = group;
             }
 
-            if (!collapsed)
+            if (collapsed)
             {
-                into.Add(new ItemRow(item!, 0, false, false, into.Count));
+                continue;
+            }
+
+            into.Add(new ItemRow(item!, 0, false, false, into.Count));
+
+            // Footers ride on the group's last row rather than being entries of their own, so they
+            // never count toward a page - for the same reason headers do not - and a group that
+            // crosses a page boundary closes on the page where its rows actually end.
+            if (last)
+            {
+                if (columnFooters)
+                {
+                    into.Add(new GroupFooterRow(group, false, into.Count));
+                }
+
+                if (GroupFooterTemplate is not null)
+                {
+                    into.Add(new GroupFooterRow(group, true, into.Count));
+                }
             }
         }
     }
@@ -1053,7 +1098,8 @@
         foreach (var slot in keys)
         {
             var (key, items) = buckets[slot];
-            var text = key is null ? UngroupedText : GroupText?.Invoke(key) ?? key.ToString() ?? UngroupedText;
+            var ungrouped = UngroupedText ?? Localize(ZenStringKeys.Table_Ungrouped);
+            var text = key is null ? ungrouped : GroupText?.Invoke(key) ?? key.ToString() ?? ungrouped;
 
             groups.Add(new ZenTableGroup<TItem>(key, text, items));
         }
@@ -1810,7 +1856,7 @@
                             <ZenCheckbox Value="@AllInGroupSelected(group)"
                                          ValueChanged="@((bool selected) => ToggleGroupSelectionAsync(group, selected))"
                                          Indeterminate="@(SomeInGroupSelected(group) && !AllInGroupSelected(group))"
-                                         aria-label="@($"Select all rows in {group.Text}")" />
+                                         aria-label="@Localize(ZenStringKeys.Table_SelectGroup, group.Text)" />
                         }
 
                         @if (GroupsCollapsible)
@@ -1829,6 +1875,52 @@
                         }
                     </div>
                 </th>
+            </tr>
+
+            return;
+        }
+
+        if (displayRow is GroupFooterRow footerRow)
+        {
+            var group = footerRow.Group;
+
+            <tr id="@RowId(footerRow.Index)"
+                class="zen-table-group-footer bg-surface-sunken font-medium"
+                style="@(UseVirtualize ? RowHeightStyle : null)"
+                aria-rowindex="@AriaRowIndexFor(footerRow)">
+                @if (footerRow.Spanning)
+                {
+                    <td colspan="@ColumnCount" class="@($"zen-table-group-footer-cell text-start {BodyCellClass}")">
+                        @GroupFooterTemplate!(group)
+                    </td>
+                }
+                else
+                {
+                    @* Empty cells for the details and selection columns, so the figures below
+                       line up with the columns above them. *@
+                    @if (HasDetails)
+                    {
+                        <td class="@BodyCellClass"></td>
+                    }
+
+                    @if (Selectable)
+                    {
+                        <td class="@BodyCellClass"></td>
+                    }
+
+                    @foreach (var column in _columns)
+                    {
+                        @* data-label only where there is a figure, so the stacked layout does not
+                           print a column's name beside nothing. *@
+                        <td class="@BodyCellClassFor(column)"
+                            data-label="@(column.GroupFooterTemplate is null ? null : column.Title)">
+                            @if (column.GroupFooterTemplate is not null)
+                            {
+                                @column.GroupFooterTemplate(group)
+                            }
+                        </td>
+                    }
+                }
             </tr>
 
             return;
@@ -1863,7 +1955,7 @@
                                 class="@DetailToggleClass"
                                 aria-expanded="@(IsDetailOpen(row.Item) ? "true" : "false")"
                                 aria-controls="@(IsDetailOpen(row.Item) ? DetailRowId(row.Index) : null)"
-                                aria-label="@($"Details for {RowLabel(row)}")"
+                                aria-label="@Localize(ZenStringKeys.Table_DetailsFor, RowLabel(row))"
                                 @onclick="@(() => ToggleDetailAsync(row.Item))">
                             <ZenIcon Path="@ZenIcons.ChevronRight" class="@DetailChevronClass(row.Item)" />
                         </button>
@@ -1881,7 +1973,7 @@
                 <td class="@($"{BodyCellClass} w-px")" @onclick:stopPropagation="true">
                     <ZenCheckbox Value="@IsSelected(row.Item)"
                                  ValueChanged="@(_ => ToggleSelectionAsync(row.Item))"
-                                 aria-label="@($"Select {RowLabel(row)}")" />
+                                 aria-label="@Localize(ZenStringKeys.Table_SelectRow, RowLabel(row))" />
                 </td>
             }
 
@@ -1968,7 +2060,7 @@
             @* The count is a number to the eye and "12 rows" to a screen reader. A bare "12"
                read out after the group name gives no hint what it is counting. *@
             <span class="rounded-full bg-surface-raised px-2 py-0.5 text-xs font-normal text-content-muted tabular-nums">
-                @group.Count<span class="zen-sr-only">@(group.Count == 1 ? " row" : " rows")</span>
+                @group.Count<span class="zen-sr-only"> @Localize(group.Count == 1 ? ZenStringKeys.Table_RowOne : ZenStringKeys.Table_RowOther)</span>
             </span>
         }
     };
@@ -2101,7 +2193,7 @@
     /// </remarks>
     private string RowId(int index) => $"{Id}-row-{index}";
 
-    private string RowLabel(ItemRow row) => RowText?.Invoke(row.Item) ?? row.Item.ToString() ?? "row";
+    private string RowLabel(ItemRow row) => RowText?.Invoke(row.Item) ?? row.Item.ToString() ?? Localize(ZenStringKeys.Table_RowOne);
 
     // ---- ARIA ---------------------------------------------------------------------------------
 
@@ -2150,7 +2242,9 @@
     private string? AriaExpandedFor(ItemRow row) =>
         Hierarchical && row.HasChildren ? (row.IsExpanded ? "true" : "false") : null;
 
-    private string PagerLabel => (Label ?? Caption) is { } name ? $"{name} pagination" : "Pagination";
+    private string PagerLabel => (Label ?? Caption) is { } name
+        ? Localize(ZenStringKeys.Table_PaginationFor, name)
+        : Localize(ZenStringKeys.Table_Pagination);
 
     private string PageSummary
     {
@@ -2160,13 +2254,13 @@
 
             if (total == 0)
             {
-                return "No rows";
+                return Localize(ZenStringKeys.Table_NoRows);
             }
 
             var first = ((Math.Clamp(CurrentPage, 1, PageCount) - 1) * EffectivePageSize) + 1;
             var last = Math.Min(first + EffectivePageSize - 1, total);
 
-            return $"{first}–{last} of {total}";
+            return Localize(ZenStringKeys.Table_PageSummary, first, last, total);
         }
     }
 
@@ -2226,8 +2320,11 @@
         ? "size-4 shrink-0 text-content-subtle transition-transform"
         : "size-4 shrink-0 rotate-90 text-content-subtle transition-transform";
 
+    // No text-align here. Alignment comes from AlignClass alone: Tailwind emits .text-start after
+    // .text-end and .text-center, so a text-start in the base classes beat every column's Align
+    // at equal specificity and right-aligned columns had left-aligned headers above them.
     private string HeaderCellClass =>
-        $"text-start align-middle font-medium text-content-muted {CellPadding}";
+        $"align-middle font-medium text-content-muted {CellPadding}";
 
     private string HeaderClassFor(ZenColumn<TItem> column) => CssBuilder
         .Default(HeaderCellClass)
@@ -2294,8 +2391,15 @@
     };
 
     private const string SortButtonClass =
-        "zen-focus group -mx-1 inline-flex items-center gap-1 rounded-zen-sm px-1 py-0.5 " +
+        "zen-focus group -mx-1 inline-flex items-center gap-1 rounded-zen-sm px-1 py-0.5 align-middle " +
         "font-medium transition-colors hover:text-content";
+
+    /// <summary>
+    /// The sort button's classes. An end-aligned column puts its indicator before the label, so
+    /// the label lines up with the numbers below it rather than a chevron's width short of them.
+    /// </summary>
+    private static string SortButtonClassFor(ZenColumn<TItem> column) =>
+        column.Align == ZenAlign.End ? $"{SortButtonClass} flex-row-reverse" : SortButtonClass;
 
     private string SortIconFor(ZenColumn<TItem> column) =>
         _sortColumn == column && _sortDescending ? ZenIcons.ChevronDown : ZenIcons.ChevronUp;

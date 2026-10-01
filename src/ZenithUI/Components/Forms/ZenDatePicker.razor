@@ -43,7 +43,7 @@
                 Placement="@(AlignEnd ? ZenPlacement.BottomEnd : ZenPlacement.BottomStart)"
                 PanelId="@PanelId"
                 Role="dialog"
-                Label="@(Label is null ? "Choose a date" : $"Choose {Label}")"
+                Label="@(Label is null ? Localize(ZenStringKeys.DatePicker_ChooseDate) : Localize(ZenStringKeys.DatePicker_Choose, Label))"
                 Bare="true"
                 CloseOnEscape="false">
         @*
@@ -76,7 +76,7 @@
                     <button type="button"
                             @ref="_trigger"
                             class="@TriggerClass"
-                            aria-label="@(_open ? CloseCalendarLabel : OpenCalendarLabel)"
+                            aria-label="@(_open ? CloseCalendarLabel ?? Localize(ZenStringKeys.DatePicker_CloseCalendar) : OpenCalendarLabel ?? Localize(ZenStringKeys.DatePicker_OpenCalendar))"
                             aria-expanded="@(_open ? "true" : "false")"
                             aria-haspopup="dialog"
                             aria-controls="@PanelId"
@@ -141,11 +141,11 @@
 
     /// <summary>Accessible name for the trigger when the panel is closed.</summary>
     [Parameter]
-    public string OpenCalendarLabel { get; set; } = "Open calendar";
+    public string? OpenCalendarLabel { get; set; }
 
     /// <summary>Accessible name for the trigger when the panel is open.</summary>
     [Parameter]
-    public string CloseCalendarLabel { get; set; } = "Close calendar";
+    public string? CloseCalendarLabel { get; set; }
 
     private CultureInfo EffectiveCulture => Culture ?? CultureInfo.CurrentCulture;
 
@@ -155,7 +155,7 @@
 
     private IEnumerable<string> AllMessages =>
         _parseFailed
-            ? ValidationMessages.Append($"Enter a date as {DateFormatHint}.")
+            ? ValidationMessages.Append(Localize(ZenStringKeys.DatePicker_EnterDateAs, DateFormatHint))
             : ValidationMessages;
 
     // ---- Value plumbing ----------------------------------------------------------------------

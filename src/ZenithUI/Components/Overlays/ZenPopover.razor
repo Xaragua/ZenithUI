@@ -186,6 +186,25 @@
         }
     }
 
+    /// <summary>
+    /// Shows or hides the panel now, to match <see cref="Open"/>, instead of in this component's
+    /// own after-render.
+    /// </summary>
+    /// <remarks>
+    /// For an owner that moves focus into the panel from its own <c>OnAfterRenderAsync</c>. A
+    /// parent's after-render runs before its children's, so without this the owner focuses an
+    /// element inside a panel that has not been shown yet - still <c>display: none</c> - and
+    /// <c>focus()</c> does nothing. Idempotent: the after-render that follows finds the panel
+    /// already in step and leaves it alone.
+    /// </remarks>
+    internal async Task EnsureSyncedAsync()
+    {
+        if (IsJsReady && _openLastRender != Open)
+        {
+            await SyncAsync();
+        }
+    }
+
     /// <summary>Re-measures an open panel. For content that changed without a resize.</summary>
     public ValueTask RepositionAsync() => InvokeModuleVoidAsync("reposition", PanelElementId);
 

@@ -56,11 +56,11 @@ public sealed class ZenModalOptions
 /// <summary>Text and intent for the built-in confirmation dialog.</summary>
 public sealed class ZenConfirmOptions
 {
-    /// <summary>Label on the confirming button.</summary>
-    public string ConfirmText { get; set; } = "Confirm";
+    /// <summary>Label on the confirming button. Defaults to a localized "Confirm".</summary>
+    public string? ConfirmText { get; set; }
 
-    /// <summary>Label on the dismissing button.</summary>
-    public string CancelText { get; set; } = "Cancel";
+    /// <summary>Label on the dismissing button. Defaults to a localized "Cancel".</summary>
+    public string? CancelText { get; set; }
 
     /// <summary>
     /// Colour of the confirming button. <see cref="ZenIntent.Danger"/> for anything destructive.

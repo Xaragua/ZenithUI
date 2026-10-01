@@ -1,0 +1,233 @@
+@namespace ZenithUI
+@inherits ZenComponentBase
+
+@*
+    An inline message: a status that belongs to a place on the page - a form that failed to save,
+    a plan about to expire, a read-only record - rather than to a moment, which is what a toast is.
+
+    NOT A LIVE REGION BY DEFAULT. A message on the page when it loads is content, and reading it
+    is the user's choice. Given role="alert" it is announced the instant the page renders, over
+    whatever the screen reader was saying, and a page with three warnings announces all three
+    before the user has heard the heading. `Announce` opts in, for a message that appears in
+    response to something the user just did - and then a danger or warning interrupts (alert)
+    while everything else waits its turn (status). For that to work the message has to appear
+    after render; a live region present from the first paint announces nothing in most screen
+    readers, so render it conditionally rather than toggling visibility on an existing one.
+
+    The icon is decorative. The intent's colour and glyph repeat what the text should already
+    say - "Payment failed", not a red box reading "Payment" - because neither colour nor shape
+    reaches a screen reader, and colour does not reach everyone who can see.
+
+    Variants follow the button's: Soft (the default) tints the panel, Outline draws the intent's
+    border on the surface, Solid fills it, and Ghost drops the surface entirely for an icon and a
+    line of text. Every pairing here is one the contrast audit already covers - body text on a
+    -soft tint, -strong on a surface, -content on its fill - so a new variant cannot ship an
+    unreadable combination.
+*@
+
+@if (IsShown)
+{
+    <div id="@Id"
+         class="@RootClass(MessageClass)"
+         style="@Style"
+         role="@Role"
+         @attributes="AttributesWithoutClass">
+        @if (ShowIcon)
+        {
+            <ZenIcon Path="@(Icon ?? ZenIcons.ForIntent(Intent))" Size="@IconSize" class="@IconClass" />
+        }
+
+        <div class="min-w-0 flex-1">
+            @if (Title is not null)
+            {
+                <p class="@TitleClass">@Title</p>
+            }
+
+            @if (ChildContent is not null)
+            {
+                <div class="@BodyClass">@ChildContent</div>
+            }
+
+            @if (Actions is not null)
+            {
+                <div class="mt-3 flex flex-wrap items-center gap-2">@Actions</div>
+            }
+        </div>
+
+        @if (Dismissible)
+        {
+            <button type="button"
+                    class="@CloseClass"
+                    aria-label="@(CloseLabel ?? Localize(ZenStringKeys.Common_Dismiss))"
+                    @onclick="DismissAsync">
+                <ZenIcon Path="@ZenIcons.Close" Size="ZenSize.Small" />
+            </button>
+        }
+    </div>
+}
+
+@code {
+    private bool _dismissed;
+
+    /// <summary>The message text. Optional when <see cref="Title"/> says everything.</summary>
+    [Parameter]
+    public RenderFragment? ChildContent { get; set; }
+
+    /// <summary>A short bold line above the text.</summary>
+    [Parameter]
+    public string? Title { get; set; }
+
+    /// <summary>Buttons or links under the text: "Retry", "Upgrade", "View details".</summary>
+    [Parameter]
+    public RenderFragment? Actions { get; set; }
+
+    /// <summary>Semantic colour role, and the default icon. Defaults to <see cref="ZenIntent.Info"/>.</summary>
+    [Parameter]
+    public ZenIntent Intent { get; set; } = ZenIntent.Info;
+
+    /// <summary>
+    /// Visual weight: <see cref="ZenVariant.Soft"/> (the default) tints the panel,
+    /// <see cref="ZenVariant.Outline"/> borders it, <see cref="ZenVariant.Solid"/> fills it and
+    /// <see cref="ZenVariant.Ghost"/> drops the panel for an icon and text alone.
+    /// </summary>
+    [Parameter]
+    public ZenVariant Variant { get; set; } = ZenVariant.Soft;
+
+    /// <summary>Padding and text size.</summary>
+    [Parameter]
+    public ZenSize Size { get; set; } = ZenSize.Medium;
+
+    /// <summary>An SVG path replacing the intent's icon, typically a <see cref="ZenIcons"/> constant.</summary>
+    [Parameter]
+    public string? Icon { get; set; }
+
+    /// <summary>Show the icon. On by default.</summary>
+    [Parameter]
+    public bool ShowIcon { get; set; } = true;
+
+    /// <summary>Give the message a close button.</summary>
+    /// <remarks>
+    /// Closing needs an interactive render mode - under static rendering the button is inert, so
+    /// do not make a message dismissible on a page that has none.
+    /// </remarks>
+    [Parameter]
+    public bool Dismissible { get; set; }
+
+    /// <summary>Whether the message shows. Bind it to control dismissal from the page.</summary>
+    /// <remarks>
+    /// Without a <see cref="VisibleChanged"/> handler the message hides itself when closed. With
+    /// one, the page owns the state and the message waits to be told.
+    /// </remarks>
+    [Parameter]
+    public bool Visible { get; set; } = true;
+
+    /// <summary>Raised with <see langword="false"/> when the user closes the message.</summary>
+    [Parameter]
+    public EventCallback<bool> VisibleChanged { get; set; }
+
+    /// <summary>Raised when the user closes the message.</summary>
+    [Parameter]
+    public EventCallback OnDismiss { get; set; }
+
+    /// <summary>Accessible name for the close button. Defaults to a localized "Dismiss".</summary>
+    [Parameter]
+    public string? CloseLabel { get; set; }
+
+    /// <summary>
+    /// Make the message a live region: <c>role="alert"</c> for danger and warning,
+    /// <c>role="status"</c> otherwise. For a message that appears in response to an action, not
+    /// one present when the page loads.
+    /// </summary>
+    [Parameter]
+    public bool Announce { get; set; }
+
+    private bool IsShown => Visible && !_dismissed;
+
+    private async Task DismissAsync()
+    {
+        if (!VisibleChanged.HasDelegate)
+        {
+            _dismissed = true;
+        }
+
+        await VisibleChanged.InvokeAsync(false);
+        await OnDismiss.InvokeAsync();
+    }
+
+    /// <inheritdoc />
+    /// <remarks>
+    /// A self-dismissed message comes back when the page shows it again, so a parent that sets
+    /// <see cref="Visible"/> to <see langword="false"/> and then <see langword="true"/> - a fresh
+    /// error after a second failed save - is not ignored.
+    /// </remarks>
+    protected override void OnParametersSet()
+    {
+        if (!Visible)
+        {
+            _dismissed = false;
+        }
+    }
+
+    private string? Role => !Announce
+        ? null
+        : Intent is ZenIntent.Danger or ZenIntent.Warning ? "alert" : "status";
+
+    // ---- Styling ------------------------------------------------------------------------------
+
+    private bool IsSolid => Variant == ZenVariant.Solid && Intent != ZenIntent.Neutral;
+
+    private string MessageClass => CssBuilder
+        .Default("zen-message flex items-start text-start")
+        .AddClass(Size switch
+        {
+            ZenSize.Small => "gap-2 text-xs",
+            ZenSize.Large => "gap-3 text-base",
+            _ => "gap-3 text-sm",
+        })
+        .AddClass(Variant == ZenVariant.Ghost
+            ? null
+            : Size switch
+            {
+                ZenSize.Small => "rounded-zen-md px-3 py-2",
+                ZenSize.Large => "rounded-zen-lg px-5 py-4",
+                _ => "rounded-zen-lg px-4 py-3",
+            })
+        .AddClass(SurfaceClass)
+        .Build()!;
+
+    /// <summary>
+    /// The panel. Soft keeps a transparent border so a soft message and an outlined one are the
+    /// same size side by side - the same reasoning as ZenToast's.
+    /// </summary>
+    private string? SurfaceClass => Variant switch
+    {
+        ZenVariant.Solid => ZenStyles.Solid(Intent),
+        // The outline's -strong text colour only reaches the close button: the title, body and
+        // icon each set their own.
+        ZenVariant.Outline => $"bg-surface {ZenStyles.Outline(Intent)}",
+        ZenVariant.Ghost => null,
+        _ => $"{ZenStyles.SoftSurface(Intent)} border border-transparent",
+    };
+
+    private ZenSize IconSize => Size == ZenSize.Large ? ZenSize.Medium : ZenSize.Small;
+
+    // A solid panel's icon and text take its -content colour, inherited from the panel. On every
+    // other variant the icon is the intent's -strong foreground and the text is ordinary content.
+    private string IconClass => CssBuilder
+        .Default("shrink-0")
+        .AddClass(Size == ZenSize.Small ? "mt-px" : "mt-0.5")
+        .AddClass(IsSolid ? null : Intent == ZenIntent.Neutral ? "text-content-muted" : ZenStyles.Foreground(Intent))
+        .Build()!;
+
+    private string TitleClass => IsSolid ? "font-semibold" : "font-semibold text-content";
+
+    private string BodyClass => CssBuilder
+        .Default(IsSolid ? null : "text-content-muted")
+        .AddClass("mt-0.5", Title is not null)
+        .Build() ?? string.Empty;
+
+    private string CloseClass => CssBuilder
+        .Default("zen-focus -m-1 grid shrink-0 place-items-center self-start rounded-zen-sm p-1 transition-colors")
+        .AddClass(IsSolid ? "hover:opacity-75" : "text-content-muted hover:text-content")
+        .Build()!;
+}

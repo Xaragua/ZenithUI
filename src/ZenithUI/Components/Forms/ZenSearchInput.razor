@@ -48,7 +48,7 @@
                an X glyph names nothing. *@
             <button type="button"
                     class="@ClearButtonClass"
-                    aria-label="@ClearLabel"
+                    aria-label="@(ClearLabel ?? Localize(ZenStringKeys.SearchInput_Clear))"
                     @onclick="ClearAsync">
                 <ZenIcon Path="@ZenIcons.Close" Size="ZenSize.Small" class="size-3.5" />
             </button>
@@ -56,7 +56,7 @@
 
         @if (Busy)
         {
-            <ZenSpinner Size="ZenSize.Small" Label="@BusyLabel" />
+            <ZenSpinner Size="ZenSize.Small" Label="@(BusyLabel ?? Localize(ZenStringKeys.SearchInput_Busy))" />
         }
     </div>
 </ZenField>
@@ -64,7 +64,7 @@
 @code {
     /// <summary>Accessible name for the clear button.</summary>
     [Parameter]
-    public string ClearLabel { get; set; } = "Clear search";
+    public string? ClearLabel { get; set; }
 
     /// <summary>
     /// Shows a spinner inside the field while results are loading. The caller owns this - the
@@ -75,7 +75,7 @@
 
     /// <summary>Accessible status text for the busy spinner.</summary>
     [Parameter]
-    public string BusyLabel { get; set; } = "Searching";
+    public string? BusyLabel { get; set; }
 
     /// <summary>Raised when the field is cleared, by the button or by Escape.</summary>
     [Parameter]

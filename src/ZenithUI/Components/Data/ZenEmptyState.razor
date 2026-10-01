@@ -26,7 +26,7 @@
         </span>
     }
 
-    <p class="@TitleClass">@Title</p>
+    <p class="@TitleClass">@(Title ?? Localize(ZenStringKeys.Common_NoData))</p>
 
     @if (Description is not null)
     {
@@ -46,7 +46,7 @@
 @code {
     /// <summary>The headline: what is empty, in the user's words.</summary>
     [Parameter]
-    public string Title { get; set; } = "No data";
+    public string? Title { get; set; }
 
     /// <summary>A sentence explaining why it is empty, or what to do about it.</summary>
     [Parameter]

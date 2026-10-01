@@ -24,7 +24,7 @@
                     class="zen-nav-toggle zen-focus size-9 shrink-0 place-items-center rounded-zen-md text-content-muted transition-colors hover:bg-surface-sunken hover:text-content"
                     popovertarget="@MenuTargetId"
                     popovertargetaction="toggle"
-                    aria-label="@MenuLabel">
+                    aria-label="@(MenuLabel ?? Localize(ZenStringKeys.AppBar_OpenNavigation))">
                 <ZenIcon Path="@ZenIcons.Menu" />
             </button>
         }
@@ -118,7 +118,7 @@
 
     /// <summary>Accessible name for the menu button.</summary>
     [Parameter]
-    public string MenuLabel { get; set; } = "Open navigation";
+    public string? MenuLabel { get; set; }
 
     private string? MenuTargetId => MenuTarget ?? Shell?.NavId;
 

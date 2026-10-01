@@ -1,5 +1,6 @@
 @namespace ZenithUI
 @implements IDisposable
+@inject IServiceProvider ZenServices
 
 @*
     One toast. Rendered by ZenToastHost; not usually placed by hand.
@@ -51,7 +52,7 @@
     {
         <button type="button"
                 class="zen-focus -m-1 grid shrink-0 place-items-center self-start rounded-zen-sm p-1 text-content-subtle transition-colors hover:bg-surface-sunken hover:text-content"
-                aria-label="@CloseLabel"
+                aria-label="@(CloseLabel ?? ZenStrings.Resolve(ZenServices)[ZenStringKeys.Common_Dismiss])"
                 @onclick="Dismiss">
             <ZenIcon Path="@ZenIcons.Close" Size="ZenSize.Small" />
         </button>
@@ -68,7 +69,7 @@
 
     /// <summary>Accessible name for the dismiss button.</summary>
     [Parameter]
-    public string CloseLabel { get; set; } = "Dismiss";
+    public string? CloseLabel { get; set; }
 
     /// <inheritdoc />
     protected override void OnInitialized() => StartTimer();
@@ -136,27 +137,14 @@
 
     // ---- Styling -----------------------------------------------------------------------------
 
-    private string IconPath => Instance.Intent switch
-    {
-        ZenIntent.Success => ZenIcons.Success,
-        ZenIntent.Warning => ZenIcons.Warning,
-        ZenIntent.Danger => ZenIcons.Danger,
-        _ => ZenIcons.Info,
-    };
+    private string IconPath => ZenIcons.ForIntent(Instance.Intent);
 
     // -strong, never the fill token: this icon is a foreground on a surface, and `text-success`
-    // on a raised panel is about 2:1.
-    private string IconColour => Instance.Intent switch
-    {
-        ZenIntent.Success => "text-success-strong",
-        ZenIntent.Warning => "text-warning-strong",
-        ZenIntent.Danger => "text-danger-strong",
-        ZenIntent.Info => "text-info-strong",
-        ZenIntent.Primary => "text-primary-strong",
-        ZenIntent.Secondary => "text-secondary-strong",
-        ZenIntent.Accent => "text-accent-strong",
-        _ => "text-content-subtle",
-    };
+    // on a raised panel is about 2:1. Neutral is quieter than Foreground's text-content, because
+    // a neutral toast's icon is decoration beside the message rather than a status of its own.
+    private string IconColour => Instance.Intent == ZenIntent.Neutral
+        ? "text-content-subtle"
+        : ZenStyles.Foreground(Instance.Intent);
 
     private bool IsTinted => Instance.Options.Soft && Instance.Intent != ZenIntent.Neutral;
 

@@ -282,6 +282,12 @@
         header says how many that is before you click. Sort a column and the order applies inside
         each group; the groups keep their own order.
     </p>
+    <p class="mt-2 max-w-3xl text-sm text-content-muted">
+        Each open group <strong>closes with two footers</strong>. The subtotal is the Amount
+        column's <code>GroupFooterTemplate</code>, so it sits under the amounts with their
+        alignment; the line below it is the table's own <code>GroupFooterTemplate</code>, spanning
+        every column. Both are computed from the whole group, not the page.
+    </p>
 
     <div class="mt-4">
         <ZenTable Items="_orders"
@@ -298,8 +304,17 @@
                 <ZenColumn TItem="Order" Title="Reference" Field="@(o => o.Reference)" Width="8rem" />
                 <ZenColumn TItem="Order" Title="Customer" Field="@(o => o.Customer)" />
                 <ZenColumn TItem="Order" Title="Placed" Field="@(o => o.Placed)" Format="d MMM yyyy" Width="9rem" />
-                <ZenColumn TItem="Order" Title="Amount" Field="@(o => o.Amount)" Format="C2" Align="ZenAlign.End" Width="9rem" />
+                <ZenColumn TItem="Order" Title="Amount" Field="@(o => o.Amount)" Format="C2" Align="ZenAlign.End" Width="9rem">
+                    <GroupFooterTemplate>
+                        <span class="tabular-nums">@context.Items.Sum(o => o.Amount).ToString("C2")</span>
+                    </GroupFooterTemplate>
+                </ZenColumn>
             </Columns>
+            <GroupFooterTemplate>
+                <span class="font-normal text-content-muted">
+                    @context.Count @(context.Count == 1 ? "order" : "orders"), averaging @context.Items.Average(o => o.Amount).ToString("C2")
+                </span>
+            </GroupFooterTemplate>
         </ZenTable>
     </div>
 

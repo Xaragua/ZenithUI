@@ -36,6 +36,12 @@ public static class ZenithUIServiceCollectionExtensions
         services.TryAddScoped<IZenModalService, ZenModalService>();
         services.TryAddScoped<IZenToastService, ZenToastService>();
 
+        // A closed registration, so it wins over the open IStringLocalizer<> that
+        // AddLocalization() adds whichever is called first. That one would look for these
+        // resources under the application's ResourcesPath and render key names. An application
+        // that registered its own IStringLocalizer<ZenStrings> beforehand keeps it.
+        services.TryAddSingleton(ZenStrings.Default);
+
         return services;
     }
 }

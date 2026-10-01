@@ -36,7 +36,7 @@
                 Placement="ZenPlacement.BottomStart"
                 MatchWidth="true"
                 Role="listbox"
-                Label="@(Label ?? "Suggestions")"
+                Label="@(Label ?? Localize(ZenStringKeys.Combobox_Suggestions))"
                 PanelId="@ListboxId"
                 Class="max-h-64 overflow-y-auto"
                 CloseOnEscape="false">
@@ -53,7 +53,7 @@
                             <button type="button"
                                     class="zen-focus rounded-zen-sm"
                                     tabindex="-1"
-                                    aria-label="@($"{RemoveLabel} {DisplayFor(item)}")"
+                                    aria-label="@($"{RemoveLabel ?? Localize(ZenStringKeys.Combobox_Remove)} {DisplayFor(item)}")"
                                     @onclick="@(() => ToggleAsync(item))">
                                 <ZenIcon Path="@ZenIcons.Close" class="size-3" />
                             </button>
@@ -87,7 +87,7 @@
                 {
                     <button type="button"
                             class="zen-focus grid shrink-0 place-items-center rounded-zen-sm p-0.5 text-content-subtle hover:text-content"
-                            aria-label="@ClearLabel"
+                            aria-label="@(ClearLabel ?? Localize(ZenStringKeys.Common_ClearSelection))"
                             @onclick="ClearAsync">
                         <ZenIcon Path="@ZenIcons.Close" Size="ZenSize.Small" />
                     </button>
@@ -107,7 +107,7 @@
                 <button type="button"
                         class="zen-focus grid shrink-0 place-items-center rounded-zen-sm p-0.5 text-content-subtle transition-colors hover:text-content"
                         tabindex="-1"
-                        aria-label="@(_open ? CollapseLabel : ExpandLabel)"
+                        aria-label="@(_open ? CollapseLabel ?? Localize(ZenStringKeys.Combobox_HideSuggestions) : ExpandLabel ?? Localize(ZenStringKeys.Combobox_ShowSuggestions))"
                         disabled="@(Disabled || ReadOnly)"
                         @onclick="ToggleOpenAsync">
                     <ZenIcon Path="@ZenIcons.ChevronDown"
@@ -128,13 +128,13 @@
             *@
             @if (_loading)
             {
-                <p class="px-3 py-2 text-sm text-content-subtle" role="status">@LoadingText</p>
+                <p class="px-3 py-2 text-sm text-content-subtle" role="status">@(LoadingText ?? Localize(ZenStringKeys.Combobox_Searching))</p>
             }
             else if (_options.Count == 0)
             {
                 @* A live region, so a screen reader hears that filtering produced nothing.
                    Silence is indistinguishable from "still loading". *@
-                <p class="px-3 py-2 text-sm text-content-subtle" role="status">@NoResultsText</p>
+                <p class="px-3 py-2 text-sm text-content-subtle" role="status">@(NoResultsText ?? Localize(ZenStringKeys.Common_NoMatches))</p>
             }
             else
             {
@@ -228,27 +228,27 @@
 
     /// <summary>Message while options are loading.</summary>
     [Parameter]
-    public string LoadingText { get; set; } = "Searching…";
+    public string? LoadingText { get; set; }
 
     /// <summary>Message when filtering matched nothing.</summary>
     [Parameter]
-    public string NoResultsText { get; set; } = "No matches.";
+    public string? NoResultsText { get; set; }
 
     /// <summary>Accessible name for the clear button.</summary>
     [Parameter]
-    public string ClearLabel { get; set; } = "Clear selection";
+    public string? ClearLabel { get; set; }
 
     /// <summary>Accessible name for the chevron when the list is closed.</summary>
     [Parameter]
-    public string ExpandLabel { get; set; } = "Show suggestions";
+    public string? ExpandLabel { get; set; }
 
     /// <summary>Accessible name for the chevron when the list is open.</summary>
     [Parameter]
-    public string CollapseLabel { get; set; } = "Hide suggestions";
+    public string? CollapseLabel { get; set; }
 
     /// <summary>Accessible name prefix for a chip's remove button.</summary>
     [Parameter]
-    public string RemoveLabel { get; set; } = "Remove";
+    public string? RemoveLabel { get; set; }
 
     /// <summary>How long to wait after a keystroke before querying.</summary>
     /// <remarks>

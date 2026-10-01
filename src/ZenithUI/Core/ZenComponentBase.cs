@@ -42,6 +42,29 @@ public abstract class ZenComponentBase : ComponentBase
     /// <summary>The id fallback generated for this instance, independent of <see cref="Id"/>.</summary>
     private protected string GeneratedId { get; }
 
+    /// <summary>
+    /// The container, asked for an optional <c>IStringLocalizer&lt;ZenStrings&gt;</c>.
+    /// </summary>
+    /// <remarks>
+    /// The provider rather than the localizer itself: <c>[Inject]</c> throws for an unregistered
+    /// service, and an app that has never registered one must still render. See
+    /// <see cref="ZenStrings"/>.
+    /// </remarks>
+    [Inject]
+    private IServiceProvider ZenServices { get; set; } = default!;
+
+    private Microsoft.Extensions.Localization.IStringLocalizer? _strings;
+
+    /// <summary>The library's text in the current UI culture.</summary>
+    private protected Microsoft.Extensions.Localization.IStringLocalizer Strings =>
+        _strings ??= ZenStrings.Resolve(ZenServices);
+
+    /// <summary>A string from <see cref="ZenStrings"/>, in the current UI culture.</summary>
+    private protected string Localize(string key) => Strings[key];
+
+    /// <summary>A format string from <see cref="ZenStrings"/>, filled in.</summary>
+    private protected string Localize(string key, params object[] arguments) => Strings[key, arguments];
+
     /// <summary>Initializes a new instance and assigns its generated element id.</summary>
     protected ZenComponentBase()
     {

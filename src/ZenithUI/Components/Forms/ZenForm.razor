@@ -42,7 +42,7 @@
             <div class="flex items-start gap-2">
                 <ZenIcon Path="@ZenIcons.Danger" Size="ZenSize.Small" class="mt-0.5 text-danger-strong" />
                 <div class="min-w-0">
-                    <p class="text-sm font-medium text-danger-strong">@SummaryTitle</p>
+                    <p class="text-sm font-medium text-danger-strong">@(SummaryTitle ?? Localize(ZenStringKeys.Form_SummaryTitle))</p>
                     <ul class="mt-1.5 list-disc space-y-0.5 ps-4 text-sm text-danger-strong">
                         @foreach (var error in _errors)
                         {
@@ -105,7 +105,7 @@
 
     /// <summary>Heading for the error summary.</summary>
     [Parameter]
-    public string SummaryTitle { get; set; } = "Please correct the following";
+    public string? SummaryTitle { get; set; }
 
     /// <summary>Vertical gap between fields.</summary>
     [Parameter]
