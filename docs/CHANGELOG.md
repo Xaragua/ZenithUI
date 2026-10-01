@@ -4,10 +4,14 @@ All notable changes to ZenithUI are documented here. The format follows
 [Keep a Changelog](https://keepachangelog.com/en/1.1.0/) and the project adheres to
 [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
-## [1.1.0] — Unreleased
+## [1.1.0] — 2026-10-01
 
 Additions and one fix. Nothing is breaking: `1.0.0` code builds and renders unchanged, in English,
 with no new registration. New parameters default to the old behaviour.
+
+```bash
+dotnet add package ZenithUI --version 1.1.0
+```
 
 ### Added
 
