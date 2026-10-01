@@ -1,0 +1,41 @@
+@inject NavigationManager Navigation
+
+@*
+    The demo's language switcher. Static, like the rest of the shell: each choice is a link to
+    /culture/set, which writes the culture cookie and redirects back here.
+
+    data-enhance-nav="false" because enhanced navigation would patch the page in place, and an
+    interactive island keeps the culture of the request that started its circuit - so the text
+    ZenithUI renders inside the island would stay in the old language until a full load.
+*@
+
+<nav aria-label="Language" class="flex items-center gap-0.5 rounded-zen-md border border-border p-0.5">
+    @foreach (var (culture, label, name) in Cultures)
+    {
+        var current = CultureInfo.CurrentUICulture.Name == culture;
+
+        <a href="@($"culture/set?culture={culture}&redirectUri={Uri.EscapeDataString(ReturnUrl)}")"
+           data-enhance-nav="false"
+           lang="@culture"
+           title="@name"
+           aria-current="@(current ? "true" : null)"
+           class="@LinkClass(current)">
+            @label<span class="zen-sr-only"> @name</span>
+        </a>
+    }
+</nav>
+
+@code {
+    private static readonly (string Culture, string Label, string Name)[] Cultures =
+    [
+        ("en-US", "EN", "English (United States)"),
+        ("es-ES", "ES", "Español (España)"),
+        ("es-DO", "DO", "Español (República Dominicana)"),
+    ];
+
+    private string ReturnUrl => "/" + Navigation.ToBaseRelativePath(Navigation.Uri);
+
+    private static string LinkClass(bool current) => current
+        ? "zen-focus rounded-zen-sm bg-primary-soft px-2 py-0.5 text-xs font-semibold text-primary-strong"
+        : "zen-focus rounded-zen-sm px-2 py-0.5 text-xs font-medium text-content-muted hover:bg-surface-hover hover:text-content";
+}

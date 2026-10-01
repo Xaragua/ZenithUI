@@ -46,6 +46,19 @@
     public RenderFragment? HeaderTemplate { get; set; }
 
     /// <summary>
+    /// This column's cell in the footer row closing each group of a grouped table - a subtotal, a
+    /// count, an average.
+    /// </summary>
+    /// <remarks>
+    /// A cell of its own rather than a slot in the table's spanning footer, so the figure lands
+    /// under the column it summarises and takes that column's <see cref="Align"/> and
+    /// <see cref="CellClass"/>. The group carries every one of its rows, including those on other
+    /// pages, so a total computed from it is the group's total and not the page's.
+    /// </remarks>
+    [Parameter]
+    public RenderFragment<ZenTableGroup<TItem>>? GroupFooterTemplate { get; set; }
+
+    /// <summary>
     /// Whether the column can be sorted. Defaults to true once there is something to sort by.
     /// </summary>
     [Parameter]

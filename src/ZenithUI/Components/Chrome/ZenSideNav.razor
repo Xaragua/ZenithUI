@@ -58,7 +58,7 @@
        popover="auto"
        class="@RootClass(NavClass)"
        style="@Style"
-       aria-label="@Label"
+       aria-label="@(Label ?? Localize(ZenStringKeys.SideNav_Label))"
        @attributes="AttributesWithoutClass">
 
     @if (Header is not null || ShowCloseButton)
@@ -76,7 +76,7 @@
                         class="zen-focus -me-1 grid shrink-0 place-items-center rounded-zen-sm p-1 text-content-subtle transition-colors hover:bg-surface-sunken hover:text-content"
                         popovertarget="@NavId"
                         popovertargetaction="hide"
-                        aria-label="@CloseLabel">
+                        aria-label="@(CloseLabel ?? Localize(ZenStringKeys.SideNav_Close))">
                     <ZenIcon Path="@ZenIcons.Close" Size="ZenSize.Small" />
                 </button>
             }
@@ -111,8 +111,8 @@
                     aria-controls="@NavId"
                     data-zen-sidenav-toggle>
                 <ZenIcon Path="@ZenIcons.ChevronLeft" Size="ZenSize.Small" class="zen-sidenav-collapse-icon" />
-                <span class="zen-nav-label zen-sidenav-collapse-text min-w-0 truncate">@CollapseText</span>
-                <span class="zen-nav-label zen-sidenav-expand-text min-w-0 truncate">@ExpandText</span>
+                <span class="zen-nav-label zen-sidenav-collapse-text min-w-0 truncate">@(CollapseText ?? Localize(ZenStringKeys.SideNav_Collapse))</span>
+                <span class="zen-nav-label zen-sidenav-expand-text min-w-0 truncate">@(ExpandText ?? Localize(ZenStringKeys.SideNav_Expand))</span>
             </button>
         </div>
     }
@@ -171,7 +171,7 @@
 
     /// <summary>Accessible name for the landmark.</summary>
     [Parameter]
-    public string Label { get; set; } = "Main navigation";
+    public string? Label { get; set; }
 
     /// <summary>Shows the drawer's close button on narrow screens.</summary>
     [Parameter]
@@ -179,7 +179,7 @@
 
     /// <summary>Accessible name for the close button.</summary>
     [Parameter]
-    public string CloseLabel { get; set; } = "Close navigation";
+    public string? CloseLabel { get; set; }
 
     /// <summary>Confines Tab to the drawer while it is open. Requires interactivity.</summary>
     /// <remarks>
@@ -228,11 +228,11 @@
 
     /// <summary>Label of the collapse button while the rail is expanded.</summary>
     [Parameter]
-    public string CollapseText { get; set; } = "Collapse navigation";
+    public string? CollapseText { get; set; }
 
     /// <summary>Label of the collapse button while the rail is collapsed.</summary>
     [Parameter]
-    public string ExpandText { get; set; } = "Expand navigation";
+    public string? ExpandText { get; set; }
 
     /// <summary>
     /// The element id the app bar's menu button targets.

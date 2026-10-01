@@ -57,7 +57,7 @@
                 {
                     <button type="button"
                             class="zen-focus -m-1 grid shrink-0 place-items-center rounded-zen-sm p-1 text-content-subtle transition-colors hover:bg-surface-sunken hover:text-content"
-                            aria-label="@CloseLabel"
+                            aria-label="@(CloseLabel ?? Localize(ZenStringKeys.Common_Close))"
                             @onclick="RequestCloseAsync">
                         <ZenIcon Path="@ZenIcons.Close" Size="ZenSize.Small" />
                     </button>
@@ -124,7 +124,7 @@
 
     /// <summary>Accessible name for the close button.</summary>
     [Parameter]
-    public string CloseLabel { get; set; } = "Close";
+    public string? CloseLabel { get; set; }
 
     /// <summary>Whether Escape dismisses the dialog.</summary>
     [Parameter]

@@ -29,7 +29,7 @@
 
     @if (HasLabel)
     {
-        <span class="@(ShowLabel ? LabelClass : "zen-sr-only")">@Label</span>
+        <span class="@(ShowLabel ? LabelClass : "zen-sr-only")">@ResolvedLabel</span>
     }
 </span>
 
@@ -39,11 +39,12 @@
     public ZenSize Size { get; set; } = ZenSize.Medium;
 
     /// <summary>
-    /// Accessible status text. Set to an empty string when an ancestor already announces the busy
+    /// Accessible status text, by default a localized "Loading". Set to an empty string when an
+    /// ancestor already announces the busy
     /// state, to avoid a screen reader saying it twice.
     /// </summary>
     [Parameter]
-    public string? Label { get; set; } = "Loading";
+    public string? Label { get; set; }
 
     /// <summary>Render <see cref="Label"/> visibly next to the spinner instead of only to screen readers.</summary>
     [Parameter]
@@ -53,7 +54,10 @@
     [Parameter]
     public ZenIntent Intent { get; set; } = ZenIntent.Neutral;
 
-    private bool HasLabel => !string.IsNullOrEmpty(Label);
+    /// <summary>The label to render: the caller's, or the localized "Loading". Empty means none.</summary>
+    private string ResolvedLabel => Label ?? Localize(ZenStringKeys.Common_Loading);
+
+    private bool HasLabel => ResolvedLabel.Length > 0;
 
     private string WrapperClass => CssBuilder
         .Default("inline-flex items-center gap-2")

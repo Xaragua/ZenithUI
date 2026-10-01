@@ -1,0 +1,133 @@
+@namespace ZenithUI
+@inherits ZenComponentBase
+@implements IDisposable
+
+@*
+    One action in a ZenSplitButton's menu.
+
+    tabindex="-1" on every item: the menu is one stop reached through its button, and the arrow
+    keys move within it. An item in the tab order would make Tab walk the menu instead of
+    leaving it, which is what the menu pattern says Tab does.
+
+    A disabled item uses the real `disabled` attribute rather than aria-disabled. It is then
+    skipped by the arrow keys and cannot be clicked, and the screen reader still announces it as
+    unavailable when the user reaches the menu. The alternative - focusable but inert - suits a
+    long application menu where discovering an option matters; a split button's three or four
+    actions do not need it.
+
+    An item with Href is a link with role="menuitem", so it still opens in a new tab on a middle
+    click. Choosing one also closes the menu.
+*@
+
+@if (Href is not null && !Disabled)
+{
+    <a id="@Id"
+       class="@RootClass(ItemClass)"
+       style="@Style"
+       href="@Href"
+       target="@Target"
+       role="menuitem"
+       tabindex="-1"
+       @onclick="ActivateAsync"
+       @onkeydown="HandleKeyDownAsync"
+       @attributes="AttributesWithoutClass">
+        @Inner
+    </a>
+}
+else
+{
+    <button id="@Id"
+            type="button"
+            class="@RootClass(ItemClass)"
+            style="@Style"
+            role="menuitem"
+            tabindex="-1"
+            disabled="@Disabled"
+            @onclick="ActivateAsync"
+            @onkeydown="HandleKeyDownAsync"
+            @attributes="AttributesWithoutClass">
+        @Inner
+    </button>
+}
+
+@code {
+    /// <summary>The menu this item belongs to.</summary>
+    [CascadingParameter]
+    private ZenSplitButton? Menu { get; set; }
+
+    /// <summary>The item's label.</summary>
+    [Parameter]
+    public RenderFragment? ChildContent { get; set; }
+
+    /// <summary>A leading icon, typically a <see cref="ZenIcons"/> constant.</summary>
+    [Parameter]
+    public string? Icon { get; set; }
+
+    /// <summary>
+    /// Colour role. <see cref="ZenIntent.Danger"/> for a destructive action - and say what it
+    /// destroys in the label, because the colour does not reach a screen reader.
+    /// </summary>
+    [Parameter]
+    public ZenIntent Intent { get; set; } = ZenIntent.Neutral;
+
+    /// <summary>Makes the item a link.</summary>
+    [Parameter]
+    public string? Href { get; set; }
+
+    /// <summary>The link's target. Only meaningful with <see cref="Href"/>.</summary>
+    [Parameter]
+    public string? Target { get; set; }
+
+    /// <summary>Disables the item. The arrow keys skip it.</summary>
+    [Parameter]
+    public bool Disabled { get; set; }
+
+    /// <summary>Raised when the item is chosen, by click, Enter or Space.</summary>
+    [Parameter]
+    public EventCallback<MouseEventArgs> OnClick { get; set; }
+
+    /// <inheritdoc />
+    protected override void OnInitialized() => Menu?.Register(this);
+
+    private async Task ActivateAsync(MouseEventArgs args)
+    {
+        if (Disabled)
+        {
+            return;
+        }
+
+        await OnClick.InvokeAsync(args);
+
+        if (Menu is not null)
+        {
+            await Menu.ItemActivatedAsync();
+        }
+    }
+
+    private Task HandleKeyDownAsync(KeyboardEventArgs args) =>
+        Menu?.HandleItemKeyDownAsync(this, args) ?? Task.CompletedTask;
+
+    /// <inheritdoc />
+    public void Dispose() => Menu?.Unregister(this);
+
+    private RenderFragment Inner => __builder =>
+    {
+        @if (Icon is not null)
+        {
+            <ZenIcon Path="@Icon" Size="ZenSize.Small" class="shrink-0" />
+        }
+
+        <span class="min-w-0 flex-1 truncate">@ChildContent</span>
+    };
+
+    // Hover and focus share one background, so the item under the pointer and the item under the
+    // keyboard look the same - the user should never see two "current" items at once. The ring is
+    // still drawn on keyboard focus, as on every other control.
+    private string ItemClass => CssBuilder
+        .Default("zen-focus flex w-full items-center gap-2 rounded-zen-md px-2.5 py-1.5 text-start text-sm transition-colors")
+        .AddClass(Intent == ZenIntent.Neutral ? "text-content" : ZenStyles.Foreground(Intent))
+        .AddClass(Disabled
+            ? "cursor-not-allowed opacity-50"
+            : "cursor-pointer hover:bg-surface-hover focus:bg-surface-hover")
+        .Build()!;
+}

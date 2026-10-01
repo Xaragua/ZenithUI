@@ -22,7 +22,7 @@
                    Variant="ZenVariant.Ghost"
                    IconOnly="true"
                    Icon="@ZenIcons.ChevronLeft"
-                   AriaLabel="@PreviousMonthLabel"
+                   AriaLabel="@(PreviousMonthLabel ?? Localize(ZenStringKeys.Calendar_PreviousMonth))"
                    Disabled="@(!CanGoToPreviousMonth)"
                    OnClick="@(() => ShiftMonth(-1))" />
 
@@ -38,7 +38,7 @@
                    Variant="ZenVariant.Ghost"
                    IconOnly="true"
                    Icon="@ZenIcons.ChevronRight"
-                   AriaLabel="@NextMonthLabel"
+                   AriaLabel="@(NextMonthLabel ?? Localize(ZenStringKeys.Calendar_NextMonth))"
                    Disabled="@(!CanGoToNextMonth)"
                    OnClick="@(() => ShiftMonth(1))" />
     </div>
@@ -108,13 +108,13 @@
     {
         <div class="mt-2 flex justify-between gap-2 border-t border-border pt-2">
             <ZenButton Size="ZenSize.Small" Variant="ZenVariant.Ghost" OnClick="GoToTodayAsync">
-                @TodayLabel
+                @(TodayLabel ?? Localize(ZenStringKeys.Calendar_Today))
             </ZenButton>
 
             @if (AllowClear)
             {
                 <ZenButton Size="ZenSize.Small" Variant="ZenVariant.Ghost" OnClick="ClearAsync">
-                    @ClearLabel
+                    @(ClearLabel ?? Localize(ZenStringKeys.Calendar_Clear))
                 </ZenButton>
             }
         </div>
@@ -170,19 +170,19 @@
 
     /// <summary>Label for the today action.</summary>
     [Parameter]
-    public string TodayLabel { get; set; } = "Today";
+    public string? TodayLabel { get; set; }
 
     /// <summary>Label for the clear action.</summary>
     [Parameter]
-    public string ClearLabel { get; set; } = "Clear";
+    public string? ClearLabel { get; set; }
 
     /// <summary>Accessible name for the previous-month button.</summary>
     [Parameter]
-    public string PreviousMonthLabel { get; set; } = "Previous month";
+    public string? PreviousMonthLabel { get; set; }
 
     /// <summary>Accessible name for the next-month button.</summary>
     [Parameter]
-    public string NextMonthLabel { get; set; } = "Next month";
+    public string? NextMonthLabel { get; set; }
 
     /// <summary>Raised when the user asks to close - Escape, or a date being chosen.</summary>
     [Parameter]

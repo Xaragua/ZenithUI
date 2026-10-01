@@ -85,7 +85,7 @@
     private string SymbolText => Symbol ?? EffectiveCulture.NumberFormat.CurrencySymbol;
 
     private IEnumerable<string> AllMessages =>
-        _parseFailed ? ValidationMessages.Append($"The {DisplayName} field is not a valid amount.")
+        _parseFailed ? ValidationMessages.Append(Localize(ZenStringKeys.Validation_InvalidAmount, DisplayName))
                      : ValidationMessages;
 
     private bool _parseFailed;

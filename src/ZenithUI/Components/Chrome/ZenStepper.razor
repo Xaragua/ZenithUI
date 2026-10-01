@@ -57,7 +57,7 @@
     }
 
     <div id="@Id" class="@RootClass(RootClasses)" style="@Style" @attributes="AttributesWithoutClass">
-        <nav aria-label="@Label" class="@(Orientation == ZenDirection.Vertical ? "shrink-0 md:w-64" : null)">
+        <nav aria-label="@(Label ?? Localize(ZenStringKeys.Stepper_Label))" class="@(Orientation == ZenDirection.Vertical ? "shrink-0 md:w-64" : null)">
             <ol class="@ListClass">
                 @for (var i = 0; i < _steps.Count; i++)
                 {
@@ -127,7 +127,7 @@
                                        Icon="@ZenIcons.ChevronLeft"
                                        Disabled="_busy"
                                        OnClick="BackAsync">
-                                @BackText
+                                @(BackText ?? Localize(ZenStringKeys.Stepper_Back))
                             </ZenButton>
                         }
                         else
@@ -139,7 +139,7 @@
                                    TrailingIcon="@(IsLast ? null : ZenIcons.ChevronRight)"
                                    Loading="_busy"
                                    OnClick="NextAsync">
-                            @(IsLast ? FinishText : NextText)
+                            @(IsLast ? FinishText ?? Localize(ZenStringKeys.Stepper_Finish) : NextText ?? Localize(ZenStringKeys.Stepper_Next))
                         </ZenButton>
                     </div>
                 }
@@ -221,7 +221,7 @@
 
     /// <summary>Accessible name for the step list.</summary>
     [Parameter]
-    public string Label { get; set; } = "Progress";
+    public string? Label { get; set; }
 
     /// <summary>Show the active step's title above its content.</summary>
     /// <remarks>
@@ -237,27 +237,27 @@
 
     /// <summary>The Back button's text.</summary>
     [Parameter]
-    public string BackText { get; set; } = "Back";
+    public string? BackText { get; set; }
 
     /// <summary>The Next button's text.</summary>
     [Parameter]
-    public string NextText { get; set; } = "Next";
+    public string? NextText { get; set; }
 
     /// <summary>The Next button's text on the last step.</summary>
     [Parameter]
-    public string FinishText { get; set; } = "Finish";
+    public string? FinishText { get; set; }
 
     /// <summary>Visually hidden text after a completed step's title.</summary>
     [Parameter]
-    public string CompletedText { get; set; } = "completed";
+    public string? CompletedText { get; set; }
 
     /// <summary>Visually hidden text after the title of a step with an error.</summary>
     [Parameter]
-    public string ErrorText { get; set; } = "has errors";
+    public string? ErrorText { get; set; }
 
     /// <summary>The label shown on optional steps.</summary>
     [Parameter]
-    public string OptionalText { get; set; } = "Optional";
+    public string? OptionalText { get; set; }
 
     // ---- Registration -------------------------------------------------------------------------
 
@@ -561,17 +561,17 @@
                    current step needs none - aria-current announces it. *@
                 @if (state == StepState.Complete)
                 {
-                    <span class="zen-sr-only">(@CompletedText)</span>
+                    <span class="zen-sr-only">(@(CompletedText ?? Localize(ZenStringKeys.Stepper_Completed)))</span>
                 }
                 else if (state == StepState.Error)
                 {
-                    <span class="zen-sr-only">(@ErrorText)</span>
+                    <span class="zen-sr-only">(@(ErrorText ?? Localize(ZenStringKeys.Stepper_HasErrors)))</span>
                 }
             </span>
 
             @if (step.Optional)
             {
-                <span class="text-xs text-content-subtle">@OptionalText</span>
+                <span class="text-xs text-content-subtle">@(OptionalText ?? Localize(ZenStringKeys.Stepper_Optional))</span>
             }
 
             @if (step.Description is not null)

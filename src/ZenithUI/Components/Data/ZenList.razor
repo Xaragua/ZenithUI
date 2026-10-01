@@ -50,7 +50,7 @@ else if (Items is null || !Items.Any())
         }
         else
         {
-            <p class="px-3 py-6 text-center text-sm text-content-subtle">@EmptyText</p>
+            <p class="px-3 py-6 text-center text-sm text-content-subtle">@(EmptyText ?? Localize(ZenStringKeys.List_Empty))</p>
         }
     </div>
 }
@@ -185,7 +185,7 @@ else
 
     /// <summary>Message shown when there is nothing to list.</summary>
     [Parameter]
-    public string EmptyText { get; set; } = "Nothing to show.";
+    public string? EmptyText { get; set; }
 
     /// <summary>Accessible name for the listbox.</summary>
     [Parameter]

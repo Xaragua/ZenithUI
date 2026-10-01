@@ -266,7 +266,10 @@ The requested set, plus the primitives the rest depend on.
 masking, which sidesteps caret-position bugs), `ZenSearchInput`, `ZenCheckbox`,
 `ZenCheckboxGroup<T>`, `ZenRadioGroup<T>` + `ZenRadio<T>`, `ZenToggle`, `ZenRangeSlider`.
 
-**Overlays and feedback** — `ZenModal` + `IZenModalService`, `ZenToast` + `IZenToastService`.
+**Overlays and feedback** — `ZenModal` + `IZenModalService`, `ZenToast` + `IZenToastService`,
+`ZenMessage` (added in `1.1.0`: the inline counterpart to a toast).
+
+**Actions** (added in `1.1.0`) — `ZenSplitButton` + `ZenMenuItem`.
 
 **Selection** — `ZenSelect<TValue>` (native `<select>`, works in SSR with zero JS),
 `ZenCombobox<TItem>` (typeahead, async `ItemsProvider`, single/multi, full WAI-ARIA combobox
@@ -440,6 +443,15 @@ which keeps ids and `aria-rowindex` correct once only a window of rows exists.
   collapsed group as one row, and a group's header repeats at the top of a page it continues onto.
   Grouping is exclusive with the treegrid, since both nest rows, and with a provider, which never
   has every row.
+- **Group footers (1.1.0).** `ZenTable.GroupFooterTemplate` adds one spanning cell, and
+  `ZenColumn.GroupFooterTemplate` adds per-column cells, for subtotals that align with their
+  column. Footers are `DisplayRow`s in the same flat list, so virtualization and `aria-rowcount`
+  pick them up with no second code path. They ride on the group's last row rather than being
+  paging entries: a group closes on the page where it ends, a collapsed group has no footer, and
+  page sizes are unaffected.
+- **Alignment (fixed in 1.1.0).** A cell carries exactly one `text-*` alignment class.
+  Equal-specificity utilities resolve by stylesheet order, which the library does not control,
+  and a hardcoded `text-start` on headers beat every column's `Align="End"`.
 
 ### `ZenLookup<TItem>`
 
@@ -481,6 +493,51 @@ reachable step is a button; an unreachable one is text rather than a disabled bu
   but a title and a flag has none that can. Such a step registered once and then vanished from the
   header on the next render. Steps now join the list the first time they register and leave it
   when disposed. Each pass's registrations are used only to place new steps.
+
+### `ZenSplitButton` + `ZenMenuItem` (1.1.0)
+
+Two real buttons, not one with two click zones: two actions need two accessible names, two focus
+stops and two disabled states. The chevron is the WAI-ARIA *menu button*. The menu is a
+`ZenPopover` with `role="menu"`, and focus moves between items rather than through
+`aria-activedescendant`. Each item is a real `<button role="menuitem">`, so Enter and Space
+activate it through the browser's own click.
+
+- **Ordering trap.** A parent's `OnAfterRenderAsync` runs before its children's, so the split
+  button's "focus the first item" ran before the popover's "show the panel", and `focus()` hit a
+  `display: none` element. The owner now awaits `ZenPopover.EnsureSyncedAsync()` before focusing.
+  This is the general rule for any component that focuses into a popover it owns.
+- **Static rendering.** The chevron is disabled until the renderer is interactive. The primary
+  action is a plain button or link and works anyway.
+- **Divider.** A one-pixel gap between filled halves, drawn by whatever is behind them. It is
+  right on every surface without a colour of its own. Outlined halves overlap borders instead.
+
+### `ZenMessage` (1.1.0)
+
+It is **not a live region by default.** A message present at page load is content, and
+`role="alert"` on it is announced over whatever the user was hearing. `Announce` opts in for a
+message that appears in response to an action. Variants reuse `ZenVariant`, with `Ghost` as the
+surface-less "simple" form. Every text pairing is one the contrast audit already covers: content
+on `-soft`, `-strong` on a surface, `-content` on a fill. The icon mapping is
+`ZenIcons.ForIntent`, shared with `ZenToast`, so the two cannot disagree.
+
+### Localization (1.1.0)
+
+Text comes from `ZenStrings.resx` (en-US), `.es.resx` and `.es-DO.resx`, the last holding only the
+Dominican differences. Components read `CultureInfo.CurrentUICulture` at render time through
+`ZenComponentBase.Localize`. Every English-default parameter became nullable, with `null` meaning
+"localized", so no name, type or explicit value changed. The decisions behind it:
+
+- **The lookup is the library's own `ResourceManager`**, not `ResourceManagerStringLocalizerFactory`,
+  which resolves through the *application's* `ResourcesPath` and would find nothing in this
+  package.
+- **Override point: `IStringLocalizer<ZenStrings>`.** `AddZenithUI` registers it closed, so it beats
+  the open generic from `AddLocalization()`. Components skip the framework's generic localizer if
+  it is all the container has.
+- **Injection is optional.** Components take `IServiceProvider` and fall back to
+  `ZenStrings.Default`, so nothing written against 1.0.0 needs a new registration.
+- **The resource name is a `const`.** A static field initialised from `typeof(...).FullName` was
+  read before it was set under the WebAssembly runtime, which initialises eagerly where the
+  server's JIT had been lazy. The accessibility sweep caught it on `/render-modes`.
 
 ### `ZenModal` and `IZenModalService`
 

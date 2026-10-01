@@ -80,6 +80,22 @@ public static class ZenIcons
     /// <summary>Circled checkmark. Success confirmations.</summary>
     public const string Success = """<circle cx="12" cy="12" r="9" /><path d="m8.5 12.5 2.5 2.5 4.5-5" />""";
 
+    /// <summary>
+    /// The status glyph for an intent: <see cref="Success"/>, <see cref="Warning"/>,
+    /// <see cref="Danger"/>, and <see cref="Info"/> for everything else.
+    /// </summary>
+    /// <remarks>
+    /// One mapping, shared by every component that announces a status - a toast and an inline
+    /// message showing the same intent should never disagree about its icon.
+    /// </remarks>
+    public static string ForIntent(ZenIntent intent) => intent switch
+    {
+        ZenIntent.Success => Success,
+        ZenIntent.Warning => Warning,
+        ZenIntent.Danger => Danger,
+        _ => Info,
+    };
+
     /// <summary>Upward arrow. A positive trend on a stat card.</summary>
     public const string TrendUp = """<path d="M12 19V5m0 0-6 6m6-6 6 6" />""";
 

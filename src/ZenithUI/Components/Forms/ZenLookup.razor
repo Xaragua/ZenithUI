@@ -84,7 +84,7 @@
                 {
                     <button type="button"
                             class="zen-focus grid shrink-0 place-items-center rounded-zen-sm p-0.5 text-content-subtle hover:text-content"
-                            aria-label="@ClearLabel"
+                            aria-label="@(ClearLabel ?? Localize(ZenStringKeys.Common_ClearSelection))"
                             @onclick="ClearAsync">
                         <ZenIcon Path="@ZenIcons.Close" Size="ZenSize.Small" />
                     </button>
@@ -96,7 +96,7 @@
                 <button type="button"
                         class="zen-focus grid shrink-0 place-items-center rounded-zen-sm p-0.5 text-content-subtle transition-colors hover:text-content"
                         tabindex="-1"
-                        aria-label="@(_open ? CollapseLabel : ExpandLabel)"
+                        aria-label="@(_open ? CollapseLabel ?? Localize(ZenStringKeys.Lookup_HideResults) : ExpandLabel ?? Localize(ZenStringKeys.Lookup_ShowResults))"
                         disabled="@(Disabled || ReadOnly)"
                         @onclick="ToggleOpenAsync">
                     <ZenIcon Path="@ZenIcons.ChevronDown"
@@ -133,7 +133,7 @@
                               Items="@(ItemsProvider is null ? _filtered : null)"
                               ItemsProvider="@(ItemsProvider is null ? null : _tableProvider)"
                               Columns="@Columns"
-                              Label="@(Label ?? "Results")"
+                              Label="@(Label ?? Localize(ZenStringKeys.Lookup_Results))"
                               Virtualize="@Virtualize"
                               ItemSize="@ItemSize"
                               PageSize="@PageSize"
@@ -142,8 +142,8 @@
                               Size="ZenSize.Small"
                               Bordered="false"
                               ResponsiveCollapse="false"
-                              EmptyText="@NoResultsText"
-                              EmptyDescription="@NoResultsDescription"
+                              EmptyText="@(NoResultsText ?? Localize(ZenStringKeys.Common_NoMatches))"
+                              EmptyDescription="@(NoResultsDescription is null ? Localize(ZenStringKeys.Lookup_TryDifferentSearch) : NoResultsDescription.Length == 0 ? null : NoResultsDescription)"
                               EmptyIcon="@ZenIcons.Search"
                               RowText="@DisplayFor" />
                 </CascadingValue>
@@ -158,12 +158,12 @@
                         <p class="min-w-0 truncate text-sm text-content-muted" aria-live="polite">
                             @if (_hasPending)
                             {
-                                <span>@PendingLabel </span>
+                                <span>@(PendingLabel ?? Localize(ZenStringKeys.Lookup_Selected)) </span>
                                 <span class="font-medium text-content">@DisplayFor(_pending!)</span>
                             }
                             else
                             {
-                                @NothingPendingText
+                                @(NothingPendingText ?? Localize(ZenStringKeys.Lookup_NothingPending))
                             }
                         </p>
 
@@ -172,13 +172,13 @@
                                        Size="ZenSize.Small"
                                        Disabled="@(!_hasPending && CurrentValue is null)"
                                        OnClick="ClearPendingAsync">
-                                @ClearSelectionText
+                                @(ClearSelectionText ?? Localize(ZenStringKeys.Common_ClearSelection))
                             </ZenButton>
                             <ZenButton Intent="ZenIntent.Primary"
                                        Size="ZenSize.Small"
                                        Disabled="@(!_hasPending)"
                                        OnClick="ConfirmAsync">
-                                @ConfirmText
+                                @(ConfirmText ?? Localize(ZenStringKeys.Common_Confirm))
                             </ZenButton>
                         </div>
                     </div>
@@ -311,39 +311,42 @@
 
     /// <summary>Headline when nothing matches.</summary>
     [Parameter]
-    public string NoResultsText { get; set; } = "No matches";
+    public string? NoResultsText { get; set; }
 
-    /// <summary>A sentence under the headline when nothing matches.</summary>
+    /// <summary>
+    /// A sentence under the headline when nothing matches. Defaults to a localized "Try a different
+    /// search."; set an empty string for none.
+    /// </summary>
     [Parameter]
-    public string? NoResultsDescription { get; set; } = "Try a different search.";
+    public string? NoResultsDescription { get; set; }
 
     /// <summary>The Confirm button's text, in <see cref="ZenLookupCommit.Confirm"/> mode.</summary>
     [Parameter]
-    public string ConfirmText { get; set; } = "Confirm";
+    public string? ConfirmText { get; set; }
 
     /// <summary>The button that clears the choice, in <see cref="ZenLookupCommit.Confirm"/> mode.</summary>
     [Parameter]
-    public string ClearSelectionText { get; set; } = "Clear selection";
+    public string? ClearSelectionText { get; set; }
 
     /// <summary>Precedes the marked row's name in the confirm bar.</summary>
     [Parameter]
-    public string PendingLabel { get; set; } = "Selected:";
+    public string? PendingLabel { get; set; }
 
     /// <summary>The confirm bar's text while no row is marked.</summary>
     [Parameter]
-    public string NothingPendingText { get; set; } = "Choose a row, then confirm.";
+    public string? NothingPendingText { get; set; }
 
     /// <summary>Accessible name for the clear button.</summary>
     [Parameter]
-    public string ClearLabel { get; set; } = "Clear selection";
+    public string? ClearLabel { get; set; }
 
     /// <summary>Accessible name for the chevron when the panel is closed.</summary>
     [Parameter]
-    public string ExpandLabel { get; set; } = "Show results";
+    public string? ExpandLabel { get; set; }
 
     /// <summary>Accessible name for the chevron when the panel is open.</summary>
     [Parameter]
-    public string CollapseLabel { get; set; } = "Hide results";
+    public string? CollapseLabel { get; set; }
 
     // ---- Ids and state ------------------------------------------------------------------------
 

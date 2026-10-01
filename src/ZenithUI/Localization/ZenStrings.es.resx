@@ -1,0 +1,241 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+  Generated layout, hand-maintained content. Keys are listed in ZenStringKeys.cs, and
+  ZenLocalizationTests fails if this file and that list disagree.
+-->
+<root>
+  <resheader name="resmimetype">
+    <value>text/microsoft-resx</value>
+  </resheader>
+  <resheader name="version">
+    <value>2.0</value>
+  </resheader>
+  <resheader name="reader">
+    <value>System.Resources.ResXResourceReader, System.Windows.Forms, Version=4.0.0.0, Culture=neutral, PublicKeyToken=b77a5c561934e089</value>
+  </resheader>
+  <resheader name="writer">
+    <value>System.Resources.ResXResourceWriter, System.Windows.Forms, Version=4.0.0.0, Culture=neutral, PublicKeyToken=b77a5c561934e089</value>
+  </resheader>
+  <data name="Common_Cancel" xml:space="preserve">
+    <value>Cancelar</value>
+  </data>
+  <data name="Common_ClearSelection" xml:space="preserve">
+    <value>Borrar selección</value>
+  </data>
+  <data name="Common_Close" xml:space="preserve">
+    <value>Cerrar</value>
+  </data>
+  <data name="Common_Confirm" xml:space="preserve">
+    <value>Confirmar</value>
+  </data>
+  <data name="Common_Dismiss" xml:space="preserve">
+    <value>Descartar</value>
+  </data>
+  <data name="Common_Loading" xml:space="preserve">
+    <value>Cargando</value>
+  </data>
+  <data name="Common_NoData" xml:space="preserve">
+    <value>Sin datos</value>
+  </data>
+  <data name="Common_NoMatches" xml:space="preserve">
+    <value>Sin coincidencias</value>
+  </data>
+  <data name="AppBar_OpenNavigation" xml:space="preserve">
+    <value>Abrir navegación</value>
+  </data>
+  <data name="AppShell_SkipToContent" xml:space="preserve">
+    <value>Saltar al contenido principal</value>
+  </data>
+  <data name="SideNav_Label" xml:space="preserve">
+    <value>Navegación principal</value>
+  </data>
+  <data name="SideNav_Close" xml:space="preserve">
+    <value>Cerrar navegación</value>
+  </data>
+  <data name="SideNav_Collapse" xml:space="preserve">
+    <value>Contraer navegación</value>
+  </data>
+  <data name="SideNav_Expand" xml:space="preserve">
+    <value>Expandir navegación</value>
+  </data>
+  <data name="Stepper_Label" xml:space="preserve">
+    <value>Progreso</value>
+  </data>
+  <data name="Stepper_Back" xml:space="preserve">
+    <value>Atrás</value>
+  </data>
+  <data name="Stepper_Next" xml:space="preserve">
+    <value>Siguiente</value>
+  </data>
+  <data name="Stepper_Finish" xml:space="preserve">
+    <value>Finalizar</value>
+  </data>
+  <data name="Stepper_Completed" xml:space="preserve">
+    <value>completado</value>
+  </data>
+  <data name="Stepper_HasErrors" xml:space="preserve">
+    <value>tiene errores</value>
+  </data>
+  <data name="Stepper_Optional" xml:space="preserve">
+    <value>Opcional</value>
+  </data>
+  <data name="List_Empty" xml:space="preserve">
+    <value>No hay nada que mostrar.</value>
+  </data>
+  <data name="Table_Details" xml:space="preserve">
+    <value>Detalles</value>
+  </data>
+  <data name="Table_DetailsFor" xml:space="preserve">
+    <value>Detalles de {0}</value>
+  </data>
+  <data name="Table_SelectAllOnPage" xml:space="preserve">
+    <value>Seleccionar todas las filas de esta página</value>
+  </data>
+  <data name="Table_SelectRow" xml:space="preserve">
+    <value>Seleccionar {0}</value>
+  </data>
+  <data name="Table_SelectGroup" xml:space="preserve">
+    <value>Seleccionar todas las filas de {0}</value>
+  </data>
+  <data name="Table_PreviousPage" xml:space="preserve">
+    <value>Página anterior</value>
+  </data>
+  <data name="Table_NextPage" xml:space="preserve">
+    <value>Página siguiente</value>
+  </data>
+  <data name="Table_PageNumber" xml:space="preserve">
+    <value>Página {0}</value>
+  </data>
+  <data name="Table_Pagination" xml:space="preserve">
+    <value>Paginación</value>
+  </data>
+  <data name="Table_PaginationFor" xml:space="preserve">
+    <value>Paginación de {0}</value>
+  </data>
+  <data name="Table_PageSummary" xml:space="preserve">
+    <value>{0}–{1} de {2}</value>
+  </data>
+  <data name="Table_NoRows" xml:space="preserve">
+    <value>Sin filas</value>
+  </data>
+  <data name="Table_RowsPerPage" xml:space="preserve">
+    <value>Filas por página</value>
+  </data>
+  <data name="Table_RowOne" xml:space="preserve">
+    <value>fila</value>
+  </data>
+  <data name="Table_RowOther" xml:space="preserve">
+    <value>filas</value>
+  </data>
+  <data name="Table_Ungrouped" xml:space="preserve">
+    <value>(Ninguno)</value>
+  </data>
+  <data name="Calendar_Today" xml:space="preserve">
+    <value>Hoy</value>
+  </data>
+  <data name="Calendar_Clear" xml:space="preserve">
+    <value>Borrar</value>
+  </data>
+  <data name="Calendar_PreviousMonth" xml:space="preserve">
+    <value>Mes anterior</value>
+  </data>
+  <data name="Calendar_NextMonth" xml:space="preserve">
+    <value>Mes siguiente</value>
+  </data>
+  <data name="Combobox_Suggestions" xml:space="preserve">
+    <value>Sugerencias</value>
+  </data>
+  <data name="Combobox_Searching" xml:space="preserve">
+    <value>Buscando…</value>
+  </data>
+  <data name="Combobox_ShowSuggestions" xml:space="preserve">
+    <value>Mostrar sugerencias</value>
+  </data>
+  <data name="Combobox_HideSuggestions" xml:space="preserve">
+    <value>Ocultar sugerencias</value>
+  </data>
+  <data name="Combobox_Remove" xml:space="preserve">
+    <value>Quitar</value>
+  </data>
+  <data name="DatePicker_ChooseDate" xml:space="preserve">
+    <value>Elegir una fecha</value>
+  </data>
+  <data name="DatePicker_Choose" xml:space="preserve">
+    <value>Elegir {0}</value>
+  </data>
+  <data name="DatePicker_OpenCalendar" xml:space="preserve">
+    <value>Abrir calendario</value>
+  </data>
+  <data name="DatePicker_CloseCalendar" xml:space="preserve">
+    <value>Cerrar calendario</value>
+  </data>
+  <data name="DatePicker_EnterDateAs" xml:space="preserve">
+    <value>Introduzca una fecha con el formato {0}.</value>
+  </data>
+  <data name="Form_SummaryTitle" xml:space="preserve">
+    <value>Corrija lo siguiente</value>
+  </data>
+  <data name="Lookup_Results" xml:space="preserve">
+    <value>Resultados</value>
+  </data>
+  <data name="Lookup_TryDifferentSearch" xml:space="preserve">
+    <value>Pruebe con otra búsqueda.</value>
+  </data>
+  <data name="Lookup_Selected" xml:space="preserve">
+    <value>Seleccionado:</value>
+  </data>
+  <data name="Lookup_NothingPending" xml:space="preserve">
+    <value>Elija una fila y confirme.</value>
+  </data>
+  <data name="Lookup_ShowResults" xml:space="preserve">
+    <value>Mostrar resultados</value>
+  </data>
+  <data name="Lookup_HideResults" xml:space="preserve">
+    <value>Ocultar resultados</value>
+  </data>
+  <data name="SearchInput_Clear" xml:space="preserve">
+    <value>Borrar búsqueda</value>
+  </data>
+  <data name="SearchInput_Busy" xml:space="preserve">
+    <value>Buscando</value>
+  </data>
+  <data name="Validation_Invalid" xml:space="preserve">
+    <value>El campo {0} no es válido.</value>
+  </data>
+  <data name="Validation_Required" xml:space="preserve">
+    <value>El campo {0} es obligatorio.</value>
+  </data>
+  <data name="Validation_InvalidDate" xml:space="preserve">
+    <value>El campo {0} no es una fecha válida.</value>
+  </data>
+  <data name="Validation_InvalidAmount" xml:space="preserve">
+    <value>El campo {0} no es un importe válido.</value>
+  </data>
+  <data name="StatCard_Up" xml:space="preserve">
+    <value>Aumentó</value>
+  </data>
+  <data name="StatCard_Down" xml:space="preserve">
+    <value>Disminuyó</value>
+  </data>
+  <data name="StatCard_Flat" xml:space="preserve">
+    <value>Sin cambios en</value>
+  </data>
+  <data name="SplitButton_MoreOptions" xml:space="preserve">
+    <value>Más opciones</value>
+  </data>
+  <data name="ThemeToggle_Label" xml:space="preserve">
+    <value>Tema de color</value>
+  </data>
+  <data name="ThemeToggle_Light" xml:space="preserve">
+    <value>Claro</value>
+  </data>
+  <data name="ThemeToggle_Dark" xml:space="preserve">
+    <value>Oscuro</value>
+  </data>
+  <data name="ThemeToggle_System" xml:space="preserve">
+    <value>Sistema</value>
+  </data>
+  <data name="ThemeToggle_SwitchTo" xml:space="preserve">
+    <value>Cambiar al tema {0}</value>
+  </data>
+</root>

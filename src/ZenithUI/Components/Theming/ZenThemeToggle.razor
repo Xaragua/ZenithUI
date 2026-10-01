@@ -21,7 +21,7 @@
     <div class="@RootClass(SegmentedRootClass)"
          style="@Style"
          role="radiogroup"
-         aria-label="@Label"
+         aria-label="@(Label ?? Localize(ZenStringKeys.ThemeToggle_Label))"
          id="@Id"
          @attributes="AttributesWithoutClass">
         @foreach (var option in Options)
@@ -55,7 +55,7 @@ else
         @IconFor(ThemeService.Theme == ZenTheme.Dark ? ZenThemeMode.Dark : ZenThemeMode.Light)
         @if (ShowLabels)
         {
-            <span class="text-sm">@(ThemeService.Theme == ZenTheme.Dark ? DarkLabel : LightLabel)</span>
+            <span class="text-sm">@(ThemeService.Theme == ZenTheme.Dark ? DarkText : LightText)</span>
         }
     </button>
 }
@@ -79,31 +79,36 @@ else
 
     /// <summary>Accessible name for the segmented group.</summary>
     [Parameter]
-    public string Label { get; set; } = "Colour theme";
+    public string? Label { get; set; }
 
     /// <summary>Label for the light option.</summary>
     [Parameter]
-    public string LightLabel { get; set; } = "Light";
+    public string? LightLabel { get; set; }
 
     /// <summary>Label for the dark option.</summary>
     [Parameter]
-    public string DarkLabel { get; set; } = "Dark";
+    public string? DarkLabel { get; set; }
 
     /// <summary>Label for the follow-the-system option.</summary>
     [Parameter]
-    public string SystemLabel { get; set; } = "System";
+    public string? SystemLabel { get; set; }
 
     private (ZenThemeMode Value, string Label)[] Options =>
     [
-        (ZenThemeMode.System, SystemLabel),
-        (ZenThemeMode.Light, LightLabel),
-        (ZenThemeMode.Dark, DarkLabel),
+        (ZenThemeMode.System, SystemLabel ?? Localize(ZenStringKeys.ThemeToggle_System)),
+        (ZenThemeMode.Light, LightText),
+        (ZenThemeMode.Dark, DarkText),
     ];
 
-    private string ToggleTitle =>
-        ThemeService.Theme == ZenTheme.Dark
-            ? $"Switch to {LightLabel.ToLowerInvariant()} theme"
-            : $"Switch to {DarkLabel.ToLowerInvariant()} theme";
+    private string LightText => LightLabel ?? Localize(ZenStringKeys.ThemeToggle_Light);
+
+    private string DarkText => DarkLabel ?? Localize(ZenStringKeys.ThemeToggle_Dark);
+
+    // Lower-cased in the UI culture, not the invariant one: the label sits mid-sentence, and
+    // casing rules are a property of the language being written.
+    private string ToggleTitle => Localize(
+        ZenStringKeys.ThemeToggle_SwitchTo,
+        (ThemeService.Theme == ZenTheme.Dark ? LightText : DarkText).ToLower(CultureInfo.CurrentUICulture));
 
     protected override void OnInitialized() => ThemeService.ThemeChanged += HandleThemeChanged;
 

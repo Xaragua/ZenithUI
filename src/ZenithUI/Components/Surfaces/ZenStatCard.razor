@@ -174,8 +174,8 @@
     // Announced instead of the arrow, which a screen reader would otherwise skip silently.
     private string TrendDescription => Trend switch
     {
-        ZenTrend.Up => "Increased by",
-        ZenTrend.Down => "Decreased by",
-        _ => "Unchanged at",
+        ZenTrend.Up => Localize(ZenStringKeys.StatCard_Up),
+        ZenTrend.Down => Localize(ZenStringKeys.StatCard_Down),
+        _ => Localize(ZenStringKeys.StatCard_Flat),
     };
 }
