@@ -1,0 +1,359 @@
+@namespace ZenithUI
+
+@inherits ZenComponentBase
+@implements IAsyncDisposable
+
+@*
+    Content grouped under tabs, one group showing at a time. The WAI-ARIA tabs pattern.
+
+    A tablist of buttons, each role="tab" with aria-selected and aria-controls naming its panel; a
+    role="tabpanel" labelled by its tab. One tab stop for the whole list - roving tabindex, so only
+    the selected tab is in the tab order - and the arrow keys move between tabs, wrapping and
+    skipping disabled ones, with Home and End for the ends. Tab from the list goes to the panel,
+    which is focusable so a panel that starts with plain text can still be reached.
+
+    Activation is automatic: arrowing to a tab shows it, which is what the APG recommends when a
+    panel is cheap to show. ManualActivation makes arrows only move focus and Enter or Space show
+    the tab, for panels that load something.
+
+    The tabs register with this component and the markup renders inside ZenDefer, like ZenStepper,
+    so the tablist is complete in the first pass and static rendering ships it whole. Under static
+    rendering the selected tab and its panel are correct and the other tabs are disabled, because
+    nothing would answer them - the same rule as ZenSplitButton's chevron.
+
+    Only the selected panel's content is rendered, so an unselected tab costs nothing. KeepAlive
+    renders every panel and hides the rest, for panels holding state - a half-filled form - that
+    switching away must not lose.
+*@
+
+@{
+    _tabs.BeginPass();
+}
+
+<CascadingValue Value="this" IsFixed="true">
+    @ChildContent
+</CascadingValue>
+
+<ZenDefer>
+    @{
+        var tabs = _tabs.Merge();
+        var active = ResolveActive(tabs);
+    }
+
+    <div id="@Id" class="@RootClass(RootClasses)" style="@Style" @attributes="AttributesWithoutClass">
+        <div role="tablist"
+             class="@TabListClass"
+             aria-label="@Label"
+             aria-orientation="@(Vertical ? "vertical" : null)"
+             @onkeydown="HandleKeyDownAsync">
+            @for (var i = 0; i < tabs.Count; i++)
+            {
+                var index = i;
+                var tab = tabs[index];
+                var selected = index == active;
+
+                <button type="button"
+                        id="@TabId(index)"
+                        role="tab"
+                        class="@TabClass(selected)"
+                        aria-selected="@(selected ? "true" : "false")"
+                        aria-controls="@PanelId(index)"
+                        tabindex="@(selected ? "0" : "-1")"
+                        disabled="@(tab.Disabled || (!selected && !RendererInfo.IsInteractive))"
+                        @onclick="() => SelectAsync(index)">
+                    @if (tab.Icon is not null)
+                    {
+                        <ZenIcon Path="@tab.Icon" Size="ZenSize.Small" class="shrink-0" aria-hidden="true" />
+                    }
+
+                    @if (tab.Header is not null)
+                    {
+                        @tab.Header
+                    }
+                    else
+                    {
+                        <span class="truncate">@tab.Title</span>
+                    }
+                </button>
+            }
+        </div>
+
+        @for (var i = 0; i < tabs.Count; i++)
+        {
+            var index = i;
+
+            if (index != active && !KeepAlive)
+            {
+                continue;
+            }
+
+            <div id="@PanelId(index)"
+                 role="tabpanel"
+                 class="@PanelClass"
+                 aria-labelledby="@TabId(index)"
+                 tabindex="0"
+                 hidden="@(index != active)">
+                @tabs[index].ChildContent
+            </div>
+        }
+    </div>
+</ZenDefer>
+
+@code {
+    private readonly ZenChildList<ZenTab> _tabs = new();
+    private int _active;
+    private int? _lastActiveIndex;
+    private string? _lastActiveKey;
+    private int _focusPending = -1;
+
+    // The tab with focus - where the last arrow key went, which under manual activation need not
+    // be the selected one.
+    private int _focused = -1;
+    private IJSObjectReference? _dom;
+    private bool _disposed;
+
+    [Inject]
+    private IJSRuntime JS { get; set; } = default!;
+
+    /// <summary>The <see cref="ZenTab"/>s.</summary>
+    [Parameter]
+    public RenderFragment? ChildContent { get; set; }
+
+    /// <summary>The selected tab, by position. Ignored when <see cref="ActiveKey"/> is set.</summary>
+    [Parameter]
+    public int ActiveIndex { get; set; }
+
+    /// <summary>Raised when the selected tab changes. Set by <c>@bind-ActiveIndex</c>.</summary>
+    [Parameter]
+    public EventCallback<int> ActiveIndexChanged { get; set; }
+
+    /// <summary>The selected tab, by its <see cref="ZenTab.Key"/>. Wins over <see cref="ActiveIndex"/>.</summary>
+    [Parameter]
+    public string? ActiveKey { get; set; }
+
+    /// <summary>Raised when the selected tab changes. Set by <c>@bind-ActiveKey</c>.</summary>
+    [Parameter]
+    public EventCallback<string?> ActiveKeyChanged { get; set; }
+
+    /// <summary>The tablist's accessible name, when the page has no heading that already says it.</summary>
+    [Parameter]
+    public string? Label { get; set; }
+
+    /// <summary>How the selected tab is marked.</summary>
+    [Parameter]
+    public ZenTabsVariant Variant { get; set; } = ZenTabsVariant.Underline;
+
+    /// <summary>Tabs down the start side, panel beside them. The arrow keys become Up and Down.</summary>
+    [Parameter]
+    public bool Vertical { get; set; }
+
+    /// <summary>Stretch the tabs to share the row's width equally. Horizontal only.</summary>
+    [Parameter]
+    public bool Stretch { get; set; }
+
+    /// <summary>Arrow keys move focus only; Enter or Space shows the tab.</summary>
+    [Parameter]
+    public bool ManualActivation { get; set; }
+
+    /// <summary>Render every panel and hide the unselected ones, so their state survives switching.</summary>
+    [Parameter]
+    public bool KeepAlive { get; set; }
+
+    internal void Register(ZenTab tab) => _tabs.Register(tab);
+
+    // No re-render: a tab goes because the content declaring it changed, which re-renders this.
+    internal void Unregister(ZenTab tab) => _tabs.Unregister(tab);
+
+    private string TabId(int index) => SubId($"tab-{index}");
+
+    private string PanelId(int index) => SubId($"panel-{index}");
+
+    /// <inheritdoc />
+    protected override void OnParametersSet()
+    {
+        // Followed only when it changes, as ZenStepper does: a page that does not bind the
+        // selection must not snap back to its initial tab on every render.
+        if (_lastActiveIndex != ActiveIndex)
+        {
+            _lastActiveIndex = ActiveIndex;
+            _active = ActiveIndex;
+        }
+    }
+
+    /// <summary>
+    /// The selected index: by key if one is given and found, otherwise by position, moved off a
+    /// disabled tab and clamped into range.
+    /// </summary>
+    private int ResolveActive(IReadOnlyList<ZenTab> tabs)
+    {
+        if (tabs.Count == 0)
+        {
+            return -1;
+        }
+
+        if (ActiveKey is not null && ActiveKey != _lastActiveKey)
+        {
+            _lastActiveKey = ActiveKey;
+
+            for (var i = 0; i < tabs.Count; i++)
+            {
+                if (tabs[i].Key == ActiveKey)
+                {
+                    _active = i;
+                }
+            }
+        }
+
+        _active = Math.Clamp(_active, 0, tabs.Count - 1);
+
+        if (tabs[_active].Disabled)
+        {
+            var enabled = Next(tabs, _active, 1);
+            _active = enabled >= 0 ? enabled : _active;
+        }
+
+        return _active;
+    }
+
+    /// <summary>The next enabled tab from <paramref name="from"/> in <paramref name="direction"/>, wrapping; -1 if none.</summary>
+    private static int Next(IReadOnlyList<ZenTab> tabs, int from, int direction)
+    {
+        for (var step = 1; step <= tabs.Count; step++)
+        {
+            var index = ((from + (direction * step)) % tabs.Count + tabs.Count) % tabs.Count;
+
+            if (!tabs[index].Disabled)
+            {
+                return index;
+            }
+        }
+
+        return -1;
+    }
+
+    private async Task SelectAsync(int index)
+    {
+        var tabs = _tabs.Items;
+
+        if (index < 0 || index >= tabs.Count || tabs[index].Disabled || index == _active)
+        {
+            return;
+        }
+
+        _active = index;
+        _focused = index;
+        _lastActiveKey = tabs[index].Key;
+
+        await ActiveIndexChanged.InvokeAsync(index);
+        await ActiveKeyChanged.InvokeAsync(tabs[index].Key);
+    }
+
+    private async Task HandleKeyDownAsync(KeyboardEventArgs args)
+    {
+        var tabs = _tabs.Items;
+
+        if (tabs.Count == 0)
+        {
+            return;
+        }
+
+        var from = _focused >= 0 && _focused < tabs.Count ? _focused : _active;
+        var previous = Vertical ? "ArrowUp" : "ArrowLeft";
+        var next = Vertical ? "ArrowDown" : "ArrowRight";
+
+        var target = args.Key switch
+        {
+            _ when args.Key == next => Next(tabs, from, 1),
+            _ when args.Key == previous => Next(tabs, from, -1),
+            "Home" => Next(tabs, -1, 1),
+            "End" => Next(tabs, tabs.Count, -1),
+            _ => -1,
+        };
+
+        if (target < 0)
+        {
+            return;
+        }
+
+        _focused = target;
+        _focusPending = target;
+
+        if (!ManualActivation)
+        {
+            await SelectAsync(target);
+        }
+    }
+
+    /// <inheritdoc />
+    protected override async Task OnAfterRenderAsync(bool firstRender)
+    {
+        if (_focusPending < 0 || !RendererInfo.IsInteractive || _disposed)
+        {
+            return;
+        }
+
+        var index = _focusPending;
+        _focusPending = -1;
+
+        try
+        {
+            _dom ??= await JS.InvokeAsync<IJSObjectReference>("import", "./_content/ZenithUI/js/zen-dom.js");
+            await _dom.InvokeVoidAsync("focusElement", TabId(index), false);
+        }
+        catch (JSDisconnectedException)
+        {
+        }
+        catch (OperationCanceledException)
+        {
+        }
+    }
+
+    /// <inheritdoc />
+    public async ValueTask DisposeAsync()
+    {
+        _disposed = true;
+
+        if (_dom is not null)
+        {
+            try
+            {
+                await _dom.DisposeAsync();
+            }
+            catch (JSDisconnectedException)
+            {
+            }
+            catch (OperationCanceledException)
+            {
+            }
+        }
+    }
+
+    private string RootClasses => Vertical ? "flex items-start gap-6" : "flex flex-col";
+
+    private string TabListClass => (Variant, Vertical) switch
+    {
+        (ZenTabsVariant.Pills, true) => "flex w-48 shrink-0 flex-col gap-1",
+        (ZenTabsVariant.Pills, false) => "flex flex-wrap gap-1",
+        (_, true) => "flex w-48 shrink-0 flex-col border-e border-border",
+        _ => "flex flex-wrap border-b border-border",
+    };
+
+    private string TabClass(bool selected) => CssBuilder
+        .Default("zen-focus inline-flex min-w-0 items-center gap-2 text-sm font-medium transition-colors disabled:cursor-not-allowed disabled:opacity-50")
+        .AddClass(Vertical ? "justify-start text-start" : "justify-center")
+        .AddClass("flex-1", Stretch && !Vertical)
+        .AddClass((Variant, Vertical, selected) switch
+        {
+            (ZenTabsVariant.Pills, _, true) => "rounded-zen-md px-3 py-1.5 bg-primary-soft text-primary-strong",
+            (ZenTabsVariant.Pills, _, false) => "rounded-zen-md px-3 py-1.5 text-content-muted hover:bg-surface-sunken hover:text-content",
+            (_, true, true) => "-me-px border-e-2 border-primary px-3 py-2 text-content",
+            (_, true, false) => "-me-px border-e-2 border-transparent px-3 py-2 text-content-muted hover:border-border-strong hover:text-content",
+            (_, false, true) => "-mb-px border-b-2 border-primary px-3 py-2 text-content",
+            _ => "-mb-px border-b-2 border-transparent px-3 py-2 text-content-muted hover:border-border-strong hover:text-content",
+        })
+        .Build()!;
+
+    private string PanelClass => Vertical
+        ? "zen-focus min-w-0 flex-1 rounded-zen-sm"
+        : "zen-focus mt-4 rounded-zen-sm";
+}

@@ -1,0 +1,139 @@
+@namespace ZenithUI
+
+@typeparam TValue
+@inherits ZenInputBase<TValue>
+
+@*
+    A row of joined buttons choosing one of a few options: a view mode, a period, an alignment.
+
+    It looks like buttons and IS a radio group. Each segment is a <label> around a visually hidden
+    native radio, in a <fieldset> whose <legend> names the set. The browser then supplies what a
+    hand-rolled role="radio" row has to rebuild and usually gets wrong: one tab stop, arrow keys
+    that move and select, "View, List, radio button, 2 of 3", and a value that submits with the
+    form - all with no JavaScript, so it works under static rendering.
+
+    The selected fill and the focus ring are drawn on the label from the radio's state, through
+    :has() - has-checked: for the fill, zen-focus-visible-within for the ring. It is a toggle, not a
+    text field, so it takes the outline ring rather than the border treatment.
+
+    ZenRadioGroup is the same control in a vertical list, for options that need a sentence each.
+    Use this for two to five short ones.
+*@
+
+<fieldset class="@RootClass(FieldsetClass)"
+          style="@Style"
+          disabled="@Disabled"
+          aria-describedby="@DescribedBy"
+          aria-invalid="@(IsInvalid ? "true" : null)"
+          aria-required="@(Required ? "true" : null)"
+          @attributes="AttributesWithoutClass">
+    @if (Label is not null)
+    {
+        <legend class="@LegendClass">
+            @Label
+            @if (Required && !HideLabel)
+            {
+                <span class="text-danger-strong" aria-hidden="true">*</span>
+            }
+        </legend>
+    }
+
+    <div class="@TrackClass">
+        <CascadingValue Value="this" IsFixed="true">
+            @ChildContent
+        </CascadingValue>
+    </div>
+
+    @if (HelpText is not null && !IsInvalid)
+    {
+        <p id="@HelpId" class="text-xs text-content-muted">@HelpText</p>
+    }
+
+    @if (IsInvalid)
+    {
+        <p id="@ErrorId" class="flex items-start gap-1.5 text-xs" role="alert">
+            <ZenIcon Path="@ZenIcons.Danger" Size="ZenSize.Small" class="mt-px size-3.5 text-danger-strong" />
+            <span class="text-danger-strong">@ValidationMessages.First()</span>
+        </p>
+    }
+</fieldset>
+
+@code {
+    /// <summary>Creates the control. Inline by default, unlike a text field.</summary>
+    public ZenSegmentedButton() => FullWidth = false;
+
+    /// <summary>The <see cref="ZenSegment{TValue}"/> options.</summary>
+    [Parameter]
+    public RenderFragment? ChildContent { get; set; }
+
+    /// <summary>
+    /// Keep <see cref="ZenInputBase{TValue}.Label"/> for screen readers only - for a toolbar where
+    /// the segments explain themselves to sighted users.
+    /// </summary>
+    [Parameter]
+    public bool HideLabel { get; set; }
+
+    /// <summary>The selected segment's colour. Neutral is a raised segment on a sunken track.</summary>
+    [Parameter]
+    public ZenIntent Intent { get; set; } = ZenIntent.Neutral;
+
+    /// <summary>The shared <c>name</c> of the radios. Defaults to the control's generated id.</summary>
+    [Parameter]
+    public string? Name { get; set; }
+
+    internal string GroupName => Name ?? Id;
+
+    internal bool IsSelected(TValue? value) => EqualityComparer<TValue>.Default.Equals(value, CurrentValue);
+
+    internal void Select(TValue? value) => CurrentValue = value;
+
+    internal bool GroupDisabled => Disabled;
+
+    internal bool GroupReadOnly => ReadOnly;
+
+    internal ZenSize GroupSize => Size;
+
+    internal bool GroupFullWidth => FullWidth;
+
+    /// <summary>The selected fill, per intent. Literal strings so Tailwind finds every one.</summary>
+    internal string CheckedClass => Intent switch
+    {
+        ZenIntent.Primary => "has-checked:bg-primary has-checked:text-primary-content",
+        ZenIntent.Secondary => "has-checked:bg-secondary has-checked:text-secondary-content",
+        ZenIntent.Accent => "has-checked:bg-accent has-checked:text-accent-content",
+        ZenIntent.Success => "has-checked:bg-success has-checked:text-success-content",
+        ZenIntent.Warning => "has-checked:bg-warning has-checked:text-warning-content",
+        ZenIntent.Danger => "has-checked:bg-danger has-checked:text-danger-content",
+        ZenIntent.Info => "has-checked:bg-info has-checked:text-info-content",
+        _ => "has-checked:bg-surface-raised has-checked:text-content has-checked:shadow-zen-sm",
+    };
+
+    private string HelpId => SubId("help");
+
+    private string ErrorId => SubId("error");
+
+    private string? DescribedBy => IsInvalid ? ErrorId : (HelpText is not null ? HelpId : null);
+
+    private string FieldsetClass => CssBuilder
+        .Default("flex min-w-0 flex-col gap-1.5")
+        .AddClass(FullWidth ? "w-full" : "w-fit")
+        .AddClass(FieldClass)
+        .Build()!;
+
+    private string LegendClass => CssBuilder
+        .Default(HideLabel ? "zen-sr-only" : "mb-1.5 inline-flex items-center gap-1 font-medium text-content")
+        .AddClass(Size switch
+        {
+            ZenSize.Small => "text-xs",
+            ZenSize.Large => "text-base",
+            _ => "text-sm",
+        }, !HideLabel)
+        .Build()!;
+
+    private string TrackClass => CssBuilder
+        .Default("flex gap-0.5 border bg-surface-sunken p-0.5")
+        .AddClass(IsInvalid ? "border-danger" : "border-border")
+        .AddClass(ZenStyles.ControlRadius(Size))
+        .AddClass(FullWidth ? "w-full" : "w-fit max-w-full")
+        .Build()!;
+}

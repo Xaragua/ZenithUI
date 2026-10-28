@@ -616,7 +616,9 @@
             _focus = null;
         }
 
-        GC.SuppressFinalize(this);
+        // The renderer calls DisposeAsync instead of Dispose when a component has both, so the
+        // base's cleanup - the EditContext subscription, DisposeCore - has to be run from here.
+        Dispose();
     }
 
     // ---- Styling -----------------------------------------------------------------------------

@@ -1,0 +1,175 @@
+@page "/navigation"
+@rendermode InteractiveServer
+
+@*
+    Interactive Server: tabs are behaviour, and the breadcrumb only collapses where its ellipsis
+    can be answered. The accordion needs neither - it is <details> - and the static half of each
+    is shown on /shell and /layout.
+*@
+
+<PageTitle>Tabs &amp; accordion &middot; ZenithUI</PageTitle>
+
+<ZenStack Gap="ZenSpace.Xxl">
+    <ZenStack As="ZenLayoutElement.Header" Gap="ZenSpace.Sm" Class="max-w-3xl">
+        <ZenText Variant="ZenTextVariant.Overline" Tone="ZenTextTone.Primary">Navigation</ZenText>
+        <ZenText Variant="ZenTextVariant.H1">Tabs, accordion and breadcrumb</ZenText>
+        <ZenText Variant="ZenTextVariant.Lead">
+            Three ways to show part of something and say where the rest is. Tabs switch between
+            peers, an accordion folds sections of one page, and a breadcrumb points back up the
+            hierarchy.
+        </ZenText>
+    </ZenStack>
+
+    <!-- ------------------------------------------------------------ Breadcrumb -->
+    <ZenStack As="ZenLayoutElement.Section" aria-labelledby="breadcrumb-heading">
+        <ZenText Variant="ZenTextVariant.H4" As="ZenTextElement.H2" Id="breadcrumb-heading">ZenBreadcrumb</ZenText>
+        <ZenText Tone="ZenTextTone.Muted" Class="max-w-3xl">
+            The last level is the current page. <code>MaxItems="3"</code> folds the middle of a long
+            trail into an ellipsis; activating it reveals every level and moves focus to the first
+            one revealed.
+        </ZenText>
+
+        <ZenCard>
+            <ZenStack Gap="ZenSpace.Md">
+                <ZenBreadcrumb Label="Breadcrumb, collapsed" MaxItems="3">
+                    <ZenBreadcrumbItem Text="Home" Href="/" Icon="@ZenIcons.Inbox" />
+                    <ZenBreadcrumbItem Text="Projects" Href="navigation#projects" />
+                    <ZenBreadcrumbItem Text="Zenith design system" Href="navigation#zenith" />
+                    <ZenBreadcrumbItem Text="Settings" Href="navigation#settings" />
+                    <ZenBreadcrumbItem Text="Members and permissions" />
+                </ZenBreadcrumb>
+
+                <ZenBreadcrumb Label="Breadcrumb, slashes" Size="ZenSize.Small">
+                    <Separator><span>/</span></Separator>
+                    <ChildContent>
+                        <ZenBreadcrumbItem Text="Docs" Href="navigation#docs" />
+                        <ZenBreadcrumbItem Text="Components" Href="navigation#components" />
+                        <ZenBreadcrumbItem Text="ZenBreadcrumb" />
+                    </ChildContent>
+                </ZenBreadcrumb>
+            </ZenStack>
+        </ZenCard>
+    </ZenStack>
+
+    <!-- ------------------------------------------------------------ Tabs -->
+    <ZenStack As="ZenLayoutElement.Section" aria-labelledby="tabs-heading">
+        <ZenText Variant="ZenTextVariant.H4" As="ZenTextElement.H2" Id="tabs-heading">ZenTabs</ZenText>
+        <ZenText Tone="ZenTextTone.Muted" Class="max-w-3xl">
+            One tab stop for the whole list. The arrow keys move between tabs and show each one,
+            skipping disabled ones; Home and End jump to the ends; Tab moves into the panel.
+        </ZenText>
+
+        <ZenGrid Columns="1" ColumnsLg="2">
+            <ZenCard Title="Underline" TitleLevel="3">
+                <ZenTabs Label="Project" @bind-ActiveIndex="_projectTab">
+                    <ZenTab Title="Overview" Icon="@ZenIcons.Inbox">
+                        <p class="text-sm text-content-muted">Twelve open issues, three due this week.</p>
+                    </ZenTab>
+                    <ZenTab Title="Activity">
+                        <Header>
+                            Activity <ZenBadge Intent="ZenIntent.Primary" Size="ZenSize.Small">4</ZenBadge>
+                        </Header>
+                        <ChildContent>
+                            <p class="text-sm text-content-muted">Four changes since your last visit.</p>
+                        </ChildContent>
+                    </ZenTab>
+                    <ZenTab Title="Billing" Disabled="true">
+                        <p class="text-sm text-content-muted">Not available on this plan.</p>
+                    </ZenTab>
+                    <ZenTab Title="Settings">
+                        <ZenTextInput Label="Project name" @bind-Value="_projectName" />
+                    </ZenTab>
+                </ZenTabs>
+
+                <p class="mt-4 text-sm text-content-subtle">Bound: <code>ActiveIndex = @_projectTab</code></p>
+            </ZenCard>
+
+            <ZenCard Title="Pills, manual activation, kept alive" TitleLevel="3">
+                <ZenTabs Label="Report period" Variant="ZenTabsVariant.Pills" ManualActivation="true" KeepAlive="true" @bind-ActiveKey="_period">
+                    <ZenTab Key="week" Title="Week">
+                        <ZenTextArea Label="Notes for the week" Rows="3" @bind-Value="_weekNotes" />
+                    </ZenTab>
+                    <ZenTab Key="month" Title="Month">
+                        <p class="text-sm text-content-muted">The month's figures. Type a note in Week, come here and back: it is still there.</p>
+                    </ZenTab>
+                    <ZenTab Key="quarter" Title="Quarter">
+                        <p class="text-sm text-content-muted">The quarter's figures.</p>
+                    </ZenTab>
+                </ZenTabs>
+
+                <p class="mt-4 text-sm text-content-subtle">Bound: <code>ActiveKey = @_period</code>. Arrows move focus; Enter or Space shows.</p>
+            </ZenCard>
+
+            <ZenCard Title="Vertical" TitleLevel="3" Class="lg:col-span-2">
+                <ZenTabs Label="Account settings" Vertical="true">
+                    <ZenTab Title="Profile">
+                        <p class="text-sm text-content-muted">Name, photo and contact details.</p>
+                    </ZenTab>
+                    <ZenTab Title="Security">
+                        <p class="text-sm text-content-muted">Password, passkeys and sessions.</p>
+                    </ZenTab>
+                    <ZenTab Title="Notifications">
+                        <p class="text-sm text-content-muted">Email and push preferences.</p>
+                    </ZenTab>
+                </ZenTabs>
+            </ZenCard>
+        </ZenGrid>
+    </ZenStack>
+
+    <!-- ------------------------------------------------------------ Accordion -->
+    <ZenStack As="ZenLayoutElement.Section" aria-labelledby="accordion-heading">
+        <ZenText Variant="ZenTextVariant.H4" As="ZenTextElement.H2" Id="accordion-heading">ZenAccordion</ZenText>
+        <ZenText Tone="ZenTextTone.Muted" Class="max-w-3xl">
+            Native <code>&lt;details&gt;</code>: it opens with no JavaScript, and find-in-page opens a
+            closed section when the text it finds is inside. By default one section is open at a
+            time; <code>Multiple</code> lifts that.
+        </ZenText>
+
+        <ZenGrid Columns="1" ColumnsLg="2">
+            <ZenAccordion>
+                <ZenAccordionItem Title="What does shipping cost?" @bind-Open="_shippingOpen">
+                    Standard shipping is free over $50. Express is $12 and arrives the next working day.
+                </ZenAccordionItem>
+                <ZenAccordionItem Title="Can I return an order?" Icon="@ZenIcons.Info">
+                    Yes, within 30 days, unused and in the original packaging.
+                </ZenAccordionItem>
+                <ZenAccordionItem Title="Do you ship abroad?">
+                    To 42 countries. Duties are calculated at checkout.
+                </ZenAccordionItem>
+                <ZenAccordionItem Title="Gift wrapping (unavailable)" Disabled="true">
+                    Coming back in the spring.
+                </ZenAccordionItem>
+            </ZenAccordion>
+
+            <ZenCard Title="Flush, several open" TitleLevel="3">
+                <ZenAccordion Flush="true" Multiple="true">
+                    <ZenAccordionItem Title="Notifications" Open="true">
+                        <ZenToggle Label="Email me about mentions" @bind-Value="_mentions" />
+                    </ZenAccordionItem>
+                    <ZenAccordionItem Title="Privacy" Open="true">
+                        Your profile is visible to members of your workspaces.
+                    </ZenAccordionItem>
+                    <ZenAccordionItem>
+                        <Header>
+                            Danger zone <ZenBadge Intent="ZenIntent.Danger" Size="ZenSize.Small">2</ZenBadge>
+                        </Header>
+                        <ChildContent>
+                            Delete the workspace, or transfer it to another owner.
+                        </ChildContent>
+                    </ZenAccordionItem>
+                </ZenAccordion>
+
+                <p class="mt-4 text-sm text-content-subtle">First section on the left is bound: <code>Open = @_shippingOpen</code></p>
+            </ZenCard>
+        </ZenGrid>
+    </ZenStack>
+</ZenStack>
+
+@code {
+    private int _projectTab;
+    private string? _projectName = "Zenith";
+    private string? _period = "week";
+    private string? _weekNotes;
+    private bool _shippingOpen = true;
+    private bool _mentions = true;
+}

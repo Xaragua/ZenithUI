@@ -2126,13 +2126,17 @@
     }
 
     /// <summary>The index of a row on screen, or -1.</summary>
-    internal int IndexOf(TItem item)
+    internal int IndexOf(TItem item) => IndexOf(row => EqualityComparer<TItem>.Default.Equals(row, item));
+
+    /// <summary>The index of the first row on screen that <paramref name="match"/> accepts, or -1.</summary>
+    /// <remarks>A predicate, so a lookup bound to a key can find its row by key.</remarks>
+    internal int IndexOf(Func<TItem, bool> match)
     {
         if (UseVirtualize && ItemsProvider is not null)
         {
             foreach (var (index, loaded) in _loadedByIndex)
             {
-                if (EqualityComparer<TItem>.Default.Equals(loaded, item))
+                if (match(loaded))
                 {
                     return index;
                 }
@@ -2141,7 +2145,7 @@
             return -1;
         }
 
-        return _itemRows.Find(r => EqualityComparer<TItem>.Default.Equals(r.Item, item))?.Index ?? -1;
+        return _itemRows.Find(r => match(r.Item))?.Index ?? -1;
     }
 
     /// <summary>

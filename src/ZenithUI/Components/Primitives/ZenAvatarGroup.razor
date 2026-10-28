@@ -1,0 +1,73 @@
+@namespace ZenithUI
+
+@inherits ZenComponentBase
+
+@*
+    A row of overlapping avatars - the people on a ticket, the members of a team - closing with a
+    "+N" for the ones not shown.
+
+    The caller decides who is shown and passes how many are not, as MoreCount. The group does not
+    count or trim its children: an avatar is any markup the caller writes, possibly wrapped in a
+    ZenIndicator or a link, and a component that hid children by position would hide the wrong
+    ones the moment that markup changed shape.
+
+    The overlap is a negative inline margin from the second avatar on, and each avatar carries a
+    ring in the surface colour so the edges read as separate discs on any background. The "+N" is
+    an image named "N more" - not "plus N", which is how a screen reader reads the visible text.
+*@
+
+<CascadingValue Value="this" IsFixed="true">
+    <div class="@RootClass(GroupClass)"
+         style="@Style"
+         role="group"
+         aria-label="@Label"
+         @attributes="AttributesWithoutClass">
+        @ChildContent
+
+        @if (MoreCount > 0)
+        {
+            <span class="@MoreClass" role="img" aria-label="@Localize(ZenStringKeys.AvatarGroup_More, MoreCount)">
+                <span aria-hidden="true">+@MoreCount</span>
+            </span>
+        }
+    </div>
+</CascadingValue>
+
+@code {
+    /// <summary>The <see cref="ZenAvatar"/>s to show.</summary>
+    [Parameter]
+    public RenderFragment? ChildContent { get; set; }
+
+    /// <summary>How many more there are than are shown. Zero shows no "+N".</summary>
+    [Parameter]
+    public int MoreCount { get; set; }
+
+    /// <summary>The size of every avatar in the group.</summary>
+    [Parameter]
+    public ZenSize Size { get; set; } = ZenSize.Medium;
+
+    /// <summary>What the group is: "Assignees", "Team members".</summary>
+    [Parameter]
+    public string? Label { get; set; }
+
+    private string GroupClass => CssBuilder
+        .Default("flex items-center")
+        .AddClass(Size switch
+        {
+            ZenSize.Small => "-space-x-1.5",
+            ZenSize.Large => "-space-x-3",
+            _ => "-space-x-2",
+        })
+        .Build()!;
+
+    private string MoreClass => CssBuilder
+        .Default("relative inline-flex shrink-0 items-center justify-center rounded-full font-semibold leading-none ring-2 ring-surface")
+        .AddClass(ZenStyles.Soft(ZenIntent.Neutral))
+        .AddClass(Size switch
+        {
+            ZenSize.Small => "size-8 text-xs",
+            ZenSize.Large => "size-14 text-base",
+            _ => "size-10 text-sm",
+        })
+        .Build()!;
+}

@@ -64,6 +64,18 @@
   }
 }
 
+/*
+ * The same ring, drawn on a wrapper whose visually hidden input has keyboard focus - a segment of
+ * ZenSegmentedButton is a <label> around a radio, and the radio is where focus actually lands.
+ * :focus-visible inside :has() keeps it off on a mouse click, as zen-focus is.
+ */
+@utility zen-focus-visible-within {
+  &:has(:focus-visible) {
+    outline: var(--zen-ring-width) solid var(--zen-ring);
+    outline-offset: var(--zen-ring-offset-width);
+  }
+}
+
 /* Same ring, but always shown - for roving-tabindex items that own focus programmatically. */
 @utility zen-focus-always {
   outline: var(--zen-ring-width) solid var(--zen-ring);

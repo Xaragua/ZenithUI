@@ -1,0 +1,130 @@
+@namespace ZenithUI
+
+@inherits ZenComponentBase
+
+@*
+    A line between two pieces of content, across or down.
+
+    Across, it is an <hr>, which is a separator to assistive technology already - nothing to add.
+    Down, there is no element for it, so a div claims role="separator" with a vertical orientation.
+
+    With a label ("or", a section name) it is NOT a separator. A separator's children are
+    presentational, so a screen reader would drop the very text that was the point of the label.
+    It becomes the text with two decorative lines either side, and the text is read as text.
+
+    Decorative="true" hides it altogether, for a rule that only tidies a layout - between toolbar
+    groups, under a card header - where announcing "separator" is noise.
+
+    Borders rather than a background, and every edge set explicitly: an <hr> arrives with a
+    browser-default inset border, and an app linking zenith.nopreflight.css has nothing resetting it.
+*@
+
+@if (HasLabel)
+{
+    <div class="@RootClass(LabelledClass)" style="@Style" aria-hidden="@(Decorative ? "true" : null)" @attributes="AttributesWithoutClass">
+        <span class="@LineClass(LabelAlign == ZenAlign.Start ? "w-4" : "flex-1")" aria-hidden="true"></span>
+        <span class="shrink-0 text-xs font-medium text-content-muted">
+            @if (ChildContent is not null)
+            {
+                @ChildContent
+            }
+            else
+            {
+                @Label
+            }
+        </span>
+        <span class="@LineClass(LabelAlign == ZenAlign.End ? "w-4" : "flex-1")" aria-hidden="true"></span>
+    </div>
+}
+else if (Vertical)
+{
+    <div class="@RootClass(VerticalClass)"
+         style="@Style"
+         role="@(Decorative ? null : "separator")"
+         aria-orientation="@(Decorative ? null : "vertical")"
+         aria-hidden="@(Decorative ? "true" : null)"
+         @attributes="AttributesWithoutClass"></div>
+}
+else
+{
+    <hr class="@RootClass(HorizontalClass)" style="@Style" aria-hidden="@(Decorative ? "true" : null)" @attributes="AttributesWithoutClass" />
+}
+
+@code {
+    /// <summary>Runs down rather than across. For a row of items - toolbar groups, inline stats.</summary>
+    /// <remarks>Stretches to the height of a flex row; elsewhere it is at least a line tall.</remarks>
+    [Parameter]
+    public bool Vertical { get; set; }
+
+    /// <summary>Text set into the line: "or", a section name. Horizontal only.</summary>
+    [Parameter]
+    public string? Label { get; set; }
+
+    /// <summary>Content set into the line, in place of <see cref="Label"/>.</summary>
+    [Parameter]
+    public RenderFragment? ChildContent { get; set; }
+
+    /// <summary>Where a label sits along the line.</summary>
+    [Parameter]
+    public ZenAlign LabelAlign { get; set; } = ZenAlign.Center;
+
+    /// <summary>A dashed line rather than a solid one.</summary>
+    [Parameter]
+    public bool Dashed { get; set; }
+
+    /// <summary>The space either side of the line. <see cref="ZenSpace.None"/> for none.</summary>
+    [Parameter]
+    public ZenSpace Spacing { get; set; } = ZenSpace.Md;
+
+    /// <summary>
+    /// Hide it from assistive technology, for a line that only tidies a layout and separates
+    /// nothing a listener needs to know about.
+    /// </summary>
+    [Parameter]
+    public bool Decorative { get; set; }
+
+    private bool HasLabel => !Vertical && (ChildContent is not null || !string.IsNullOrEmpty(Label));
+
+    private string BorderStyle => Dashed ? "border-dashed" : "border-solid";
+
+    private string LineClass(string width) => $"{width} border-0 border-t {BorderStyle} border-border";
+
+    private string HorizontalClass => CssBuilder
+        .Default("h-0 w-full border-0 border-t border-border")
+        .AddClass(BorderStyle)
+        .AddClass(BlockSpacing)
+        .Build()!;
+
+    private string LabelledClass => CssBuilder
+        .Default("flex w-full items-center gap-3")
+        .AddClass(BlockSpacing)
+        .Build()!;
+
+    private string VerticalClass => CssBuilder
+        .Default("inline-block min-h-[1em] w-0 shrink-0 self-stretch border-0 border-s border-border")
+        .AddClass(BorderStyle)
+        .AddClass(InlineSpacing)
+        .Build()!;
+
+    private string BlockSpacing => Spacing switch
+    {
+        ZenSpace.None => "my-0",
+        ZenSpace.Xs => "my-1",
+        ZenSpace.Sm => "my-2",
+        ZenSpace.Lg => "my-6",
+        ZenSpace.Xl => "my-8",
+        ZenSpace.Xxl => "my-12",
+        _ => "my-4",
+    };
+
+    private string InlineSpacing => Spacing switch
+    {
+        ZenSpace.None => "mx-0",
+        ZenSpace.Xs => "mx-1",
+        ZenSpace.Sm => "mx-2",
+        ZenSpace.Lg => "mx-6",
+        ZenSpace.Xl => "mx-8",
+        ZenSpace.Xxl => "mx-12",
+        _ => "mx-4",
+    };
+}

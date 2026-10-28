@@ -238,4 +238,19 @@
   <data name="ThemeToggle_SwitchTo" xml:space="preserve">
     <value>Cambiar al tema {0}</value>
   </data>
+  <data name="Avatar_Anonymous" xml:space="preserve">
+    <value>Usuario</value>
+  </data>
+  <data name="AvatarGroup_More" xml:space="preserve">
+    <value>{0} más</value>
+  </data>
+  <data name="Breadcrumb_Label" xml:space="preserve">
+    <value>Ruta de navegación</value>
+  </data>
+  <data name="Breadcrumb_ShowAll" xml:space="preserve">
+    <value>Mostrar todos los niveles</value>
+  </data>
+  <data name="Otp_Label" xml:space="preserve">
+    <value>Código de verificación</value>
+  </data>
 </root>

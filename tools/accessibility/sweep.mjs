@@ -36,7 +36,7 @@ const EDGE = process.env.ZENITH_BROWSER ??
 /** Every routable page in the demo. */
 const pages = [
   "/", "/tokens", "/primitives", "/typography", "/layout", "/forms", "/theming",
-  "/overlays", "/data", "/stepper", "/shell", "/render-modes", "/reference",
+  "/overlays", "/data", "/stepper", "/navigation", "/shell", "/render-modes", "/reference",
 ];
 
 const states = JSON.parse(readFileSync(join(here, "states.json"), "utf8"));

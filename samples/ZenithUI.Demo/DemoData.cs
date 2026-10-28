@@ -64,7 +64,14 @@ public sealed record Vendor(
     string Account,
     string Category,
     decimal MonthlyVolume,
-    string Region);
+    string Region)
+{
+    /// <summary>
+    /// The vendor's id, as a form model would hold it - for the ZenKeyLookup demo. Derived from the
+    /// account number so it is the same on every run.
+    /// </summary>
+    public Guid Id { get; } = new(System.Security.Cryptography.MD5.HashData(System.Text.Encoding.UTF8.GetBytes(Account)));
+}
 
 /// <summary>
 /// Stands in for a vendor directory API: searches, sorts and windows on the "server".

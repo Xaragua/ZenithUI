@@ -1,0 +1,57 @@
+@namespace ZenithUI
+@inherits ComponentBase
+@implements IDisposable
+
+@*
+    One level of a ZenBreadcrumb. Renders nothing itself - it is a declaration the breadcrumb
+    reads, as ZenStep is for ZenStepper, because whether it is the current page, and whether it
+    is hidden behind the ellipsis, depends on where it sits in the whole trail.
+*@
+
+@code {
+    /// <summary>The breadcrumb this item belongs to.</summary>
+    [CascadingParameter]
+    public ZenBreadcrumb Breadcrumb { get; set; } = default!;
+
+    /// <summary>The level's name. Also its tooltip, which shows the whole name when it is truncated.</summary>
+    [Parameter]
+    public string? Text { get; set; }
+
+    /// <summary>Content in place of <see cref="Text"/>.</summary>
+    [Parameter]
+    public RenderFragment? ChildContent { get; set; }
+
+    /// <summary>Where the level links to. Without it the level is plain text.</summary>
+    [Parameter]
+    public string? Href { get; set; }
+
+    /// <summary>A leading icon, typically a <see cref="ZenIcons"/> constant or a home glyph.</summary>
+    [Parameter]
+    public string? Icon { get; set; }
+
+    /// <summary>
+    /// Whether this is the current page. <see langword="null"/> leaves it to position: the last
+    /// item is current.
+    /// </summary>
+    [Parameter]
+    public bool? Current { get; set; }
+
+    /// <summary>Render as text even with an <see cref="Href"/>.</summary>
+    [Parameter]
+    public bool Disabled { get; set; }
+
+    /// <inheritdoc />
+    protected override void OnInitialized()
+    {
+        if (Breadcrumb is null)
+        {
+            throw new InvalidOperationException($"{nameof(ZenBreadcrumbItem)} must be placed inside a {nameof(ZenBreadcrumb)}.");
+        }
+    }
+
+    /// <inheritdoc />
+    protected override void OnParametersSet() => Breadcrumb.Register(this);
+
+    /// <inheritdoc />
+    public void Dispose() => Breadcrumb?.Unregister(this);
+}

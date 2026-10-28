@@ -1,0 +1,56 @@
+@namespace ZenithUI
+
+@inherits ZenComponentBase
+
+@*
+    A vertical stack of headings that each reveal a section.
+
+    Built on <details> and <summary>, not on buttons and aria-expanded. The browser then opens and
+    closes sections with no JavaScript (so it works under static rendering), announces each summary
+    as an expandable control with its state, and opens a closed section when find-in-page lands in
+    it - something a script-driven accordion cannot do, since its hidden text is not searchable.
+
+    One open at a time is the native "exclusive accordion": every <details> in the set shares a
+    name, and the browser closes the others when one opens. Multiple="true" drops the name.
+
+    The trade-off, recorded in docs/plan.md: the APG accordion puts its button inside a heading, so
+    headings-mode navigation finds the sections. A <summary>'s children are presentational, so a
+    heading inside one is not announced as a heading, and none is offered here.
+*@
+
+<div class="@RootClass(AccordionClass)" style="@Style" @attributes="AttributesWithoutClass">
+    <CascadingValue Value="this" IsFixed="true">
+        @ChildContent
+    </CascadingValue>
+</div>
+
+@code {
+    /// <summary>The <see cref="ZenAccordionItem"/>s.</summary>
+    [Parameter]
+    public RenderFragment? ChildContent { get; set; }
+
+    /// <summary>
+    /// Let several sections be open at once. Off by default: opening one closes the others.
+    /// </summary>
+    [Parameter]
+    public bool Multiple { get; set; }
+
+    /// <summary>No outer border or rounding - sections divided by lines alone, for use inside a card.</summary>
+    [Parameter]
+    public bool Flush { get; set; }
+
+    /// <summary>
+    /// The name shared by the sections when only one may be open. Defaults to the accordion's id.
+    /// </summary>
+    [Parameter]
+    public string? Name { get; set; }
+
+    /// <summary>The <c>name</c> each section's <c>&lt;details&gt;</c> carries, or none when several may be open.</summary>
+    internal string? GroupName => Multiple ? null : Name ?? Id;
+
+    private string AccordionClass => CssBuilder
+        .Default("divide-y divide-border")
+        .AddClass("overflow-hidden rounded-zen-lg border border-border bg-surface", !Flush)
+        .AddClass("border-y border-border", Flush)
+        .Build()!;
+}

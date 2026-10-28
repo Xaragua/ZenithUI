@@ -1,0 +1,11 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 96 96">
+  <!-- A stand-in profile picture for the ZenAvatar demo. Its colours are the picture's own, not UI. -->
+  <rect width="96" height="96" fill="#f4c7a1" />
+  <path d="M8 96c4-22 20-32 40-32s36 10 40 32Z" fill="#3f6bd8" />
+  <path d="M40 58h16v12a8 8 0 0 1-16 0Z" fill="#e3a77f" />
+  <ellipse cx="48" cy="42" rx="18" ry="21" fill="#f0b48b" />
+  <path d="M28 44c-4-20 8-32 22-32 13 0 24 9 20 30-3-9-10-14-20-16-6 6-15 9-22 18Z" fill="#3b2418" />
+  <circle cx="41" cy="44" r="2" fill="#3b2418" />
+  <circle cx="55" cy="44" r="2" fill="#3b2418" />
+  <path d="M42 53q6 4 12 0" stroke="#a5523a" stroke-width="2" fill="none" stroke-linecap="round" />
+</svg>

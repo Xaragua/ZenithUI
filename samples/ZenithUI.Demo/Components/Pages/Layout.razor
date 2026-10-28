@@ -134,6 +134,39 @@
         </ZenGrid>
     </ZenStack>
 
+    <!-- ------------------------------------------------------------ Divider -->
+    <ZenStack As="ZenLayoutElement.Section" aria-labelledby="divider-heading">
+        <ZenText Variant="ZenTextVariant.H4" As="ZenTextElement.H2" Id="divider-heading">ZenDivider</ZenText>
+        <ZenText Tone="ZenTextTone.Muted" Class="max-w-3xl">
+            A line, across or down. With text in it, it stops being a separator so the text is read.
+            <code>Decorative</code> hides one that only tidies a layout.
+        </ZenText>
+
+        <ZenGrid Columns="1" ColumnsLg="2">
+            <ZenCard Title="Across" TitleLevel="3">
+                @Tile("Account details")
+                <ZenDivider />
+                @Tile("Billing address")
+                <ZenDivider Label="or" />
+                @Tile("Sign in with a passkey")
+                <ZenDivider Label="Advanced" LabelAlign="ZenAlign.Start" Dashed="true" />
+                @Tile("Webhooks")
+            </ZenCard>
+
+            <ZenCard Title="Down" TitleLevel="3">
+                <ZenStack Direction="ZenDirection.Horizontal" Gap="ZenSpace.Sm" Wrap="true">
+                    @Tile("Bold")
+                    @Tile("Italic")
+                    <ZenDivider Vertical="true" Spacing="ZenSpace.None" />
+                    @Tile("Left")
+                    @Tile("Center")
+                    <ZenDivider Vertical="true" Spacing="ZenSpace.None" Dashed="true" />
+                    @Tile("Link")
+                </ZenStack>
+            </ZenCard>
+        </ZenGrid>
+    </ZenStack>
+
     <!-- ------------------------------------------------------------ Container -->
     <ZenStack As="ZenLayoutElement.Section" aria-labelledby="container-heading">
         <ZenText Variant="ZenTextVariant.H4" As="ZenTextElement.H2" Id="container-heading">ZenContainer</ZenText>

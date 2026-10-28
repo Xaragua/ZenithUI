@@ -1,9 +1,18 @@
 @namespace ZenithUI
 @typeparam TItem where TItem : notnull
-@inherits ZenInputBase<TItem>
+@typeparam TValue
+@inherits ZenInputBase<TValue>
 @implements IAsyncDisposable
 
 @*
+    The implementation behind ZenLookup and ZenKeyLookup, which differ only in what they bind.
+    ZenLookup binds the record; ZenKeyLookup binds a key of it - a Guid, an id - which is what a
+    form model usually holds. Everything here works on the chosen ITEM, through SelectedItem and
+    SetSelectedItem, and leaves turning it into a value to the subclass. A TValue parameter could
+    not simply be added to ZenLookup: Razor does not infer one type argument when another is given,
+    so every existing TItem="Vendor" would stop compiling.
+
+
     A search field whose suggestions are a table: pick one record from many, by any of its
     columns. The WAI-ARIA "combobox with grid popup" pattern.
 
@@ -80,7 +89,7 @@
                        @onkeydown="HandleKeyDownAsync"
                        @onclick="HandleInputClickAsync" />
 
-                @if (AllowClear && CurrentValue is not null && !Disabled && !ReadOnly)
+                @if (AllowClear && HasValue && !Disabled && !ReadOnly)
                 {
                     <button type="button"
                             class="zen-focus grid shrink-0 place-items-center rounded-zen-sm p-0.5 text-content-subtle hover:text-content"
@@ -170,7 +179,7 @@
                         <div class="flex shrink-0 items-center gap-2">
                             <ZenButton Variant="ZenVariant.Ghost"
                                        Size="ZenSize.Small"
-                                       Disabled="@(!_hasPending && CurrentValue is null)"
+                                       Disabled="@(!_hasPending && !HasValue)"
                                        OnClick="ClearPendingAsync">
                                 @(ClearSelectionText ?? Localize(ZenStringKeys.Common_ClearSelection))
                             </ZenButton>
@@ -215,7 +224,7 @@
     private bool _hasPending;
 
     /// <summary>Creates the lookup.</summary>
-    public ZenLookup()
+    protected ZenLookupBase()
     {
         _picker = new ZenTablePicker<TItem>
         {
@@ -363,18 +372,44 @@
 
     private string DisplayFor(TItem item) => ItemText?.Invoke(item) ?? item.ToString() ?? string.Empty;
 
+    /// <summary>The field's text when closed: the chosen item's, or nothing.</summary>
+    private string CommittedText => SelectedItem is { } item ? DisplayFor(item) : string.Empty;
+
     /// <summary>The marked row while one is pending, otherwise the value.</summary>
     private bool IsChosen(TItem item) =>
         _hasPending
             ? EqualityComparer<TItem>.Default.Equals(_pending, item)
-            : CurrentValue is not null && EqualityComparer<TItem>.Default.Equals(CurrentValue, item);
+            : HasValue && IsCurrent(item);
+
+    // ---- Binding ------------------------------------------------------------------------------
+
+    /// <summary>The item the current value names, or <see langword="null"/> when it names none.</summary>
+    protected abstract TItem? SelectedItem { get; }
+
+    /// <summary>Writes the value for <paramref name="item"/>; <see langword="null"/> clears it.</summary>
+    protected abstract void SetSelectedItem(TItem? item);
+
+    /// <summary>Whether anything is chosen. Defaults to "the value is not its type's default".</summary>
+    protected virtual bool HasValue => !EqualityComparer<TValue>.Default.Equals(CurrentValue, default);
+
+    /// <summary>Whether <paramref name="item"/> is the one the current value names.</summary>
+    protected virtual bool IsCurrent(TItem item) =>
+        SelectedItem is { } selected && EqualityComparer<TItem>.Default.Equals(selected, item);
+
+    /// <summary>
+    /// Brings <see cref="SelectedItem"/> up to date with a new value before the field's text is
+    /// taken from it. Asynchronous because a key may name a record nobody has loaded yet.
+    /// </summary>
+    protected virtual Task SyncSelectedItemAsync() => Task.CompletedTask;
 
     /// <inheritdoc />
-    protected override void OnParametersSet()
+    protected override async Task OnParametersSetAsync()
     {
+        await SyncSelectedItemAsync();
+
         if (!_open)
         {
-            _query = CurrentValue is null ? string.Empty : DisplayFor(CurrentValue);
+            _query = CommittedText;
         }
 
         if (ItemsProvider is null)
@@ -527,7 +562,7 @@
         _activeIndex = -1;
         _hasPending = false;
         _pending = default;
-        _query = CurrentValue is null ? string.Empty : DisplayFor(CurrentValue);
+        _query = CommittedText;
     }
 
     private async Task ToggleOpenAsync()
@@ -602,7 +637,7 @@
             return;
         }
 
-        CurrentValue = item;
+        SetSelectedItem(item);
         Close();
         _query = DisplayFor(item);
 
@@ -618,7 +653,7 @@
 
         var item = _pending!;
 
-        CurrentValue = item;
+        SetSelectedItem(item);
         Close();
         _query = DisplayFor(item);
 
@@ -634,9 +669,9 @@
         _hasPending = false;
         _pending = default;
 
-        if (CurrentValue is not null)
+        if (HasValue)
         {
-            CurrentValue = default;
+            SetSelectedItem(default);
         }
 
         await FocusInputAsync();
@@ -648,7 +683,7 @@
         _pending = default;
         _query = string.Empty;
         _filtering = false;
-        CurrentValue = default;
+        SetSelectedItem(default);
 
         if (_open)
         {
@@ -698,8 +733,7 @@
 
         _seekActive = false;
 
-        var chosen = _hasPending ? _pending : CurrentValue;
-        var index = chosen is null ? -1 : _table.IndexOf(chosen);
+        var index = _hasPending || HasValue ? _table.IndexOf(IsChosen) : -1;
 
         _activeIndex = index >= 0 ? index : 0;
         StateHasChanged();
@@ -917,7 +951,9 @@
             _dom = null;
         }
 
-        GC.SuppressFinalize(this);
+        // The renderer calls DisposeAsync instead of Dispose when a component has both, so the
+        // base's cleanup - the EditContext subscription, DisposeCore - has to be run from here.
+        Dispose();
     }
 
     // ---- Styling ------------------------------------------------------------------------------

@@ -28,6 +28,19 @@ export function setIndeterminate(id, value) {
 }
 
 /**
+ * Whether a <details> element is open.
+ *
+ * The browser opens and closes a <details> itself, and Blazor's toggle event carries no state, so
+ * ZenAccordionItem reads the `open` property after each toggle rather than guessing.
+ *
+ * @param {string} id Element id.
+ * @returns {boolean} The element's open state; false when it is missing.
+ */
+export function isOpen(id) {
+    return !!document.getElementById(id)?.open;
+}
+
+/**
  * Removes focus from an element.
  *
  * Used by ZenNumberInput to stop the browser stepping the value when the wheel turns over a

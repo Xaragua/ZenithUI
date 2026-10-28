@@ -1,0 +1,242 @@
+@namespace ZenithUI
+
+@inherits ZenComponentBase
+
+@*
+    Where the current page sits in the site's hierarchy, as a trail of links back up it. The
+    WAI-ARIA breadcrumb pattern: a <nav> landmark named "Breadcrumb", an ordered list, and
+    aria-current="page" on the last item.
+
+    The last item is current unless an item says otherwise, which is why the items register with
+    the breadcrumb rather than rendering themselves: only the breadcrumb knows which one is last.
+    ZenDefer orders the render so that is known in the first pass, under static SSR as well.
+
+    The separators are drawn by the list, between items, and are aria-hidden. A screen reader
+    already hears a list of links; "chevron" between each would be noise.
+
+    MaxItems collapses the middle of a long trail into an ellipsis button, keeping the root and the
+    nearest levels. The button expands the trail in place and moves focus to the first level it
+    revealed, since the button itself has gone. Under static rendering nothing would answer the
+    button, so the trail is never collapsed there - a long breadcrumb that wraps beats one that
+    hides levels behind a control that does not work.
+*@
+
+@{
+    _items.BeginPass();
+}
+
+<CascadingValue Value="this" IsFixed="true">
+    @ChildContent
+</CascadingValue>
+
+<ZenDefer>
+    @{
+        var items = _items.Merge();
+        var current = CurrentIndex(items);
+        var collapsed = IsCollapsed(items.Count);
+        var tail = Math.Max(MaxItems - 1, 1);
+    }
+
+    <nav class="@RootClass(null)" style="@Style" aria-label="@(Label ?? Localize(ZenStringKeys.Breadcrumb_Label))" @attributes="AttributesWithoutClass">
+        <ol class="@ListClass">
+            @for (var i = 0; i < items.Count; i++)
+            {
+                var index = i;
+
+                if (collapsed && index > 0 && index < items.Count - tail)
+                {
+                    if (index == 1)
+                    {
+                        <li class="inline-flex items-center gap-1.5">
+                            @SeparatorContent
+                            <button type="button"
+                                    class="zen-focus rounded-zen-sm px-1 text-content-muted hover:bg-surface-sunken hover:text-content"
+                                    aria-label="@(ShowAllLabel ?? Localize(ZenStringKeys.Breadcrumb_ShowAll))"
+                                    @onclick="Expand">
+                                <span aria-hidden="true">&hellip;</span>
+                            </button>
+                        </li>
+                    }
+
+                    continue;
+                }
+
+                var item = items[index];
+                var isCurrent = index == current;
+
+                <li class="inline-flex min-w-0 items-center gap-1.5">
+                    @if (index > 0)
+                    {
+                        @SeparatorContent
+                    }
+
+                    @if (item.Href is not null && !item.Disabled)
+                    {
+                        if (index == 1 && _focusRevealed)
+                        {
+                            <a href="@item.Href"
+                               class="@LinkClass(isCurrent)"
+                               title="@item.Text"
+                               aria-current="@(isCurrent ? "page" : null)"
+                               @ref="_firstRevealed">@ItemContent(item)</a>
+                        }
+                        else
+                        {
+                            <a href="@item.Href"
+                               class="@LinkClass(isCurrent)"
+                               title="@item.Text"
+                               aria-current="@(isCurrent ? "page" : null)">@ItemContent(item)</a>
+                        }
+                    }
+                    else
+                    {
+                        <span class="@TextClass(isCurrent)" title="@item.Text" aria-current="@(isCurrent ? "page" : null)">@ItemContent(item)</span>
+                    }
+                </li>
+            }
+        </ol>
+    </nav>
+</ZenDefer>
+
+@code {
+    private readonly ZenChildList<ZenBreadcrumbItem> _items = new();
+    private bool _expanded;
+    private bool _focusRevealed;
+    private ElementReference _firstRevealed;
+
+    /// <summary>The <see cref="ZenBreadcrumbItem"/>s, root first.</summary>
+    [Parameter]
+    public RenderFragment? ChildContent { get; set; }
+
+    /// <summary>The landmark's accessible name. Defaults to a localized "Breadcrumb".</summary>
+    [Parameter]
+    public string? Label { get; set; }
+
+    /// <summary>
+    /// The most items to show before the middle collapses into an ellipsis. The first item and
+    /// the last <c>MaxItems - 1</c> stay. Zero never collapses.
+    /// </summary>
+    [Parameter]
+    public int MaxItems { get; set; }
+
+    /// <summary>Accessible name of the ellipsis button. Defaults to a localized "Show all levels".</summary>
+    [Parameter]
+    public string? ShowAllLabel { get; set; }
+
+    /// <summary>What goes between items, in place of the chevron. Always hidden from assistive technology.</summary>
+    [Parameter]
+    public RenderFragment? Separator { get; set; }
+
+    /// <summary>Text size of the trail.</summary>
+    [Parameter]
+    public ZenSize Size { get; set; } = ZenSize.Medium;
+
+    internal void Register(ZenBreadcrumbItem item) => _items.Register(item);
+
+    // No re-render: an item goes because the content declaring it changed, which re-renders this.
+    internal void Unregister(ZenBreadcrumbItem item) => _items.Unregister(item);
+
+    /// <summary>The item marked current, or else the last one.</summary>
+    private static int CurrentIndex(IReadOnlyList<ZenBreadcrumbItem> items)
+    {
+        for (var i = 0; i < items.Count; i++)
+        {
+            if (items[i].Current == true)
+            {
+                return i;
+            }
+        }
+
+        return items.Count > 0 && items[^1].Current != false ? items.Count - 1 : -1;
+    }
+
+    private bool IsCollapsed(int count) =>
+        MaxItems > 0 && count > MaxItems && !_expanded && RendererInfo.IsInteractive;
+
+    private void Expand()
+    {
+        _expanded = true;
+        _focusRevealed = true;
+    }
+
+    /// <inheritdoc />
+    protected override async Task OnAfterRenderAsync(bool firstRender)
+    {
+        if (!_focusRevealed || !RendererInfo.IsInteractive)
+        {
+            return;
+        }
+
+        _focusRevealed = false;
+
+        try
+        {
+            await _firstRevealed.FocusAsync();
+        }
+        catch (JSDisconnectedException)
+        {
+        }
+        catch (InvalidOperationException)
+        {
+            // The revealed level is not a link, or has already gone.
+        }
+    }
+
+    private RenderFragment SeparatorContent => builder =>
+    {
+        builder.OpenElement(0, "span");
+        builder.AddAttribute(1, "class", "inline-flex shrink-0 text-content-subtle");
+        builder.AddAttribute(2, "aria-hidden", "true");
+
+        if (Separator is not null)
+        {
+            builder.AddContent(3, Separator);
+        }
+        else
+        {
+            builder.OpenComponent<ZenIcon>(4);
+            builder.AddComponentParameter(5, nameof(ZenIcon.Path), ZenIcons.ChevronRight);
+            builder.AddComponentParameter(6, nameof(ZenIcon.Size), ZenSize.Small);
+            builder.AddAttribute(7, "class", "size-3.5 rtl:-scale-x-100");
+            builder.CloseComponent();
+        }
+
+        builder.CloseElement();
+    };
+
+    private static RenderFragment ItemContent(ZenBreadcrumbItem item) => builder =>
+    {
+        if (item.Icon is not null)
+        {
+            builder.OpenComponent<ZenIcon>(0);
+            builder.AddComponentParameter(1, nameof(ZenIcon.Path), item.Icon);
+            builder.AddComponentParameter(2, nameof(ZenIcon.Size), ZenSize.Small);
+            builder.AddAttribute(3, "class", "shrink-0");
+            builder.AddAttribute(4, "aria-hidden", "true");
+            builder.CloseComponent();
+        }
+
+        builder.OpenElement(5, "span");
+        builder.AddAttribute(6, "class", "truncate");
+        builder.AddContent(7, item.ChildContent ?? (RenderFragment)(b => b.AddContent(0, item.Text)));
+        builder.CloseElement();
+    };
+
+    private string ListClass => CssBuilder
+        .Default("flex flex-wrap items-center gap-x-1.5 gap-y-1")
+        .AddClass(Size switch
+        {
+            ZenSize.Small => "text-xs",
+            ZenSize.Large => "text-base",
+            _ => "text-sm",
+        })
+        .Build()!;
+
+    private static string LinkClass(bool current) => current
+        ? "zen-focus inline-flex max-w-64 items-center gap-1 rounded-zen-sm font-medium text-content hover:underline"
+        : "zen-focus inline-flex max-w-64 items-center gap-1 rounded-zen-sm text-content-muted transition-colors hover:text-content hover:underline";
+
+    private static string TextClass(bool current) => current
+        ? "inline-flex max-w-64 items-center gap-1 font-medium text-content"
+        : "inline-flex max-w-64 items-center gap-1 text-content-muted";
+}

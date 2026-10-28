@@ -236,6 +236,61 @@
     </div>
 </section>
 
+<!-- ---------------------------------------------------------------- Avatars -->
+<section class="mt-12">
+    <h2 class="text-lg font-semibold">ZenAvatar</h2>
+    <p class="mt-1 max-w-3xl text-sm text-content-muted">
+        A picture, else initials, else a glyph. The colour comes from the name, so the same person
+        is the same colour everywhere. A picture that fails to load leaves the initials showing.
+    </p>
+
+    <div class="mt-4 grid gap-4 md:grid-cols-2">
+        <ZenCard Title="Fallbacks and sizes" TitleLevel="3">
+            <div class="flex flex-wrap items-center gap-3">
+                <ZenAvatar Name="Ana Pérez" Src="@AvatarPhoto" />
+                <ZenAvatar Name="Ben Okafor" />
+                <ZenAvatar Name="Chloé Martin" Src="/does-not-exist.jpg" Title="This picture fails to load" />
+                <ZenAvatar />
+                <ZenAvatar Name="Acme Corporation" Square="true" />
+                <ZenAvatar Name="Dmitri Ivanov" Intent="ZenIntent.Danger" />
+            </div>
+
+            <div class="mt-4 flex flex-wrap items-center gap-3 border-t border-border pt-4">
+                @foreach (var size in Sizes)
+                {
+                    <ZenAvatar Name="María José de la Cruz" Size="size" />
+                }
+            </div>
+        </ZenCard>
+
+        <ZenCard Title="With status, in a group, beside a name" TitleLevel="3">
+            <div class="flex flex-wrap items-center gap-6">
+                <ZenIndicator Label="Online" Intent="ZenIntent.Success" Corner="ZenCorner.BottomEnd">
+                    <ZenAvatar Name="Ana Pérez" Src="@AvatarPhoto" />
+                </ZenIndicator>
+
+                <ZenIndicator Count="3" Intent="ZenIntent.Danger">
+                    <ZenAvatar Name="Ben Okafor" />
+                </ZenIndicator>
+
+                <ZenAvatarGroup Label="Assignees" MoreCount="4">
+                    <ZenAvatar Name="Ana Pérez" Src="@AvatarPhoto" Title="Ana Pérez" />
+                    <ZenAvatar Name="Ben Okafor" Title="Ben Okafor" />
+                    <ZenAvatar Name="Chloé Martin" Title="Chloé Martin" />
+                </ZenAvatarGroup>
+            </div>
+
+            <div class="mt-4 flex items-center gap-3 border-t border-border pt-4">
+                <ZenAvatar Name="Ana Pérez" Src="@AvatarPhoto" Decorative="true" />
+                <div class="min-w-0">
+                    <p class="text-sm font-medium text-content">Ana Pérez</p>
+                    <p class="text-xs text-content-muted">Decorative here: the name beside it already says who.</p>
+                </div>
+            </div>
+        </ZenCard>
+    </div>
+</section>
+
 <!-- ------------------------------------------------------------ Stat cards -->
 <section class="mt-12">
     <h2 class="text-lg font-semibold">ZenStatCard</h2>
@@ -479,6 +534,8 @@
         .Build()!;
 
     private bool _saving;
+
+    private const string AvatarPhoto = "img/avatar-ana.svg";
 
     // Every intent would be eight split buttons a row; four are enough to see the joins.
     private static readonly ZenIntent[] SplitIntents =
