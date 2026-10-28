@@ -96,6 +96,9 @@ public static class ZenIcons
         _ => Info,
     };
 
+    /// <summary>A head and shoulders. An avatar with no name and no picture.</summary>
+    public const string User = """<circle cx="12" cy="8" r="5" /><path d="M20 21a8 8 0 0 0-16 0" />""";
+
     /// <summary>Upward arrow. A positive trend on a stat card.</summary>
     public const string TrendUp = """<path d="M12 19V5m0 0-6 6m6-6 6 6" />""";
 

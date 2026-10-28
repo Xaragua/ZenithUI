@@ -7,8 +7,8 @@ that licence requires.
 Where: src/ZenithUI/Core/ZenIcons.cs - the built-in SVG icon paths.
 
   Lucide     Close, ChevronDown, ChevronRight, ChevronUp, ChevronLeft, Spinner,
-             Sun, Monitor, Search, Menu (the last two adjusted to ZenithUI's
-             grid)
+             Sun, Monitor, User (Lucide "user-round"), Search, Menu (the last
+             two adjusted to ZenithUI's grid)
   Feather    Moon, Warning (adjusted)
   Heroicons  Check (Heroicons v1 outline)
 

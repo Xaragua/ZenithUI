@@ -1,0 +1,172 @@
+@namespace ZenithUI
+
+@inherits ZenComponentBase
+
+@*
+    A person or an organisation, as a picture, their initials, or a generic glyph - in that order of
+    preference.
+
+    The initials are always rendered and the picture is laid over them. A picture that fails to
+    load is hidden (interactively, through onerror), and what shows through is the initials, not a
+    broken-image icon. Under static rendering there is no onerror, but an <img> with an empty alt
+    draws nothing when it fails, so the initials still show through.
+
+    Accessibility. The whole avatar is ONE image named by Name: role="img" with aria-label, and the
+    initials and picture inside are presentational. A screen reader hears "Ana Pérez, image" rather
+    than "A P". Next to a visible name the avatar says nothing new, so Decorative hides it.
+
+    Colour. With no Intent set, one is derived from the name, so the same person gets the same
+    colour on every page and in every list. The hash is FNV-1a, not string.GetHashCode: that one is
+    randomised per process, and a prerendered page would change colour when it went interactive.
+    Every intent is drawn Soft, a pairing the contrast audit already covers in both palettes.
+*@
+
+<span class="@RootClass(AvatarClass)"
+      style="@Style"
+      role="@(Decorative ? null : "img")"
+      aria-label="@(Decorative ? null : AccessibleName)"
+      aria-hidden="@(Decorative ? "true" : null)"
+      title="@Title"
+      @attributes="AttributesWithoutClass">
+    @if (DisplayInitials is { Length: > 0 } initials)
+    {
+        <span aria-hidden="true">@initials</span>
+    }
+    else
+    {
+        <ZenIcon Path="@(Icon ?? ZenIcons.User)" Size="EffectiveSize" aria-hidden="true" class="@IconClass" />
+    }
+
+    @if (ShowImage)
+    {
+        <img src="@Src" alt="" class="absolute inset-0 size-full object-cover" loading="lazy" @onerror="HandleImageError" />
+    }
+</span>
+
+@code {
+    private string? _failedSrc;
+
+    /// <summary>A picture. Falls back to the initials when absent or when it fails to load.</summary>
+    [Parameter]
+    public string? Src { get; set; }
+
+    /// <summary>
+    /// Who the avatar is: its accessible name, and where the initials and the derived colour come
+    /// from.
+    /// </summary>
+    [Parameter]
+    public string? Name { get; set; }
+
+    /// <summary>The letters to show, in place of those taken from <see cref="Name"/>.</summary>
+    [Parameter]
+    public string? Initials { get; set; }
+
+    /// <summary>The glyph shown with neither a picture nor initials. Defaults to <see cref="ZenIcons.User"/>.</summary>
+    [Parameter]
+    public string? Icon { get; set; }
+
+    /// <summary>Avatar size. Inside a <see cref="ZenAvatarGroup"/>, the group's size wins.</summary>
+    [Parameter]
+    public ZenSize Size { get; set; } = ZenSize.Medium;
+
+    /// <summary>Rounded square rather than a circle - the convention for an organisation or a team.</summary>
+    [Parameter]
+    public bool Square { get; set; }
+
+    /// <summary>Colour. <see langword="null"/> derives one from <see cref="Name"/>.</summary>
+    [Parameter]
+    public ZenIntent? Intent { get; set; }
+
+    /// <summary>
+    /// Hide the avatar from assistive technology, for one sitting beside the person's visible
+    /// name, where announcing it would say the name twice.
+    /// </summary>
+    [Parameter]
+    public bool Decorative { get; set; }
+
+    /// <summary>A tooltip. Useful in a <see cref="ZenAvatarGroup"/>, where names are not shown.</summary>
+    [Parameter]
+    public string? Title { get; set; }
+
+    [CascadingParameter]
+    private ZenAvatarGroup? Group { get; set; }
+
+    private ZenSize EffectiveSize => Group?.Size ?? Size;
+
+    private bool ShowImage => !string.IsNullOrEmpty(Src) && Src != _failedSrc;
+
+    private string AccessibleName => string.IsNullOrWhiteSpace(Name) ? Localize(ZenStringKeys.Avatar_Anonymous) : Name;
+
+    private string? DisplayInitials => string.IsNullOrWhiteSpace(Initials) ? InitialsOf(Name) : Initials.Trim();
+
+    private void HandleImageError() => _failedSrc = Src;
+
+    /// <summary>
+    /// The first letter of the first and last words, upper-cased in the current culture.
+    /// </summary>
+    /// <remarks>
+    /// By text element rather than by char, so a name starting with a letter outside the Basic
+    /// Multilingual Plane, or with a combining accent, is not cut in half.
+    /// </remarks>
+    internal static string? InitialsOf(string? name)
+    {
+        if (string.IsNullOrWhiteSpace(name))
+        {
+            return null;
+        }
+
+        var words = name.Split((char[]?)null, StringSplitOptions.RemoveEmptyEntries);
+        var first = StringInfo.GetNextTextElement(words[0]);
+        var last = words.Length > 1 ? StringInfo.GetNextTextElement(words[^1]) : string.Empty;
+
+        return (first + last).ToUpper(CultureInfo.CurrentCulture);
+    }
+
+    private static readonly ZenIntent[] DerivedIntents =
+    [
+        ZenIntent.Primary,
+        ZenIntent.Secondary,
+        ZenIntent.Accent,
+        ZenIntent.Success,
+        ZenIntent.Info,
+        ZenIntent.Warning,
+    ];
+
+    /// <summary>The same intent for the same name, in every process.</summary>
+    internal static ZenIntent IntentFor(string? name)
+    {
+        if (string.IsNullOrWhiteSpace(name))
+        {
+            return ZenIntent.Neutral;
+        }
+
+        var hash = 2166136261u;
+
+        foreach (var c in name.Trim())
+        {
+            hash = (hash ^ c) * 16777619u;
+        }
+
+        return DerivedIntents[hash % (uint)DerivedIntents.Length];
+    }
+
+    private string AvatarClass => CssBuilder
+        .Default("relative inline-flex shrink-0 select-none items-center justify-center overflow-hidden font-semibold leading-none")
+        .AddClass(ZenStyles.Variant(Intent ?? IntentFor(Name), ZenVariant.Soft, interactive: false))
+        .AddClass(Square ? "rounded-zen-md" : "rounded-full")
+        .AddClass(EffectiveSize switch
+        {
+            ZenSize.Small => "size-8 text-xs",
+            ZenSize.Large => "size-14 text-lg",
+            _ => "size-10 text-sm",
+        })
+        .AddClass("ring-2 ring-surface", Group is not null)
+        .Build()!;
+
+    private string IconClass => EffectiveSize switch
+    {
+        ZenSize.Small => "size-4",
+        ZenSize.Large => "size-8",
+        _ => "size-5",
+    };
+}

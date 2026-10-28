@@ -620,3 +620,13 @@ public enum ZenLookupCommit
     /// </summary>
     Confirm,
 }
+
+/// <summary>How a <c>ZenTabs</c> marks its selected tab.</summary>
+public enum ZenTabsVariant
+{
+    /// <summary>A line under the selected tab, on a rule under the whole row. The default.</summary>
+    Underline,
+
+    /// <summary>A tinted fill behind the selected tab, with no rule.</summary>
+    Pills,
+}

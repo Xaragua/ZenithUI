@@ -1,0 +1,168 @@
+@namespace ZenithUI
+
+@inherits ZenComponentBase
+@implements IAsyncDisposable
+
+@*
+    One section of a ZenAccordion: a <details> whose <summary> is the heading.
+
+    The browser owns the open state; this component only ever writes it when the Open parameter
+    changes. Blazor diffs against its own last render, not the DOM, so a section the user opened
+    stays open through any number of parent renders that pass the same Open. Every toggle - a
+    click, the keyboard, find-in-page, the exclusive accordion closing this one because another
+    opened - is then READ back from the element's open property and reported through OpenChanged.
+    Read, not inferred: toggle also fires when a section is first rendered open, and Blazor's
+    event carries no state, so flipping a flag on each one would close it again.
+
+    A disabled section cannot be toggled: its summary leaves the tab order and the click that would
+    toggle it is cancelled. It still shows whatever state it was given.
+*@
+
+<details id="@Id"
+         class="@RootClass("group")"
+         style="@Style"
+         name="@Accordion?.GroupName"
+         open="@_open"
+         @ontoggle="HandleToggleAsync"
+         @attributes="AttributesWithoutClass">
+    <summary class="@SummaryClass"
+             tabindex="@(Disabled ? "-1" : null)"
+             aria-disabled="@(Disabled ? "true" : null)"
+             @onclick:preventDefault="Disabled">
+        @if (Icon is not null)
+        {
+            <ZenIcon Path="@Icon" Size="ZenSize.Small" class="shrink-0 text-content-muted" aria-hidden="true" />
+        }
+
+        <span class="min-w-0 flex-1">
+            @if (Header is not null)
+            {
+                @Header
+            }
+            else
+            {
+                @Title
+            }
+        </span>
+
+        <ZenIcon Path="@ZenIcons.ChevronDown"
+                 Size="ZenSize.Small"
+                 class="shrink-0 text-content-subtle transition-transform group-open:rotate-180 motion-reduce:transition-none"
+                 aria-hidden="true" />
+    </summary>
+
+    <div class="px-4 pb-4 text-sm text-content-muted">
+        @ChildContent
+    </div>
+</details>
+
+@code {
+    private bool _open;
+    private bool _known;
+    private bool? _lastOpenParameter;
+    private IJSObjectReference? _dom;
+    private bool _disposed;
+
+    [Inject]
+    private IJSRuntime JS { get; set; } = default!;
+
+    [CascadingParameter]
+    private ZenAccordion? Accordion { get; set; }
+
+    /// <summary>The section's heading.</summary>
+    [Parameter]
+    public string? Title { get; set; }
+
+    /// <summary>Heading content in place of <see cref="Title"/> - a title with a badge, a count.</summary>
+    [Parameter]
+    public RenderFragment? Header { get; set; }
+
+    /// <summary>The section's content.</summary>
+    [Parameter]
+    public RenderFragment? ChildContent { get; set; }
+
+    /// <summary>A leading icon.</summary>
+    [Parameter]
+    public string? Icon { get; set; }
+
+    /// <summary>Whether the section is open.</summary>
+    [Parameter]
+    public bool Open { get; set; }
+
+    /// <summary>Raised when the user opens or closes the section. Set by <c>@bind-Open</c>.</summary>
+    [Parameter]
+    public EventCallback<bool> OpenChanged { get; set; }
+
+    /// <summary>Stops the section being opened or closed.</summary>
+    [Parameter]
+    public bool Disabled { get; set; }
+
+    /// <inheritdoc />
+    protected override void OnParametersSet()
+    {
+        if (_lastOpenParameter != Open)
+        {
+            _lastOpenParameter = Open;
+            _open = Open;
+            _known = Open;
+        }
+    }
+
+    /// <summary>Reports a toggle that changed what the parent last knew.</summary>
+    private async Task HandleToggleAsync()
+    {
+        if (!OpenChanged.HasDelegate || !RendererInfo.IsInteractive || _disposed)
+        {
+            return;
+        }
+
+        bool open;
+
+        try
+        {
+            _dom ??= await JS.InvokeAsync<IJSObjectReference>("import", "./_content/ZenithUI/js/zen-dom.js");
+            open = await _dom.InvokeAsync<bool>("isOpen", Id);
+        }
+        catch (JSDisconnectedException)
+        {
+            return;
+        }
+        catch (OperationCanceledException)
+        {
+            return;
+        }
+
+        if (open == _known)
+        {
+            return;
+        }
+
+        _known = open;
+        await OpenChanged.InvokeAsync(open);
+    }
+
+    /// <inheritdoc />
+    public async ValueTask DisposeAsync()
+    {
+        _disposed = true;
+
+        if (_dom is not null)
+        {
+            try
+            {
+                await _dom.DisposeAsync();
+            }
+            catch (JSDisconnectedException)
+            {
+            }
+            catch (OperationCanceledException)
+            {
+            }
+        }
+    }
+
+    private string SummaryClass => CssBuilder
+        .Default("zen-focus flex list-none items-center gap-3 px-4 py-3 text-sm font-medium text-content [&::-webkit-details-marker]:hidden")
+        .AddClass(Disabled ? "cursor-not-allowed opacity-50" : "cursor-pointer transition-colors hover:bg-surface-sunken")
+        .Build()!;
+}

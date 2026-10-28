@@ -46,9 +46,9 @@
 /* ZenithUI's own custom utilities. */
 @source inline("zen-focus");
 @source inline("zen-focus-always");
+@source inline("zen-focus-visible-within");
 @source inline("zen-focus-border");
-@source inline("zen-focus-border-within");
-@source inline("zen-interactive-border");
+@source inline("zen-focus-border-within");@source inline("zen-interactive-border");
 @source inline("zen-check");
 @source inline("zen-radio");
 @source inline("zen-slider");

@@ -1,0 +1,54 @@
+@namespace ZenithUI
+@inherits ComponentBase
+@implements IDisposable
+
+@*
+    One tab of a ZenTabs. Renders nothing itself - it is a declaration the tab set reads, as ZenStep
+    is for ZenStepper: its title belongs in the tablist and its content in the panel, and neither
+    is where the tab is written.
+*@
+
+@code {
+    /// <summary>The tab set this tab belongs to.</summary>
+    [CascadingParameter]
+    public ZenTabs Tabs { get; set; } = default!;
+
+    /// <summary>The tab's label.</summary>
+    [Parameter]
+    public string? Title { get; set; }
+
+    /// <summary>Label content in place of <see cref="Title"/> - a title with a count badge.</summary>
+    [Parameter]
+    public RenderFragment? Header { get; set; }
+
+    /// <summary>The panel's content.</summary>
+    [Parameter]
+    public RenderFragment? ChildContent { get; set; }
+
+    /// <summary>A leading icon.</summary>
+    [Parameter]
+    public string? Icon { get; set; }
+
+    /// <summary>A stable name for the tab, for <see cref="ZenTabs.ActiveKey"/>.</summary>
+    [Parameter]
+    public string? Key { get; set; }
+
+    /// <summary>Shown in the list but cannot be selected; the arrow keys skip it.</summary>
+    [Parameter]
+    public bool Disabled { get; set; }
+
+    /// <inheritdoc />
+    protected override void OnInitialized()
+    {
+        if (Tabs is null)
+        {
+            throw new InvalidOperationException($"{nameof(ZenTab)} must be placed inside a {nameof(ZenTabs)}.");
+        }
+    }
+
+    /// <inheritdoc />
+    protected override void OnParametersSet() => Tabs.Register(this);
+
+    /// <inheritdoc />
+    public void Dispose() => Tabs?.Unregister(this);
+}

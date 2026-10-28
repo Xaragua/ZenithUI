@@ -99,4 +99,15 @@ internal static class ZenStringKeys
     public const string ThemeToggle_Dark = nameof(ThemeToggle_Dark);
     public const string ThemeToggle_System = nameof(ThemeToggle_System);
     public const string ThemeToggle_SwitchTo = nameof(ThemeToggle_SwitchTo);
+
+    // ---- Avatar -------------------------------------------------------------------------------
+    public const string Avatar_Anonymous = nameof(Avatar_Anonymous);
+    public const string AvatarGroup_More = nameof(AvatarGroup_More);
+
+    // ---- Breadcrumb ---------------------------------------------------------------------------
+    public const string Breadcrumb_Label = nameof(Breadcrumb_Label);
+    public const string Breadcrumb_ShowAll = nameof(Breadcrumb_ShowAll);
+
+    // ---- One-time code ------------------------------------------------------------------------
+    public const string Otp_Label = nameof(Otp_Label);
 }

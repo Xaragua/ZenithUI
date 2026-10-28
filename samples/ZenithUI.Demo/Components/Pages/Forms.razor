@@ -290,6 +290,96 @@
         <code>ZenLookupRequest.Query</code>. Its Confirm mode is for picks that are costly to undo:
         a click only marks the row, and closing the panel any way other than Confirm discards it.
     </p>
+
+    <div class="mt-4 grid gap-4 lg:grid-cols-2">
+        <ZenCard Title="Bound to a Guid" TitleLevel="3" Subtitle="ZenKeyLookup, in an EditForm">
+            <ZenForm Model="_order" OnValidSubmit="() => _orderSaved = true">
+                <ChildContent>
+                    <ZenKeyLookup TItem="Vendor"
+                                  TValue="Guid?"
+                                  Items="VendorService.Featured"
+                                  ValueField="@(v => v.Id)"
+                                  ItemText="@(v => v.Name)"
+                                  Label="Purchase-order vendor"
+                                  Placeholder="Search vendors"
+                                  HelpText="The model holds VendorId, a Guid?, not the vendor."
+                                  Required="true"
+                                  @bind-Value="_order.VendorId">
+                        <Columns>
+                            <ZenColumn TItem="Vendor" Title="Vendor" Field="@(v => v.Name)" />
+                            <ZenColumn TItem="Vendor" Title="Account" Field="@(v => v.Account)" Width="7rem" CellClass="font-mono text-xs" />
+                            <ZenColumn TItem="Vendor" Title="Region" Field="@(v => v.Region)" Width="12rem" />
+                        </Columns>
+                    </ZenKeyLookup>
+                </ChildContent>
+
+                <Actions>
+                    <ZenButton ButtonType="submit" Intent="ZenIntent.Primary">Save order</ZenButton>
+                </Actions>
+            </ZenForm>
+
+            <p class="mt-3 text-sm text-content-muted">
+                Bound: <code class="font-medium text-content">@(_order.VendorId?.ToString() ?? "null")</code>
+                @if (_orderSaved)
+                {
+                    <span class="ms-2 text-success-strong">Saved.</span>
+                }
+            </p>
+        </ZenCard>
+    </div>
+</section>
+
+<!-- --------------------------------------------------- Segmented & one-time code -->
+<section class="mt-12 grid gap-4 md:grid-cols-2">
+    <ZenCard Title="ZenSegmentedButton" TitleLevel="2">
+        <div class="space-y-5">
+            <ZenSegmentedButton TValue="string" Label="Billing period" @bind-Value="_period">
+                <ZenSegment TValue="string" Value="@("month")" Label="Monthly" />
+                <ZenSegment TValue="string" Value="@("year")" Label="Yearly" />
+                <ZenSegment TValue="string" Value="@("lifetime")" Label="Lifetime" Disabled="true" />
+            </ZenSegmentedButton>
+
+            <ZenSegmentedButton TValue="string" Label="View" HideLabel="true" Intent="ZenIntent.Primary" Size="ZenSize.Small" @bind-Value="_view">
+                <ZenSegment TValue="string" Value="@("list")" Icon="@ZenIcons.Menu" Title="List" />
+                <ZenSegment TValue="string" Value="@("calendar")" Icon="@ZenIcons.Calendar" Title="Calendar" />
+                <ZenSegment TValue="string" Value="@("inbox")" Icon="@ZenIcons.Inbox" Title="Inbox" />
+            </ZenSegmentedButton>
+
+            <ZenSegmentedButton TValue="string" Label="Alignment" FullWidth="true" Size="ZenSize.Large" @bind-Value="_alignment">
+                <ZenSegment TValue="string" Value="@("start")" Label="Start" />
+                <ZenSegment TValue="string" Value="@("center")" Label="Center" />
+                <ZenSegment TValue="string" Value="@("end")" Label="End" />
+            </ZenSegmentedButton>
+
+            <p class="text-sm text-content-muted">
+                Bound: <code>@_period</code>, <code>@_view</code>, <code>@_alignment</code>. These are
+                native radios: Tab reaches the group once and the arrow keys choose.
+            </p>
+        </div>
+    </ZenCard>
+
+    <ZenCard Title="ZenOtpInput" TitleLevel="2">
+        <div class="space-y-5">
+            <ZenOtpInput HelpText="We sent six digits to •••• 4417. Try pasting 123456."
+                         SeparatorAfter="3"
+                         ErrorMessage="@_otpError"
+                         OnComplete="VerifyCode"
+                         @bind-Value="_otp" />
+
+            <ZenOtpInput Label="Recovery code" Length="4" Numeric="false" Mask="true" Size="ZenSize.Small" @bind-Value="_recovery" />
+
+            <p class="text-sm text-content-muted">
+                @if (_verified)
+                {
+                    <span class="text-success-strong">Verified.</span>
+                }
+                else
+                {
+                    <span>One real input, so SMS autofill and paste work. Any code but 000000 verifies.</span>
+                }
+            </p>
+        </div>
+    </ZenCard>
 </section>
 
 <!-- --------------------------------------------------- Progress & indicator -->
@@ -366,6 +456,30 @@
 
         [Range(typeof(bool), "true", "true", ErrorMessage = "You must accept the terms.")]
         public bool Accepted { get; set; }
+    }
+
+    private sealed class OrderModel
+    {
+        [Required(ErrorMessage = "Choose a vendor.")]
+        public Guid? VendorId { get; set; }
+    }
+
+    private readonly OrderModel _order = new();
+    private bool _orderSaved;
+
+    private string? _period = "month";
+    private string? _view = "list";
+    private string? _alignment = "start";
+
+    private string? _otp;
+    private string? _recovery;
+    private string? _otpError;
+    private bool _verified;
+
+    private void VerifyCode(string code)
+    {
+        _verified = code != "000000";
+        _otpError = _verified ? null : "That code is not valid. Check the message and try again.";
     }
 
     private SignupModel _model = new();

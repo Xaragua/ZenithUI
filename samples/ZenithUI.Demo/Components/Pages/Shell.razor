@@ -276,11 +276,34 @@
     </div>
 </section>
 
+<!-- ------------------------------------------------------------------- Breadcrumb -->
+<section class="mt-10">
+    <h2 class="text-lg font-semibold">ZenBreadcrumb</h2>
+    <p class="mt-2 max-w-3xl text-sm text-content-muted">
+        A <code>nav</code> landmark with an ordered list, the last level marked
+        <code>aria-current="page"</code>. This page has no render mode, so the
+        <code>MaxItems="3"</code> below does not collapse anything: nothing would answer the
+        ellipsis. The <a href="navigation" class="zen-focus rounded-zen-sm text-primary-strong underline">interactive page</a>
+        shows it folded.
+    </p>
+
+    <ZenCard Class="mt-4">
+        <ZenBreadcrumb Label="Breadcrumb, static" MaxItems="3">
+            <ZenBreadcrumbItem Text="Home" Href="/" Icon="@ZenIcons.Inbox" />
+            <ZenBreadcrumbItem Text="Shell" Href="shell" />
+            <ZenBreadcrumbItem Text="Orders" Href="shell/orders" />
+            <ZenBreadcrumbItem Text="Order #10482" Href="shell/orders/10482" />
+            <ZenBreadcrumbItem Text="Shipping" />
+        </ZenBreadcrumb>
+    </ZenCard>
+</section>
+
 <!-- ------------------------------------------------------------------- App bar -->
 <section class="mt-10">
     <h2 class="text-lg font-semibold">ZenAppBar</h2>
     <p class="mt-2 max-w-3xl text-sm text-content-muted">
-        Four slots &mdash; <code>Brand</code>, <code>ChildContent</code>, <code>Actions</code> and
+        Four slots &mdash; <code>Brand</code>, <code>ChildContent</code>, <code>Actions</code> (here ending
+        in the signed-in user's <code>ZenAvatar</code>) and
         an optional <code>Below</code> row that stays inside the sticky region. The bar at the top
         of this page is one; here is another, with a second row.
     </p>
@@ -303,6 +326,14 @@
             <Actions>
                 <ZenBadge Intent="ZenIntent.Success" Variant="ZenVariant.Soft">Live</ZenBadge>
                 <ZenButton Size="ZenSize.Small" Intent="ZenIntent.Primary">New order</ZenButton>
+
+                @* The signed-in user. The link is what is announced, so the avatar inside it is
+                   decorative - otherwise a screen reader would read the name twice. *@
+                <a href="/shell" class="zen-focus ms-1 rounded-full" aria-label="Account: Ana Pérez" title="Ana Pérez">
+                    <ZenIndicator Intent="ZenIntent.Success" Corner="ZenCorner.BottomEnd" LabelledByChild="true">
+                        <ZenAvatar Name="Ana Pérez" Src="img/avatar-ana.svg" Size="ZenSize.Small" Decorative="true" />
+                    </ZenIndicator>
+                </a>
             </Actions>
 
             <Below>

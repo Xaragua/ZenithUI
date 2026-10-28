@@ -3,7 +3,7 @@
   <PropertyGroup>
     <ManagePackageVersionsCentrally>true</ManagePackageVersionsCentrally>
     <CentralPackageTransitivePinningEnabled>true</CentralPackageTransitivePinningEnabled>
-    <AspNetCoreVersion>10.0.12</AspNetCoreVersion>
+    <AspNetCoreVersion>10.0.14</AspNetCoreVersion>
   </PropertyGroup>
 
   <!-- Library -->

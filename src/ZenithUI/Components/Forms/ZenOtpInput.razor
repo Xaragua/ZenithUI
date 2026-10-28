@@ -1,0 +1,178 @@
+@namespace ZenithUI
+
+@inherits ZenInputBase<string>
+
+@*
+    A one-time code: the six digits from an SMS, an authenticator app or an email.
+
+    ONE real <input>, drawn as a row of boxes. The usual build - one input per digit, with script
+    moving focus along - breaks everything a code field depends on: the phone's "From Messages"
+    suggestion fills a single field marked autocomplete="one-time-code", a pasted code lands in
+    one box, a screen reader announces six unlabelled fields, and without script the user cannot
+    get past the first. A single input does all of it natively, and submits under static rendering.
+
+    The input is laid over the boxes, transparent with a transparent caret, and carries `peer`; the
+    boxes are aria-hidden copies of its characters. The box the next character will go in takes the
+    text-field focus treatment (zen-focus-border's border and inset outline) through peer-focus
+    while the input is focused, so it reads as a caret. Invalid keeps every box danger-coloured,
+    focused or not.
+
+    Every keystroke commits - a code is short and the point of the field is to react when it is
+    complete, through OnComplete. Characters that cannot be in the code (letters, when Numeric) are
+    dropped as they are typed.
+*@
+
+<ZenField Label="@(Label ?? Localize(ZenStringKeys.Otp_Label))"
+          HelpText="@HelpText"
+          Errors="ValidationMessages"
+          Required="Required"
+          Disabled="Disabled"
+          For="@Id"
+          Size="Size"
+          Class="@FieldClass">
+    <div class="relative inline-flex w-fit max-w-full items-center gap-2" dir="ltr">
+        <input id="@context.InputId"
+               type="text"
+               class="@RootClass(InputClass)"
+               style="@Style"
+               value="@_display"
+               autocomplete="one-time-code"
+               inputmode="@(Numeric ? "numeric" : "text")"
+               pattern="@(Numeric ? "[0-9]*" : null)"
+               maxlength="@Length"
+               spellcheck="false"
+               autocapitalize="off"
+               disabled="@Disabled"
+               readonly="@ReadOnly"
+               aria-describedby="@context.DescribedBy"
+               aria-invalid="@context.AriaInvalid"
+               aria-required="@context.AriaRequired"
+               @attributes="AttributesWithoutClass"
+               @oninput="HandleCodeInputAsync" />
+
+        @for (var i = 0; i < Length; i++)
+        {
+            if (SeparatorAfter > 0 && i == SeparatorAfter)
+            {
+                <span class="h-0.5 w-3 shrink-0 rounded-full bg-border-strong" aria-hidden="true"></span>
+            }
+
+            <span class="@CellClass(i)" aria-hidden="true">@CellText(i)</span>
+        }
+    </div>
+</ZenField>
+
+@code {
+    private string _display = string.Empty;
+    private bool _completeRaised;
+
+    /// <summary>How many characters the code has.</summary>
+    [Parameter]
+    public int Length { get; set; } = 6;
+
+    /// <summary>Digits only, with the numeric keypad on a phone. On by default.</summary>
+    [Parameter]
+    public bool Numeric { get; set; } = true;
+
+    /// <summary>Show dots in place of the characters.</summary>
+    [Parameter]
+    public bool Mask { get; set; }
+
+    /// <summary>
+    /// Draw a dash after this many boxes - 3 for a "123-456" code. Zero for none.
+    /// </summary>
+    [Parameter]
+    public int SeparatorAfter { get; set; }
+
+    /// <summary>Raised once the code is complete, with the code. Again only after it is edited and completed again.</summary>
+    [Parameter]
+    public EventCallback<string> OnComplete { get; set; }
+
+    /// <inheritdoc />
+    protected override void OnParametersSet()
+    {
+        if (Length < 1)
+        {
+            throw new InvalidOperationException($"{nameof(ZenOtpInput)}.{nameof(Length)} must be at least 1.");
+        }
+
+        _display = Clean(CurrentValue);
+        _completeRaised = _display.Length == Length;
+    }
+
+    /// <summary>The code as it may be held: allowed characters only, at most <see cref="Length"/>.</summary>
+    private string Clean(string? value)
+    {
+        if (string.IsNullOrEmpty(value))
+        {
+            return string.Empty;
+        }
+
+        var kept = Numeric ? new string([.. value.Where(char.IsAsciiDigit)]) : value.Trim();
+
+        return kept.Length > Length ? kept[..Length] : kept;
+    }
+
+    private async Task HandleCodeInputAsync(ChangeEventArgs args)
+    {
+        var raw = args.Value?.ToString() ?? string.Empty;
+        var code = Clean(raw);
+
+        if (code != raw)
+        {
+            // The DOM holds what was typed. Blazor diffs against its last render, not the DOM, so
+            // rendering the cleaned code - unchanged since the last render - would leave the
+            // rejected character on screen. Rendering the raw text first gives the second render
+            // a difference to apply.
+            _display = raw;
+            StateHasChanged();
+            await Task.Yield();
+        }
+
+        _display = code;
+        CurrentValue = code;
+
+        if (code.Length < Length)
+        {
+            _completeRaised = false;
+        }
+        else if (!_completeRaised)
+        {
+            _completeRaised = true;
+            await OnComplete.InvokeAsync(code);
+        }
+    }
+
+    private string CellText(int index) =>
+        index < _display.Length ? (Mask ? "•" : _display[index].ToString()) : string.Empty;
+
+    /// <summary>Where the next character goes; the last box once the code is full.</summary>
+    private int ActiveIndex => Math.Min(_display.Length, Length - 1);
+
+    private string InputClass =>
+        "peer absolute inset-0 size-full cursor-text border-0 bg-transparent p-0 text-transparent caret-transparent " +
+        "outline-none selection:bg-transparent disabled:cursor-not-allowed";
+
+    // zen-focus-border's look, triggered by the input it stands in for: the border plus a 1px
+    // outline inset by the 2px ring width.
+    private const string ActiveCell =
+        "peer-focus:border-ring peer-focus:outline-1 peer-focus:outline-ring peer-focus:-outline-offset-2";
+
+    private const string ActiveCellInvalid =
+        "peer-focus:border-danger peer-focus:outline-1 peer-focus:outline-danger peer-focus:-outline-offset-2";
+
+    private string CellClass(int index) => CssBuilder
+        .Default("flex shrink-0 items-center justify-center border bg-surface font-mono font-semibold text-content tabular-nums transition-colors")
+        .AddClass(IsInvalid ? "border-danger" : "border-border")
+        .AddClass(IsInvalid ? ActiveCellInvalid : ActiveCell, index == ActiveIndex && !ReadOnly)
+        .AddClass("bg-surface-sunken", ReadOnly)
+        .AddClass("opacity-50", Disabled)
+        .AddClass(ZenStyles.InputRadius(Size))
+        .AddClass(Size switch
+        {
+            ZenSize.Small => "size-9 text-base",
+            ZenSize.Large => "size-14 text-2xl",
+            _ => "size-11 text-xl",
+        })
+        .Build()!;
+}
