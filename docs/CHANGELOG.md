@@ -4,6 +4,123 @@ All notable changes to ZenithUI are documented here. The format follows
 [Keep a Changelog](https://keepachangelog.com/en/1.1.0/) and the project adheres to
 [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.2.0] — unreleased
+
+Seven new controls and one fix. Nothing is breaking: `1.1.0` code builds and renders unchanged.
+
+```bash
+dotnet add package ZenithUI --version 1.2.0
+```
+
+### Added
+
+- **`ZenKeyLookup<TItem, TValue>`**: `ZenLookup` bound to a key of the record instead of the
+  record. See *Fixed* below.
+- **`ZenAvatar`** and **`ZenAvatarGroup`**: a person or organisation as a picture, their initials or
+  a glyph, in that order of preference.
+  - The initials are always rendered under the picture, so a picture that fails to load leaves
+    them showing, interactively and under static rendering alike.
+  - It is one image named by `Name`. `Decorative` hides it when the name is already beside it.
+  - With no `Intent`, the colour is derived from the name with a stable hash, so the same person
+    is the same colour in every process. `string.GetHashCode` would have changed it between
+    prerender and interactive render.
+  - Status dots are `ZenIndicator` around an avatar, not a parameter.
+  - The group overlaps its avatars and ends with a "+N" from `MoreCount`, announced as "N more".
+- **`ZenBreadcrumb`** and **`ZenBreadcrumbItem`**: the WAI-ARIA breadcrumb. It is a named `nav`
+  holding an ordered list, with hidden separators and `aria-current="page"` on the last item
+  unless another item says `Current`.
+  - `MaxItems` folds the middle of a long trail into an ellipsis button. The button expands the
+    trail and moves focus to the first level it revealed.
+  - Under static rendering the trail never folds, because nothing would answer the button.
+- **`ZenSegmentedButton<TValue>`** and **`ZenSegment<TValue>`**: joined buttons that choose one
+  of a few options. Underneath they are native radios in a `fieldset`, so the group is one tab
+  stop, the arrow keys choose, the value submits with a form, and it all works with no script.
+  - The selected fill follows `Intent`. Neutral, the default, is a raised segment on a sunken
+    track.
+  - Icon-only segments need a `Title`, which becomes the accessible name. Omitting it throws.
+- **`ZenDivider`**: a line, horizontal (`<hr>`) or `Vertical` (`role="separator"`).
+  - With a `Label` it is deliberately not a separator. A separator's children are
+    presentational, so the label would never be read.
+  - It also takes `Dashed`, `Spacing` and `Decorative`.
+- **`ZenOtpInput`**: a one-time code field. It is one real input with
+  `autocomplete="one-time-code"`, drawn as a row of boxes. That keeps SMS autofill, pasting a
+  whole code, password managers, screen readers and static form submission working, where one
+  input per digit breaks each of them.
+  - `Numeric` (the default) drops anything that is not a digit as it is typed.
+  - It also takes `Mask` and `SeparatorAfter`.
+  - `OnComplete` fires once each time the code becomes complete.
+- **`ZenAccordion`** and **`ZenAccordionItem`**: built on `<details>`/`<summary>`.
+  - Sections open with no script, and find-in-page opens a closed section when it finds text
+    inside.
+  - One section is open at a time through the native exclusive accordion (`name`).
+    `Multiple` lifts that.
+  - `@bind-Open` reads the real state back from the element after each toggle.
+- **`ZenTabs`** and **`ZenTab`**: the WAI-ARIA tabs pattern.
+  - It uses a roving tabindex. The arrow keys wrap and skip disabled tabs, and Home and End jump
+    to the ends.
+  - Activation is automatic by default; `ManualActivation` switches it off.
+  - You can bind `ActiveIndex` or `ActiveKey`.
+  - It has `Underline` and `Pills` variants and a `Vertical` layout.
+  - `KeepAlive` keeps unselected panels rendered, so their state survives switching.
+  - Under static rendering the selected tab and panel are correct, and the other tabs are
+    disabled.
+- **`ZenIcons.User`**, the avatar's fallback glyph (Lucide `user-round`).
+- **`zen-focus-visible-within`**: the outline ring, drawn on a wrapper whose descendant has
+  keyboard focus.
+- Strings for `en-US` and `es`: `Avatar_Anonymous`, `AvatarGroup_More`, `Breadcrumb_Label`,
+  `Breadcrumb_ShowAll` and `Otp_Label`.
+
+### Fixed
+
+- **`ZenLookup` could not be bound to a `Guid` (or any other key).** Its value was the record, so
+  `@bind-Value="model.VendorId"` did not compile. Every app wrapped it in a component that looked
+  the record up, mapped it back to an id on each change, and re-implemented `EditContext`
+  validation. `ZenKeyLookup` does that for you:
+
+  ```razor
+  <ZenKeyLookup TItem="Vendor" TValue="Guid?"
+                Items="vendors"
+                ValueField="@(v => v.Id)"
+                ItemText="@(v => v.Name)"
+                @bind-Value="order.VendorId">
+      <Columns>…</Columns>
+  </ZenKeyLookup>
+  ```
+
+  - Validation comes from the binding, as for any other input.
+  - Rows are matched by key, so `TItem` needs no value equality.
+  - A cleared value is the type's default: `Guid.Empty` for `Guid` and `null` for `Guid?`. Bind
+    a nullable key when an empty value must fail `[Required]`.
+  - With an `ItemsProvider`, `ItemResolver` fetches the record for a key that no loaded page
+    holds, so a form opened on an existing record shows its name.
+  - `ZenLookup` itself is unchanged: both now share `ZenLookupBase<TItem, TValue>`.
+- **`ZenLookup` and `ZenCombobox` never released their `EditContext` subscription.** Both
+  implement `IAsyncDisposable` as well as `ZenInputBase`'s `IDisposable`. When a component has
+  both, Blazor calls only `DisposeAsync`, and theirs did not run the base's cleanup. So a
+  disposed field stayed subscribed to its form and re-rendered on every validation pass. Both now
+  run it, and a test pins it.
+
+### Changed
+
+- **The dark palette's `-soft` tints are lighter-handed.** They sat at lightness 0.30–0.33 with
+  noticeable chroma and read as solid panels, well above the 0.19 surface. Each is now about a 13%
+  wash of its intent over the surface, at lightness ~0.255 and lower chroma. Soft badges, messages,
+  toasts and selected tabs now look translucent.
+  - The tokens stay opaque, so the contrast audit still measures exactly what is drawn.
+    `-strong` and content text on every `-soft` still pass AA.
+- **Dark danger moved from brick to rose.** At low lightness, hue 25 turned brown, so
+  `--zen-danger-soft` is now hue 12 and `--zen-danger-strong` hue 18. The solid `--zen-danger`
+  fill is unchanged.
+
+### Security
+
+- **ASP.NET Core packages moved from 10.0.12 to 10.0.14**, past
+  [GHSA-g27p-qf6j-c96c](https://github.com/advisories/GHSA-g27p-qf6j-c96c). That advisory is a code
+  injection through the WebAssembly debug proxy in `Microsoft.AspNetCore.Components.WebAssembly.Server`.
+  The demo is what references that package; the library does not. But every ASP.NET Core package
+  shares one version, so the library's own floor on `Microsoft.AspNetCore.Components.Web` and
+  `Microsoft.Extensions.Localization.Abstractions` rises to 10.0.14 as well.
+
 ## [1.1.0] — 2026-10-01
 
 Additions and one fix. Nothing is breaking: `1.0.0` code builds and renders unchanged, in English,

@@ -7,6 +7,7 @@ audits found.
 - [How it is verified](#how-it-is-verified)
 - [The M6 audit](#the-m6-audit)
 - [The M7 audit](#the-m7-audit)
+- [The 1.2.0 audit](#the-120-audit)
 - [What the checks cannot see](#what-the-checks-cannot-see)
 - [What a consuming application still owns](#what-a-consuming-application-still-owns)
 
@@ -214,6 +215,28 @@ A unit test now pins the order of the two JavaScript calls.
 
 Zero violations across all twenty-six page/palette combinations and all twenty-four interactive
 states. Every state reported reaching the condition it drives, not merely running.
+
+## The 1.2.0 audit
+
+`/navigation` joins the page list, which means tabs, an accordion and a collapsing breadcrumb in
+both palettes. Six states were added. Each one checks that the behaviour happened before axe runs,
+and fails the run if it did not:
+
+- the breadcrumb expanded from its ellipsis, with focus on the first level it revealed;
+- a tab selected with ArrowRight and then End, with focus following the selection;
+- an accordion section opened, with the open one closing (exclusive) and `@bind-Open` updating;
+- a segmented-button segment chosen, with the selected fill applied;
+- a one-time code typed with a letter in it, with the letter dropped and the next box focused;
+- a key lookup picking a row, with a `Guid` bound and the row selected on reopening.
+
+Also on the checklist: a labelled `ZenDivider` drops `role="separator"`, since a separator's
+children are presentational and its label would be silenced. An icon-only `ZenSegment` with no
+`Title` throws rather than render an unnamed radio.
+
+### Result
+
+Zero violations across all twenty-eight page/palette combinations and all thirty interactive
+states, and every state reported the outcome it checks for.
 
 ## What the checks cannot see
 

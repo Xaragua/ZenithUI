@@ -4,7 +4,8 @@
 > promoted unchanged. The consumer-`@theme` gap is closed, the package is verified from a feed by
 > both a Blazor Web App and a standalone WebAssembly app, and the accessibility sweep is clean
 > across every page, both palettes and every interactive state. The public API now follows
-> Semantic Versioning.
+> Semantic Versioning. `1.1.0` added localization; `1.2.0` adds tabs, accordion, breadcrumb,
+> avatar, segmented button, one-time-code input and divider, and `ZenKeyLookup`.
 > This is the plan of record. It is kept current: where implementation contradicted the original
 > plan, the plan was corrected and the change noted under [Deviations](#deviations-from-the-original-plan).
 
@@ -274,7 +275,13 @@ masking, which sidesteps caret-position bugs), `ZenSearchInput`, `ZenCheckbox`,
 **Selection** — `ZenSelect<TValue>` (native `<select>`, works in SSR with zero JS),
 `ZenCombobox<TItem>` (typeahead, async `ItemsProvider`, single/multi, full WAI-ARIA combobox
 pattern), `ZenLookup<TItem>` (added in `1.0.0-rc.1.4`: a search field whose popup is a
-`ZenTable`, the combobox-with-grid-popup pattern).
+`ZenTable`, the combobox-with-grid-popup pattern) and `ZenKeyLookup<TItem, TValue>` (added in
+`1.2.0`: the same, bound to a key), `ZenSegmentedButton<TValue>` + `ZenSegment<TValue>` (`1.2.0`),
+`ZenOtpInput` (`1.2.0`).
+
+**Disclosure and identity** (added in `1.2.0`) — `ZenTabs` + `ZenTab`, `ZenAccordion` +
+`ZenAccordionItem`, `ZenBreadcrumb` + `ZenBreadcrumbItem`, `ZenAvatar` + `ZenAvatarGroup`,
+`ZenDivider`.
 
 **Data display** — `ZenList<TItem>`, `ZenTable<TItem>` + `ZenColumn<TItem>` (server data,
 virtualization and grouping added in `1.0.0-rc.1.4`), `ZenTree<TItem>`,
@@ -475,6 +482,16 @@ telling two similar ones apart means seeing them side by side, sorted by the one
   row would blur the field first and close the panel before the click arrived.
 - **The commit mode** is `Immediate` or `Confirm`. In Confirm mode a pick only marks the row, a live
   footer says which row, and Confirm (or Ctrl+Enter) writes the value.
+- **Binding a key (1.2.0).** A form holds `VendorId`, not the vendor, so every consumer wrapped
+  the lookup to map between them. A `TValue` parameter could not be added to `ZenLookup` without
+  breaking it, because Razor does not infer one type argument when another is given. So
+  everything moved into `ZenLookupBase<TItem, TValue>`, which works on the chosen *item* through
+  two hooks: `SelectedItem` and `SetSelectedItem`.
+  - `ZenLookup<TItem>` maps the item to itself.
+  - `ZenKeyLookup<TItem, TValue>` maps it through `ValueField`, matches rows by key rather than by
+    record equality, and resolves a key no loaded page holds through `ItemResolver`.
+  - Both concrete types are plain C# classes, since a markup-less `.razor` file would emit a
+    `BuildRenderTree` that hides the base's.
 
 ### `ZenStepper` + `ZenStep`
 
@@ -538,6 +555,51 @@ Dominican differences. Components read `CultureInfo.CurrentUICulture` at render 
 - **The resource name is a `const`.** A static field initialised from `typeof(...).FullName` was
   read before it was set under the WebAssembly runtime, which initialises eagerly where the
   server's JIT had been lazy. The accessibility sweep caught it on `/render-modes`.
+
+### New controls (1.2.0)
+
+Each control takes the most native element that does the job. Script is added only where the
+platform has no declarative answer.
+
+- **`ZenSegmentedButton` is a radio group that looks like buttons.** It uses native radios inside
+  labels, in a `fieldset`. That gives one tab stop, arrow-key choice, form submission and the
+  right announcement with no script. The selected fill (`has-checked:`) and the focus ring
+  (`zen-focus-visible-within`, new) are drawn on the label from the radio's state.
+- **`ZenOtpInput` is one input, not one per digit.** SMS autofill fills a single
+  `autocomplete="one-time-code"` field, and a pasted code lands in one box. Split inputs break both,
+  and screen-reader and no-script use too. The boxes are `aria-hidden` copies laid under a
+  transparent input. The next box takes the text-field focus look through `peer-focus:`.
+  - A nested `@utility` selector (`.peer:focus ~ &`) was tried first. Tailwind flattened it to the
+    bare class, so every box looked focused all the time.
+  - A rejected character takes a second render after a yield. Blazor diffs against its last
+    render, not the DOM, so re-rendering an unchanged cleaned value would leave the character on
+    screen.
+- **`ZenAccordion` is `<details>`.** Sections open with no script, find-in-page opens a closed one,
+  and the native `name` attribute gives the one-open-at-a-time behaviour.
+  - Blazor writes `open` only when the parameter changes, so a user-opened section survives parent
+    renders. After each toggle, `zen-dom.js`'s new `isOpen` reads the real state back.
+  - Flipping a flag instead fails, because the browser also fires `toggle` when a section first
+    renders open.
+  - **Trade-off:** the APG puts the trigger inside a heading, but a `<summary>`'s children are
+    presentational, so no heading level is offered.
+- **`ZenTabs` is the APG tabs pattern**: roving tabindex, automatic activation by default, and the
+  arrow keys wrap and skip disabled tabs.
+  - Tabs register like `ZenStepper`'s steps and render inside `ZenDefer`. That logic is now
+    `ZenChildList<T>`, shared with `ZenBreadcrumb`.
+  - Under static rendering the unselected tabs are disabled, as `ZenSplitButton`'s chevron is.
+  - Routed tabs (`Href`) were considered and left out. A tab set whose tabs are links is a `nav`,
+    not a tablist, and would need its own markup.
+- **`ZenBreadcrumb`** folds the middle of a long trail only where its ellipsis button can be
+  answered, which means never under static rendering. Expanding it moves focus to the first level
+  it revealed, since the button has gone.
+- **`ZenAvatar`** always renders its initials under the picture, so a failed load needs no script
+  to recover.
+  - The derived colour uses FNV-1a, because `string.GetHashCode` is randomised per process and a
+    prerendered avatar would change colour on going interactive.
+  - `ZenAvatarGroup` takes `MoreCount` rather than counting its children. It cannot know which
+    of arbitrary child markup to hide.
+- **`ZenDivider`** with a label is not a `separator`, because a separator's children are
+  presentational and the label would never be read.
 
 ### `ZenModal` and `IZenModalService`
 
@@ -620,7 +682,7 @@ is knowable without fetching.
 | `zen-theme.js` | localStorage, `data-zen-theme`, `matchMedia` → broadcast to all .NET listeners | ✅ M0 |
 | `zen-popover.js` | Anchored positioning with flip/shift, click-outside, Escape | M3 |
 | `zen-focus.js` | Focus trap, `scrollIntoView` for active listbox/tree items, focus restore | ✅ M3 |
-| `zen-dom.js` | Properties with no attribute equivalent, and imperative one-shots: `indeterminate`, `focus`, `blur`, active-element containment, scrolling a grid row clear of a sticky header | ✅ M2, M7 |
+| `zen-dom.js` | Properties with no attribute equivalent, and imperative one-shots: `indeterminate`, a `<details>`'s `open`, `focus`, `blur`, active-element containment, scrolling a grid row clear of a sticky header | ✅ M2, M7, 1.2.0 |
 
 Currency formatting, debouncing and textarea auto-grow are handled in C#/CSS — no JS.
 

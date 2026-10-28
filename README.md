@@ -10,7 +10,9 @@ custom properties, with first-class light and dark palettes.
 > and verified from a feed by both a Blazor Web App and a standalone WebAssembly app, the
 > accessibility sweep is clean, and the public API follows Semantic Versioning from here on.
 > `1.1.0` adds localization (en-US, es-ES, es-DO), `ZenSplitButton`, `ZenMessage` and table group
-> footers.
+> footers. `1.2.0` adds `ZenTabs`, `ZenAccordion`, `ZenBreadcrumb`, `ZenAvatar`,
+> `ZenSegmentedButton`, `ZenOtpInput`, `ZenDivider`, and `ZenKeyLookup` for binding a lookup to a
+> `Guid`.
 
 ## Why another Blazor component library
 
@@ -222,6 +224,7 @@ a palette fix is one edit rather than a guess-and-rerun loop:
 | **rc.1.5** ✅ | `ZenColumn.Interactive`, `AutoFocus` / `FocusAsync` on form controls, nav `IconSize`, and a collapsible icon-only `ZenSideNav` rail |
 | **1.0.0** ✅ | `rc.1.5` promoted to stable, unchanged |
 | **1.1.0** ✅ | Localization (en-US, es-ES, es-DO); `ZenSplitButton` + `ZenMenuItem`; `ZenMessage`; table group footers, spanning and per-column; fix: end- and centre-aligned column headers |
+| **1.2.0** | `ZenTabs` + `ZenTab`, `ZenAccordion` + `ZenAccordionItem`, `ZenBreadcrumb` + `ZenBreadcrumbItem`, `ZenAvatar` + `ZenAvatarGroup`, `ZenSegmentedButton` + `ZenSegment`, `ZenOtpInput`, `ZenDivider`; fix: `ZenKeyLookup` binds a lookup to a `Guid` or other key |
 
 ## Documentation
 
