@@ -3,7 +3,7 @@
 A TailwindCSS component library for Blazor. Render-mode agnostic, themed entirely through CSS
 custom properties, with first-class light and dark palettes.
 
-> **Status: `1.1.0`, stable.** Every component in the plan ships: tokens and theming, primitives,
+> **Status: `1.2.0`, stable.** Every component in the plan ships: tokens and theming, primitives,
 > the full form control set, the overlay family (modal + toast services, popover, combobox, list),
 > the data components (table, tree, timeline) and the application shell. M7 adds a table that reads
 > from a server, virtualizes and groups, a lookup whose popup is that table, and a wizard stepper. The package is consumed
@@ -224,7 +224,7 @@ a palette fix is one edit rather than a guess-and-rerun loop:
 | **rc.1.5** ✅ | `ZenColumn.Interactive`, `AutoFocus` / `FocusAsync` on form controls, nav `IconSize`, and a collapsible icon-only `ZenSideNav` rail |
 | **1.0.0** ✅ | `rc.1.5` promoted to stable, unchanged |
 | **1.1.0** ✅ | Localization (en-US, es-ES, es-DO); `ZenSplitButton` + `ZenMenuItem`; `ZenMessage`; table group footers, spanning and per-column; fix: end- and centre-aligned column headers |
-| **1.2.0** | `ZenTabs` + `ZenTab`, `ZenAccordion` + `ZenAccordionItem`, `ZenBreadcrumb` + `ZenBreadcrumbItem`, `ZenAvatar` + `ZenAvatarGroup`, `ZenSegmentedButton` + `ZenSegment`, `ZenOtpInput`, `ZenDivider`; fix: `ZenKeyLookup` binds a lookup to a `Guid` or other key |
+| **1.2.0** ✅ | `ZenTabs` + `ZenTab`, `ZenAccordion` + `ZenAccordionItem`, `ZenBreadcrumb` + `ZenBreadcrumbItem`, `ZenAvatar` + `ZenAvatarGroup`, `ZenSegmentedButton` + `ZenSegment`, `ZenOtpInput`, `ZenDivider`; fix: `ZenKeyLookup` binds a lookup to a `Guid` or other key |
 
 ## Documentation
 
